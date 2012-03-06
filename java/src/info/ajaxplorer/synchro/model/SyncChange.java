@@ -38,7 +38,11 @@ public class SyncChange {
 			SyncChange s = new SyncChange();
 			SyncChangeValue v = new SyncChangeValue((Integer)ob[0], (Node)ob[1], (Integer)ob[2]);
 			s.setKey(entry.getKey());
-			s.setChangeValue(v);
+			try{
+				s.setChangeValue(v);				
+			}catch(Exception e){
+				continue;
+			}
 			s.setJobId(jobId);
 			changes.add(s);
 		}

@@ -89,7 +89,7 @@ public class SyncJob implements org.quartz.Job {
 	
 	public void run()  throws URISyntaxException, Exception{
 		
-        Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Passed node id is " + currentJobNodeID);
+		Manager.getInstance().updateSynchroState(true);
 		
 		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);		
 		Server s = new Server(currentRepository.getParent());
@@ -98,6 +98,8 @@ public class SyncJob implements org.quartz.Job {
 		AjxpAPI.getInstance().setServer(s);		
 		
 		final File d = new File(currentRepository.getPropertyValue("target_folder"));
+
+        Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
 
     	Dao<SyncChange,String> syncDao = Manager.getInstance().getSyncChangeDao();
     	List<SyncChange> previouslyRemaining = syncDao.queryForEq("jobId", "unique-job");
@@ -109,6 +111,7 @@ public class SyncJob implements org.quartz.Job {
 			syncDao.delete(previouslyRemaining);
 		}
 		
+		//List<Node> emptySnapshot = new ArrayList<Node>();
 		List<Node> localSnapshot = new ArrayList<Node>();
 		List<Node> remoteSnapshot = new ArrayList<Node>();
 		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, d);
@@ -135,6 +138,7 @@ public class SyncJob implements org.quartz.Job {
         takeLocalSnapshot(localRootNode, d, null, true);
         takeRemoteSnapshot(remoteRootNode, null, true);
 		
+        Manager.getInstance().updateSynchroState(false);
 	}
 	
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, File localFolder) throws Exception{
@@ -147,90 +151,90 @@ public class SyncJob implements org.quartz.Job {
 			Object[] value = entry.getValue().clone();
 			Integer v = (Integer)value[0];
 			Node n = (Node)value[1];
-			if(v == TASK_LOCAL_GET_CONTENT){
+			try{
 				
-				Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
-				node.setPath(k);
-				File targetFile = new File(localFolder, k);
-				this.logChange("Downloading file from server", k);
-				this.synchronousDL(node, targetFile);
-				if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
-					value[2] = STATUS_ERROR;
-					notApplied.put(k, value);
-				}
-				
-			}else if(v == TASK_LOCAL_MKDIR){
-				
-				File f = new File(localFolder, k);
-				if(!f.exists()) {
-					this.logChange("Creating local folder", k);
-					boolean res = f.mkdirs();
-					if(!res){
-						value[2] = STATUS_ERROR;
-						notApplied.put(k, value);
+				if(v == TASK_LOCAL_GET_CONTENT){
+					
+					Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
+					node.setPath(k);
+					File targetFile = new File(localFolder, k);
+					this.logChange("Downloading file from server", k);
+					this.synchronousDL(node, targetFile);
+					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
+						throw new Exception("Error while downloading file from server");
 					}
-				}
-				
-			}else if(v == TASK_LOCAL_REMOVE){
-				
-				this.logChange("Remove local resource", k);
-				File f = new File(localFolder, k);
-				if(f.exists()){
-					boolean res = f.delete();
-					if(!res){
-						value[2] = STATUS_ERROR;
-						notApplied.put(k, value);
+					
+				}else if(v == TASK_LOCAL_MKDIR){
+					
+					File f = new File(localFolder, k);
+					if(!f.exists()) {
+						this.logChange("Creating local folder", k);
+						boolean res = f.mkdirs();
+						if(!res){
+							throw new Exception("Error while creating local folder");
+						}
 					}
-				}
-				
-			}else if(v == TASK_REMOTE_MKDIR){
-				
-				this.logChange("Creating remote folder", k);
-				Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
-				int lastSlash = k.lastIndexOf("/");
-				currentDirectory.setPath(k.substring(0, lastSlash));
-				RestStateHolder.getInstance().setDirectory(currentDirectory);
-				rest.getStatusCodeForRequest(AjxpAPI.getInstance().getMkdirUri(k.substring(lastSlash+1)));
-				JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
-				if(!object.has("mtime")){
-					value[2] = STATUS_ERROR;
+					
+				}else if(v == TASK_LOCAL_REMOVE){
+					
+					this.logChange("Remove local resource", k);
+					File f = new File(localFolder, k);
+					if(f.exists()){
+						boolean res = f.delete();
+						if(!res){
+							throw new Exception("Error while removing local resource");
+						}
+					}
+					
+				}else if(v == TASK_REMOTE_MKDIR){
+					
+					this.logChange("Creating remote folder", k);
+					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
+					int lastSlash = k.lastIndexOf("/");
+					currentDirectory.setPath(k.substring(0, lastSlash));
+					RestStateHolder.getInstance().setDirectory(currentDirectory);
+					rest.getStatusCodeForRequest(AjxpAPI.getInstance().getMkdirUri(k.substring(lastSlash+1)));
+					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
+					if(!object.has("mtime")){
+						throw new Exception("Could not create remote folder");
+					}
+					
+				}else if(v == TASK_REMOTE_PUT_CONTENT){
+	
+					this.logChange("Uploading file to server", k);
+					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
+					int lastSlash = k.lastIndexOf("/");
+					currentDirectory.setPath(k.substring(0, lastSlash));
+					RestStateHolder.getInstance().setDirectory(currentDirectory);
+					this.synchronousUP(currentDirectory, new File(localFolder, k));
+					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
+					if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
+						throw new Exception("Could not upload file to the server");
+					}
+					
+				}else if(v == TASK_REMOTE_REMOVE){
+					
+					this.logChange("Delete remote resource", k);
+					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
+					int lastSlash = k.lastIndexOf("/");
+					currentDirectory.setPath(k.substring(0, lastSlash));
+					RestStateHolder.getInstance().setDirectory(currentDirectory);
+					rest.getStatusCodeForRequest(AjxpAPI.getInstance().getDeleteUri(k));
+					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
+					if(object.has("mtime")){ // Still exists, should be empty!
+						throw new Exception("Could not remove the resource from the server");
+					}
+					
+				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
+					
+					this.logChange("Conflict detected on this resource!", k);
 					notApplied.put(k, value);
-				}
-				
-			}else if(v == TASK_REMOTE_PUT_CONTENT){
-
-				this.logChange("Uploading file to server", k);
-				Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
-				int lastSlash = k.lastIndexOf("/");
-				currentDirectory.setPath(k.substring(0, lastSlash));
-				RestStateHolder.getInstance().setDirectory(currentDirectory);
-				this.synchronousUP(currentDirectory, new File(localFolder, k));
-				JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
-				if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
-					value[2] = STATUS_ERROR;
-					notApplied.put(k, value);
-				}
-				
-			}else if(v == TASK_REMOTE_REMOVE){
-				
-				this.logChange("Delete remote resource", k);
-				Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
-				int lastSlash = k.lastIndexOf("/");
-				currentDirectory.setPath(k.substring(0, lastSlash));
-				RestStateHolder.getInstance().setDirectory(currentDirectory);
-				rest.getStatusCodeForRequest(AjxpAPI.getInstance().getDeleteUri(k));
-				JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
-				if(object.has("mtime")){ // Still exists, should be empty!
-					value[2] = STATUS_ERROR;
-					notApplied.put(k, value);
-				}
-				
-			}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
-				
-				this.logChange("Conflict detected on this resource!", k);
+					
+				}			
+			}catch(Exception e){
+				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
-				
-			}			
+			}				
 		}
 		return notApplied;
 	}

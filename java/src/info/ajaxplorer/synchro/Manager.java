@@ -16,10 +16,17 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.JobDetail;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.JobKey;
+import org.quartz.JobListener;
+import org.quartz.Matcher;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.matchers.EverythingMatcher;
+import org.quartz.impl.matchers.KeyMatcher;
 
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
@@ -113,8 +120,22 @@ public class Manager {
 		});
 	}
 	
+	public void updateSynchroState(final boolean running){
+		if(this.sysTray == null) {
+			return;
+		}
+		this.sysTray.getDisplay().asyncExec(new Runnable() {			
+			public void run() {
+				if(!sysTray.isDisposed()){
+					sysTray.setMenuTriggerRunning(running);
+				}
+			}
+		});
+	}
+	
 	public Manager(Shell shell, Locale locale){
-		messages = ResourceBundle.getBundle("info/ajaxplorer/synchro/resources/MessagesBundle", locale);
+		//messages = ResourceBundle.getBundle("info/ajaxplorer/synchro/resources/MessagesBundle", locale);
+		messages = ResourceBundle.getBundle("info/ajaxplorer/synchro/resources/MessagesBundle");
 		sysTray = new SysTray(shell, messages);
 		try {
 			initializeDAO();
@@ -161,6 +182,12 @@ public class Manager {
 			node.addProperty("repository_id", data.get("REPOSITORY_ID"));
 			node.addProperty("target_folder", data.get("TARGET"));
 			nodeDao.update(node);
+			try {
+				this.scheduleJob();
+			} catch (SchedulerException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}else{
 			s = new Server(node.getParent());
 			s.setUrl(data.get("HOST"));
@@ -197,19 +224,34 @@ public class Manager {
 		
         JobDetail job = newJob(SyncJob.class)
         		.withIdentity("syncJob", "ajxp")
+        		.usingJobData("node-id", String.valueOf(baseNodeId))
         		.build();
         
 
         Trigger trigger = newTrigger()
         		.withIdentity("syncTrigger", "ajxp")
-        		.startNow()
-        		.usingJobData("node-id", String.valueOf(baseNodeId))
+        		.startNow()        		
         		.withSchedule(simpleSchedule()
-        				.withIntervalInSeconds(60)
-        				.repeatForever())            
-        				.build();
+    				.withIntervalInSeconds(60)
+    				.repeatForever())
+        		.build();
 
-        scheduler.scheduleJob(job, trigger);		        
+        scheduler.scheduleJob(job, trigger);		   
+
+	}
+	
+	public void triggerJobNow() throws SchedulerException{
+		
+		JobKey jK = new JobKey("syncJob", "ajxp");
+		JobDetail job = scheduler.getJobDetail(jK);
+		if(job != null){
+	        Trigger trigger = newTrigger()
+	        		.withIdentity("oneTimeTrigger", "ajxp")
+	        		.forJob(jK)
+	        		.startNow().build();
+	        scheduler.scheduleJob(trigger);
+		}
+		
 	}
 
 }
