@@ -13,6 +13,7 @@ import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.gui.SysTray;
 import info.ajaxplorer.synchro.model.SyncChange;
 
+import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.JobDetail;
@@ -24,6 +25,7 @@ import org.quartz.Matcher;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
+import org.quartz.TriggerKey;
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.EverythingMatcher;
 import org.quartz.impl.matchers.KeyMatcher;
@@ -68,7 +70,7 @@ public class Manager {
         Locale currentLocale = new Locale(language, country);
 		
 		Display display = new Display();
-		Shell shell = new Shell(display);
+		Shell shell = new Shell(display, SWT.ON_TOP | SWT.TITLE | SWT.MIN );
 		Manager.instanciate(shell, currentLocale);
 		
 		try {
@@ -238,6 +240,8 @@ public class Manager {
 
         scheduler.scheduleJob(job, trigger);		   
 
+        //scheduler.unscheduleJob(new TriggerKey("syncTrigger", "ajxp"));
+        
 	}
 	
 	public void triggerJobNow() throws SchedulerException{

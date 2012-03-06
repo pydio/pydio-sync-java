@@ -69,7 +69,7 @@ public class SysTray {
 			System.out.println ("The system tray is not available");
 			item = null;			
 		} else {			
-			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("info/ajaxplorer/synchro/resources/AjxpLogo16-Bi.png"));
+			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("info/ajaxplorer/synchro/resources/images/AjxpLogo16-Bi.png"));
 		    //tip.setMessage("Here is a message for the user. When the message is too long it wraps. I should say something cool but nothing comes to my mind.");
 
 			item = new TrayItem (tray, SWT.NONE);
@@ -138,7 +138,7 @@ public class SysTray {
 			
 			item.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
-					menu.setVisible (true);
+					//menu.setVisible (true);
 				}
 			});
 			
@@ -166,8 +166,8 @@ public class SysTray {
 			shellInitialized = true;
 		}
 		shell.setVisible(true);
-		shell.setMinimized(true);
-		shell.setMinimized(false);		
+		//shell.setMinimized(true);
+		//shell.setMinimized(false);		
 	}
 	
 }
