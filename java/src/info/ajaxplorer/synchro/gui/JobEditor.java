@@ -210,6 +210,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		if(tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") ){
 			return;
 		}
+		comboRepository.setText("Loading ...");
 		String host = tfHost.getText();
 		String login = tfLogin.getText();
 		String pass = tfPassword.getText();
@@ -247,8 +248,8 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 					}
 				}
 			}
-			
-			comboRepository.setEnabled(true);
+
+			comboRepository.setText("");
 			comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
 			
 		} catch (URISyntaxException e) {
@@ -370,7 +371,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							comboRepository.setLayoutData(comboRepositoryLData);
 							comboRepository.setToolTipText("Click on the load button to get the repositories list from the server");
 							comboRepository.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-							comboRepository.setEditable(false);
 							comboRepository.setEnabled(false);
 						}
 						{
@@ -476,7 +476,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							tfTargetLData.right =  new FormAttachment(1000, 1000, -126);
 							tfTarget = new Text(composite1, SWT.BORDER);
 							tfTarget.setLayoutData(tfTargetLData);
-							tfTarget.setEditable(false);
 							tfTarget.setToolTipText("Choose a local folder for synchronization");
 							tfTarget.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
 						}
@@ -514,13 +513,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
 							saveButton.setText("Delete");
 							saveButton.setEnabled(false);
-							saveButton.addListener(SWT.PUSH, new Listener() {
-								
-								@Override
-								public void handleEvent(Event arg0) {
-									saveConfig();						
-								}
-							});
 						}
 						{
 							button1 = new Button(composite1, SWT.PUSH | SWT.LEFT);
@@ -533,6 +525,13 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							button1.setLayoutData(button1LData);
 							button1.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
 							button1.setBackground(SWTResourceManager.getColor(255,255,255));
+							button1.addListener(SWT.Selection, new Listener() {
+								
+								@Override
+								public void handleEvent(Event arg0) {
+									saveConfig();						
+								}
+							});
 						}
 						{
 							label1 = new Label(composite1, SWT.NONE);
