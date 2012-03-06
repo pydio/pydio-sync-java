@@ -70,7 +70,9 @@ public class Manager {
         Locale currentLocale = new Locale(language, country);
 		
 		Display display = new Display();
-		Shell shell = new Shell(display, SWT.ON_TOP | SWT.TITLE | SWT.MIN );
+		Display.setAppName("AjaXplorer Synchronizer");
+		Display.setAppVersion("1.0");
+		Shell shell = new Shell(display, SWT.ON_TOP | SWT.TITLE | SWT.MIN | SWT.CLOSE );
 		Manager.instanciate(shell, currentLocale);
 		
 		try {

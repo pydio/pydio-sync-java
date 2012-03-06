@@ -81,8 +81,8 @@ public class SWTResourceManager {
 	}
 	
 	public static Font getFont(String name, int size, int style, boolean strikeout, boolean underline) {
-		if(name.equals("Arial") && SWTResourceManager.isMac() && size == 9){
-			size = 12;
+		if(name.equals("Arial") && SWTResourceManager.isMac()){
+			size +=2;
 		}
 		String fontName = name + "|" + size + "|" + style + "|" + strikeout + "|" + underline;
 		if (resources.containsKey(fontName))

@@ -33,12 +33,16 @@ import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.CCombo;
 import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
@@ -78,6 +82,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 	private Text tfPassword;
 	private Label labelPass;
 	private Button radioDirection2;
+	private Label label1;
+	private CLabel cLabel1;
+	private CCombo cCombo1;
 	private Label localLabel;
 	private Label remoteTitle;
 	private Group group2;
@@ -86,7 +93,8 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 	private Button saveButton;
 	private Button buttonLoadRepositories;
 	private Button radioSyncInterval2;
-	private Combo comboRepository;
+	private Button button1;
+	private CCombo comboRepository;
 	private Label labelRepository;
 	private Button radioSyncInterval3;
 	private Button radioSyncInterval1;
@@ -258,17 +266,39 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		try {
 			FormLayout thisLayout = new FormLayout();
 			this.setLayout(thisLayout);
-			this.setSize(401, 325);
+			this.setSize(411, 437);
 			this.setBackground(SWTResourceManager.getColor(94, 124, 144));
 			this.setBackgroundMode(1);
 			{
+				cLabel1 = new CLabel(this, SWT.NONE);
+				FormData cLabel1LData = new FormData();
+				cLabel1LData.left =  new FormAttachment(0, 1000, 11);
+				cLabel1LData.top =  new FormAttachment(0, 1000, 32);
+				cLabel1LData.width = 381;
+				cLabel1LData.height = 19;
+				cLabel1.setLayoutData(cLabel1LData);
+				cLabel1.setText("Select a synchronisation job to edit");
+				cLabel1.setForeground(SWTResourceManager.getColor(255, 255, 255));
+			}
+			{
+				cCombo1 = new CCombo(this, SWT.NONE);
+				FormData cCombo1LData = new FormData();
+				cCombo1LData.left =  new FormAttachment(0, 1000, 12);
+				cCombo1LData.top =  new FormAttachment(0, 1000, 56);
+				cCombo1LData.width = 387;
+				cCombo1LData.height = 16;
+				cCombo1.setLayoutData(cCombo1LData);
+				cCombo1.setText("Default Synchronisation Job");
+				cCombo1.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
+			}
+			{
 				Title = new Label(this, SWT.NONE);
 				FormData TitleLData = new FormData();
-				TitleLData.left =  new FormAttachment(0, 1000, 18);
-				TitleLData.top =  new FormAttachment(0, 1000, 20);
-				TitleLData.width = 320;
+				TitleLData.left =  new FormAttachment(0, 1000, 13);
+				TitleLData.top =  new FormAttachment(0, 1000, 9);
+				TitleLData.width = 292;
 				TitleLData.height = 26;
-				TitleLData.right =  new FormAttachment(1000, 1000, -63);
+				TitleLData.right =  new FormAttachment(1000, 1000, -106);
 				Title.setLayoutData(TitleLData);
 				Title.setText("AjaXplorer Synchronizer");
 				Title.setForeground(SWTResourceManager.getColor(255, 255, 255));
@@ -290,12 +320,12 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							localLabel = new Label(composite1, SWT.NONE);
 							FormData localLabelLData = new FormData();
 							localLabelLData.left =  new FormAttachment(0, 1000, 12);
-							localLabelLData.top =  new FormAttachment(0, 1000, 174);
-							localLabelLData.width = 349;
+							localLabelLData.top =  new FormAttachment(0, 1000, 204);
+							localLabelLData.width = 383;
 							localLabelLData.right =  new FormAttachment(1000, 1000, -12);
 							localLabelLData.height = 22;
 							localLabel.setLayoutData(localLabelLData);
-							localLabel.setText("Local folder");
+							localLabel.setText("3. Choose a local folder");
 							localLabel.setFont(SWTResourceManager.getFont("Arial", 12, 1, false, false));
 							localLabel.setForeground(SWTResourceManager.getColor(94, 124, 144));
 						}
@@ -303,25 +333,25 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							remoteTitle = new Label(composite1, SWT.NONE);
 							FormData remoteTitleLData = new FormData();
 							remoteTitleLData.left =  new FormAttachment(0, 1000, 12);
-							remoteTitleLData.top =  new FormAttachment(0, 1000, 10);
-							remoteTitleLData.width = 349;
+							remoteTitleLData.top =  new FormAttachment(0, 1000, 18);
+							remoteTitleLData.width = 383;
 							remoteTitleLData.right =  new FormAttachment(1000, 1000, -12);
 							remoteTitleLData.height = 22;
 							remoteTitle.setLayoutData(remoteTitleLData);
-							remoteTitle.setText("Remote Server");
+							remoteTitle.setText("1. Set up remote connexion");
 							remoteTitle.setFont(SWTResourceManager.getFont("Arial", 12, 1, false, false));
 							remoteTitle.setForeground(SWTResourceManager.getColor(94, 124, 144));
 						}
 						{
 							buttonLoadRepositories = new Button(composite1, SWT.PUSH | SWT.CENTER);
-							FormData buttonLoadRepositoriesLData = new FormData(36, 24);
-							buttonLoadRepositoriesLData.top =  new FormAttachment(0, 1000, 138);
-							buttonLoadRepositoriesLData.width = 36;
-							buttonLoadRepositoriesLData.height = 24;
-							buttonLoadRepositoriesLData.left =  new FormAttachment(0, 1000, 298);
+							FormData buttonLoadRepositoriesLData = new FormData();
+							buttonLoadRepositoriesLData.top =  new FormAttachment(0, 1000, 150);
+							buttonLoadRepositoriesLData.width = 98;
+							buttonLoadRepositoriesLData.height = 28;
+							buttonLoadRepositoriesLData.right =  new FormAttachment(1000, 1000, -22);
 							buttonLoadRepositories.setLayoutData(buttonLoadRepositoriesLData);
 							buttonLoadRepositories.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/reload.png"));
-							buttonLoadRepositories.setSize(36, 24);
+							buttonLoadRepositories.setText("Load");
 							buttonLoadRepositories.addListener(SWT.Selection, new Listener() {
 								@Override
 								public void handleEvent(Event arg0) {
@@ -332,22 +362,23 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							FormData comboRepositoryLData = new FormData();
 							comboRepositoryLData.left =  new FormAttachment(0, 1000, 111);
-							comboRepositoryLData.top =  new FormAttachment(0, 1000, 139);
-							comboRepositoryLData.width = 147;
-							comboRepositoryLData.height = 23;
-							comboRepositoryLData.right =  new FormAttachment(1000, 1000, -87);
-							comboRepository = new Combo(composite1, SWT.NONE);
+							comboRepositoryLData.top =  new FormAttachment(0, 1000, 154);
+							comboRepositoryLData.width = 166;
+							comboRepositoryLData.height = 18;
+							comboRepositoryLData.right =  new FormAttachment(1000, 1000, -126);
+							comboRepository = new CCombo(composite1, SWT.BORDER);
 							comboRepository.setLayoutData(comboRepositoryLData);
 							comboRepository.setToolTipText("Click on the load button to get the repositories list from the server");
 							comboRepository.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
+							comboRepository.setEditable(false);
 							comboRepository.setEnabled(false);
 						}
 						{
 							labelRepository = new Label(composite1, SWT.NONE);
 							FormData labelRepositoryLData = new FormData();
-							labelRepositoryLData.left =  new FormAttachment(0, 1000, 30);
-							labelRepositoryLData.top =  new FormAttachment(0, 1000, 142);
-							labelRepositoryLData.width = 69;
+							labelRepositoryLData.left =  new FormAttachment(0, 1000, 12);
+							labelRepositoryLData.top =  new FormAttachment(0, 1000, 155);
+							labelRepositoryLData.width = 90;
 							labelRepositoryLData.height = 19;
 							labelRepository.setLayoutData(labelRepositoryLData);
 							labelRepository.setText("Repository");
@@ -357,9 +388,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							hostLabel = new Label(composite1, SWT.NONE);
 							FormData hostLabelLData = new FormData();
-							hostLabelLData.left =  new FormAttachment(0, 1000, 30);
-							hostLabelLData.top =  new FormAttachment(0, 1000, 41);
-							hostLabelLData.width = 69;
+							hostLabelLData.left =  new FormAttachment(0, 1000, 12);
+							hostLabelLData.top =  new FormAttachment(0, 1000, 51);
+							hostLabelLData.width = 90;
 							hostLabelLData.height = 19;
 							hostLabel.setLayoutData(hostLabelLData);
 							hostLabel.setText("Host URL");
@@ -369,8 +400,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							FormData hostTextLData = new FormData();
 							hostTextLData.left =  new FormAttachment(0, 1000, 111);
-							hostTextLData.top =  new FormAttachment(0, 1000, 40);
-							hostTextLData.width = 211;
+							hostTextLData.top =  new FormAttachment(0, 1000, 50);
+							hostTextLData.width = 262;
+							hostTextLData.height = 15;
 							tfHost = new Text(composite1, SWT.BORDER);
 							tfHost.setLayoutData(hostTextLData);
 							tfHost.setOrientation(SWT.HORIZONTAL);
@@ -380,9 +412,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							labelLogin = new Label(composite1, SWT.NONE);
 							FormData labelLoginLData = new FormData();
-							labelLoginLData.left =  new FormAttachment(0, 1000, 30);
-							labelLoginLData.top =  new FormAttachment(0, 1000, 73);
-							labelLoginLData.width = 69;
+							labelLoginLData.left =  new FormAttachment(0, 1000, 12);
+							labelLoginLData.top =  new FormAttachment(0, 1000, 78);
+							labelLoginLData.width = 90;
 							labelLoginLData.height = 19;
 							labelLogin.setLayoutData(labelLoginLData);
 							labelLogin.setText("Login");
@@ -392,8 +424,8 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							FormData tfLoginLData = new FormData();
 							tfLoginLData.left =  new FormAttachment(0, 1000, 111);
-							tfLoginLData.top =  new FormAttachment(0, 1000, 72);
-							tfLoginLData.width = 211;
+							tfLoginLData.top =  new FormAttachment(0, 1000, 77);
+							tfLoginLData.width = 76;
 							tfLoginLData.height = 15;
 							tfLogin = new Text(composite1, SWT.BORDER);
 							tfLogin.setLayoutData(tfLoginLData);
@@ -403,9 +435,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							labelPass = new Label(composite1, SWT.NONE);
 							FormData labelPassLData = new FormData();
-							labelPassLData.left =  new FormAttachment(0, 1000, 30);
-							labelPassLData.top =  new FormAttachment(0, 1000, 106);
-							labelPassLData.width = 69;
+							labelPassLData.left =  new FormAttachment(0, 1000, 205);
+							labelPassLData.top =  new FormAttachment(0, 1000, 79);
+							labelPassLData.width = 84;
 							labelPassLData.height = 19;
 							labelPass.setLayoutData(labelPassLData);
 							labelPass.setText("Password");
@@ -414,9 +446,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						}
 						{
 							FormData tfPasswordLData = new FormData();
-							tfPasswordLData.left =  new FormAttachment(0, 1000, 111);
-							tfPasswordLData.top =  new FormAttachment(0, 1000, 105);
-							tfPasswordLData.width = 211;
+							tfPasswordLData.left =  new FormAttachment(0, 1000, 297);
+							tfPasswordLData.top =  new FormAttachment(0, 1000, 77);
+							tfPasswordLData.width = 76;
 							tfPasswordLData.height = 15;
 							tfPassword = new Text(composite1, SWT.BORDER|SWT.PASSWORD);
 							tfPassword.setLayoutData(tfPasswordLData);
@@ -426,9 +458,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							labelTarget = new Label(composite1, SWT.NONE);
 							FormData labelTargetLData = new FormData();
-							labelTargetLData.left =  new FormAttachment(0, 1000, 30);
-							labelTargetLData.top =  new FormAttachment(0, 1000, 202);
-							labelTargetLData.width = 69;
+							labelTargetLData.left =  new FormAttachment(0, 1000, 12);
+							labelTargetLData.top =  new FormAttachment(0, 1000, 234);
+							labelTargetLData.width = 90;
 							labelTargetLData.height = 19;
 							labelTarget.setLayoutData(labelTargetLData);
 							labelTarget.setText("Target Folder");
@@ -438,10 +470,10 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							FormData tfTargetLData = new FormData();
 							tfTargetLData.left =  new FormAttachment(0, 1000, 111);
-							tfTargetLData.top =  new FormAttachment(0, 1000, 200);
-							tfTargetLData.width = 163;
+							tfTargetLData.top =  new FormAttachment(0, 1000, 233);
+							tfTargetLData.width = 158;
 							tfTargetLData.height = 15;
-							tfTargetLData.right =  new FormAttachment(1000, 1000, -87);
+							tfTargetLData.right =  new FormAttachment(1000, 1000, -126);
 							tfTarget = new Text(composite1, SWT.BORDER);
 							tfTarget.setLayoutData(tfTargetLData);
 							tfTarget.setEditable(false);
@@ -451,12 +483,13 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 						{
 							buttonFileChooser = new Button(composite1, SWT.PUSH | SWT.CENTER);
 							FormData buttonFileChooserLData = new FormData();
-							buttonFileChooserLData.top =  new FormAttachment(0, 1000, 198);
-							buttonFileChooserLData.width = 36;
-							buttonFileChooserLData.height = 24;
-							buttonFileChooserLData.left =  new FormAttachment(0, 1000, 298);
+							buttonFileChooserLData.top =  new FormAttachment(0, 1000, 229);
+							buttonFileChooserLData.width = 98;
+							buttonFileChooserLData.height = 28;
+							buttonFileChooserLData.right =  new FormAttachment(1000, 1000, -22);
 							buttonFileChooser.setLayoutData(buttonFileChooserLData);
 							buttonFileChooser.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/view_tree.png"));
+							buttonFileChooser.setText("Browse");
 							buttonFileChooser.addListener(SWT.Selection, new Listener() {
 								
 								@Override
@@ -468,6 +501,50 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 									}
 								}
 							});
+						}
+						{
+							saveButton = new Button(composite1, SWT.PUSH | SWT.LEFT);
+							FormData saveButtonLData = new FormData();
+							saveButtonLData.width = 92;
+							saveButtonLData.height = 28;
+							saveButtonLData.right =  new FormAttachment(1000, 1000, -107);
+							saveButtonLData.top =  new FormAttachment(0, 1000, 291);
+							saveButton.setLayoutData(saveButtonLData);
+							saveButton.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/editdelete.png"));
+							saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
+							saveButton.setText("Delete");
+							saveButton.setEnabled(false);
+							saveButton.addListener(SWT.PUSH, new Listener() {
+								
+								@Override
+								public void handleEvent(Event arg0) {
+									saveConfig();						
+								}
+							});
+						}
+						{
+							button1 = new Button(composite1, SWT.PUSH | SWT.LEFT);
+							button1.setText("Save");
+							FormData button1LData = new FormData();
+							button1LData.width = 91;
+							button1LData.height = 28;
+							button1LData.right =  new FormAttachment(1000, 1000, -201);
+							button1LData.top =  new FormAttachment(0, 1000, 291);
+							button1.setLayoutData(button1LData);
+							button1.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
+							button1.setBackground(SWTResourceManager.getColor(255,255,255));
+						}
+						{
+							label1 = new Label(composite1, SWT.NONE);
+							FormData label1LData = new FormData();
+							label1LData.left =  new FormAttachment(0, 1000, 12);
+							label1LData.top =  new FormAttachment(0, 1000, 125);
+							label1LData.width = 383;
+							label1LData.height = 22;
+							label1.setLayoutData(label1LData);
+							label1.setText("2. Load and select a repository");
+							label1.setFont(SWTResourceManager.getFont("Arial",12,1,false,false));
+							label1.setForeground(SWTResourceManager.getColor(94,124,144));
 						}
 					}
 
@@ -487,12 +564,12 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							group2Layout.makeColumnsEqualWidth = true;
 							group2.setLayout(group2Layout);
 							FormData group2LData = new FormData();
-							group2LData.width = 346;
+							group2LData.width = 377;
 							group2LData.left =  new FormAttachment(0, 1000, 12);
 							group2LData.top =  new FormAttachment(0, 1000, 134);
 							group2LData.height = 75;
 							group2.setLayoutData(group2LData);
-							group2.setText("Run every...");
+							group2.setText("Run this job every...");
 							group2.setBackground(SWTResourceManager.getColor(255, 255, 255));
 							{
 								radioSyncInterval1 = new Button(group2, SWT.RADIO | SWT.LEFT);
@@ -529,7 +606,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							group1Layout.makeColumnsEqualWidth = true;
 							group1.setLayout(group1Layout);
 							FormData group1LData = new FormData();
-							group1LData.width = 346;
+							group1LData.width = 377;
 							group1LData.left =  new FormAttachment(0, 1000, 12);
 							group1LData.top =  new FormAttachment(0, 1000, 34);
 							group1LData.height = 71;
@@ -580,37 +657,17 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 					}
 				}
 				FormData cTabFolderLData = new FormData();
-				cTabFolderLData.left =  new FormAttachment(0, 1000, 12);
-				cTabFolderLData.top =  new FormAttachment(0, 1000, 57);
-				cTabFolderLData.width = 373;
-				cTabFolderLData.height = 234;
-				cTabFolderLData.right =  new FormAttachment(1000, 1000, -12);
-				cTabFolderLData.bottom =  new FormAttachment(1000, 1000, -12);
+				cTabFolderLData.left =  new FormAttachment(0, 1000, 0);
+				cTabFolderLData.top =  new FormAttachment(0, 1000, 85);
+				cTabFolderLData.width = 407;
+				cTabFolderLData.height = 330;
+				cTabFolderLData.right =  new FormAttachment(1000, 1000, 0);
+				cTabFolderLData.bottom =  new FormAttachment(1000, 1000, 0);
 				cTabFolder.setLayoutData(cTabFolderLData);
 				cTabFolder.setSelection(0);
 				cTabFolder.setBackground(SWTResourceManager.getColor(255, 255, 255));
 				cTabFolder.setSimple(false);
-			}
-			{
-				saveButton = new Button(this, SWT.PUSH | SWT.CENTER);
-				FormData saveButtonLData = new FormData();
-				saveButtonLData.left =  new FormAttachment(0, 1000, 350);
-				saveButtonLData.top =  new FormAttachment(0, 1000, 17);
-				saveButtonLData.right =  new FormAttachment(1000, 1000, -17);
-				saveButtonLData.bottom =  new FormAttachment(1000, 1000, -274);
-				saveButtonLData.width = 34;
-				saveButtonLData.height = 34;
-				saveButton.setLayoutData(saveButtonLData);
-				saveButton.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
-				saveButton.setAlignment(SWT.CENTER);
-				saveButton.setBackground(SWTResourceManager.getColor(255, 255, 255));
-				saveButton.addListener(SWT.PUSH, new Listener() {
-					
-					@Override
-					public void handleEvent(Event arg0) {
-						saveConfig();						
-					}
-				});
+				cTabFolder.setVisible(true);
 			}
 			this.layout();
 		} catch (Exception e) {
