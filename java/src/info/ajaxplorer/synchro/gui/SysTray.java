@@ -10,6 +10,8 @@ import org.eclipse.swt.graphics.*;
 import org.eclipse.swt.widgets.*;
 import org.quartz.SchedulerException;
 
+import com.cloudgarden.resource.SWTResourceManager;
+
 
 public class SysTray {
 
@@ -68,8 +70,9 @@ public class SysTray {
 		if (tray == null) {
 			System.out.println ("The system tray is not available");
 			item = null;			
-		} else {			
-			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("info/ajaxplorer/synchro/resources/images/AjxpLogo16-Bi.png"));
+		} else {
+			boolean isMac = SWTResourceManager.isMac();
+			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("info/ajaxplorer/synchro/resources/images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
 		    //tip.setMessage("Here is a message for the user. When the message is too long it wraps. I should say something cool but nothing comes to my mind.");
 
 			item = new TrayItem (tray, SWT.NONE);

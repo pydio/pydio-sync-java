@@ -75,7 +75,15 @@ public class SWTResourceManager {
 		return getFont(name, size, style, false, false);
 	}
 
+	public static boolean isMac(){
+		String os = System.getProperty("os.name").toLowerCase();
+		return (os.indexOf("mac") >= 0);
+	}
+	
 	public static Font getFont(String name, int size, int style, boolean strikeout, boolean underline) {
+		if(name.equals("Arial") && SWTResourceManager.isMac() && size == 9){
+			size = 12;
+		}
 		String fontName = name + "|" + size + "|" + style + "|" + strikeout + "|" + underline;
 		if (resources.containsKey(fontName))
 			return (Font) resources.get(fontName);
