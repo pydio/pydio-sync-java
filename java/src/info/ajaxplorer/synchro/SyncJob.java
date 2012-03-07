@@ -6,6 +6,7 @@ import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
+import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
 
 import java.io.BufferedInputStream;
@@ -43,7 +44,6 @@ import org.w3c.dom.NodeList;
 
 import com.j256.ormlite.dao.CloseableIterator;
 import com.j256.ormlite.dao.Dao;
-import com.j256.ormlite.stmt.DeleteBuilder;
 
 @DisallowConcurrentExecution
 public class SyncJob implements org.quartz.Job {
@@ -99,10 +99,10 @@ public class SyncJob implements org.quartz.Job {
 	
 	public void run()  throws URISyntaxException, Exception{
 		
-		Manager.getInstance().updateSynchroState(true);
+		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
 		
 		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);		
-		Server s = new Server(currentRepository.getParent());
+		Server s = new CipheredServer(currentRepository.getParent());
 		RestStateHolder.getInstance().setServer(s);		
 		RestStateHolder.getInstance().setRepository(currentRepository);
 		AjxpAPI.getInstance().setServer(s);		
@@ -153,7 +153,7 @@ public class SyncJob implements org.quartz.Job {
         
 		cleanDB();
         
-        Manager.getInstance().updateSynchroState(false);
+        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	}
 	
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, File localFolder) throws Exception{

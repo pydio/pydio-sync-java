@@ -7,14 +7,15 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.gui.SysTray;
+import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -28,7 +29,6 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
-import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.quartz.impl.StdSchedulerFactory;
 
@@ -121,14 +121,14 @@ public class Manager {
 		});
 	}
 	
-	public void updateSynchroState(final boolean running){
+	public void updateSynchroState(final String nodeId, final boolean running){
 		if(this.sysTray == null) {
 			return;
 		}
 		this.sysTray.getDisplay().asyncExec(new Runnable() {			
 			public void run() {
 				if(!sysTray.isDisposed()){
-					sysTray.setMenuTriggerRunning(running);
+					sysTray.setMenuTriggerRunning(nodeId, running);
 				}
 			}
 		});
@@ -136,13 +136,13 @@ public class Manager {
 	
 	public Manager(Shell shell, Locale locale){
 		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
-		sysTray = new SysTray(shell, messages);
 		try {
 			initializeDAO();
 		}catch(SQLException e){
 			e.printStackTrace();
 		}
 		
+		sysTray = new SysTray(shell, messages, this);
 	    try {			
             scheduler = StdSchedulerFactory.getDefaultScheduler();
             scheduler.start();
@@ -179,7 +179,7 @@ public class Manager {
 	public Node updateSynchroNode(Map<String, String> data, Node node) throws SQLException, URISyntaxException{
 		Server s;		
 		if(node == null){
-			s = new Server(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), false, false);			
+			s = new CipheredServer(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), true, false);			
 			Node serverNode = s.createDbNode(nodeDao);
 			node = new Node(Node.NODE_TYPE_REPOSITORY, data.get("REPOSITORY_LABEL"), serverNode);
 			nodeDao.create(node);
@@ -289,6 +289,15 @@ public class Manager {
 		return node;
 	}
 	
+	public String makeJobLabel(Node node){
+		String s = "HOST::REPO <=> LOCAL";
+		s = s.replace("REPO", node.getLabel());
+		URI uri = URI.create(node.getParent().getLabel());
+		s = s.replace("HOST", uri.getScheme()+ "://" +uri.getHost());
+		s = s.replace("LOCAL", node.getPropertyValue("target_folder"));
+		return s.toString();
+	}
+	
 	public Node getSynchroNode(String nodeId) throws SQLException{
 		Node n = this.getNodeDao().queryForId(nodeId);
 		n.setParent(this.getNodeDao().queryForId(String.valueOf(n.getParent().id)));
@@ -298,7 +307,14 @@ public class Manager {
 	public Collection<Node> listSynchroNodes(){
 		Collection<Node> n = new ArrayList<Node>();
 		try {
-			n =  nodeDao.queryForEq("resourceType", Node.NODE_TYPE_REPOSITORY);
+			Collection<Node> servers  =  nodeDao.queryForEq("resourceType", Node.NODE_TYPE_SERVER);
+			for(Node s:servers){
+				for(Node c:s.children){
+					if(c.getResourceType().equals(Node.NODE_TYPE_REPOSITORY)){
+						n.add(c);
+					}
+				}
+			}
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

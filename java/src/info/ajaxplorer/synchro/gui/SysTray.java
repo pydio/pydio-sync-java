@@ -27,6 +27,7 @@ public class SysTray {
 	private boolean showNotifications = true;
 	ResourceBundle messages;
 	MenuItem mTrig ;
+	Menu jobsMenu;
 	
 	public void notifyUser(String title, String message){
 		if(!showNotifications || menu.isVisible()){
@@ -51,18 +52,24 @@ public class SysTray {
 	public Display getDisplay(){
 		return display;
 	}
-	public void setMenuTriggerRunning(boolean state){
+	public void setMenuTriggerRunning(String nodeId, boolean state){
 		if(mTrig == null) return;
-		if(state){
-			mTrig.setEnabled(false);
-			mTrig.setText(messages.getString("tray_menu_running"));
-		}else{			
-			mTrig.setEnabled(true);
-			mTrig.setText(messages.getString("tray_menu_trigger"));
-		}
+		for(MenuItem item:jobsMenu.getItems()){
+			if(item.getData() == null || !(item.getData() instanceof Node)) continue;
+			if(Integer.parseInt(nodeId) == ((Node)item.getData()).id){
+				String label = Manager.getInstance().makeJobLabel((Node)item.getData());
+				if(state){
+					item.setEnabled(false);
+					item.setText(label + " : " +messages.getString("tray_menu_running"));
+				}else{			
+					item.setEnabled(true);
+					item.setText(label);
+				}
+			}
+		}		
 	}
 	
-	public SysTray(final Shell shell, ResourceBundle messages){
+	public SysTray(final Shell shell, ResourceBundle messages, Manager managerInstance){
 		
 		this.shell = shell;
 		this.messages = messages;
@@ -106,21 +113,28 @@ public class SysTray {
 				}
 			});
 			
-			mTrig = new MenuItem (menu, SWT.PUSH);
+			
+			
+			mTrig = new MenuItem (menu, SWT.CASCADE);
 			mTrig.setText ( messages.getString("tray_menu_trigger") );
-			mTrig.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					try {
-						Collection<Node> n = Manager.getInstance().listSynchroNodes();
-						if(n.size() > 0){
-							Manager.getInstance().triggerJobNow(n.iterator().next(), false);
+			
+			jobsMenu = new Menu(shell, SWT.DROP_DOWN);
+			mTrig.setMenu(jobsMenu);
+			Collection<Node> ns = managerInstance.listSynchroNodes();
+			for(Node syncNode:ns){
+				MenuItem mI = new MenuItem(jobsMenu, SWT.PUSH);
+				mI.setText(managerInstance.makeJobLabel(syncNode));
+				mI.setData(syncNode);
+				mI.addListener (SWT.Selection, new Listener () {
+					public void handleEvent (Event event) {
+						try {
+							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
+						} catch (SchedulerException e) {
+							e.printStackTrace();
 						}
-					} catch (SchedulerException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
 					}
-				}
-			});
+				});
+			}
 			
 			final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
 			showNotifMenu.setSelection(showNotifications);

@@ -5,17 +5,23 @@ import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.model.CipheredServer;
 
 import java.net.URISyntaxException;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CCombo;
 import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
@@ -90,6 +96,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 	private Button checkboxActive;
 	private Composite composite2;
 	private Text tfLogin;
+	ArrayList<Object> jobComboItems;
 	
 	private HashMap<String, String> repoItems;
 	private Node currentSynchroNode;
@@ -104,6 +111,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 	protected void saveConfig(){
 		try {
 			currentSynchroNode = Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
+			loadJobComboValues();
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} catch (URISyntaxException e) {
@@ -116,12 +124,21 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 	public JobEditor(org.eclipse.swt.widgets.Composite parent, int style) {
 		super(parent, style);
 		initGUI();
-		int baseNodeId = -1;
 		try {
-			Dao<Node, String> nodeDao = Manager.getInstance().getNodeDao();
-			baseNodeId = nodeDao.queryForEq("resourceType", Node.NODE_TYPE_REPOSITORY).get(0).id;
-			Node baseNode = Manager.getInstance().getSynchroNode(String.valueOf(baseNodeId));
-			Server s = new Server(baseNode.getParent());
+			Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
+			if(nodes.size()>0){
+				currentSynchroNode = nodes.iterator().next();
+				loadFormFromNode(currentSynchroNode);
+			}
+		} catch (Exception e) {
+		}
+
+	}
+	
+	protected void loadFormFromNode(Node baseNode){
+		Server s;
+		try {
+			s = new CipheredServer(baseNode.getParent());
 			HashMap<String, String> values = new HashMap<String, String>();
 			values.put("HOST", s.getUrl());
 			values.put("LOGIN", s.getUser());
@@ -132,11 +149,10 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
 			values.put("DIRECTION", baseNode.getPropertyValue("synchro_direction"));
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
-			this.loadFormData(values);
-			currentSynchroNode = baseNode;
-		} catch (Exception e) {
+			this.loadFormData(values);		
+		} catch (URISyntaxException e) {
+			e.printStackTrace();
 		}
-
 	}
 	
 	public Map<String, String> getFormData() throws Exception{
@@ -180,6 +196,68 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
 	}
 
+	public void clearFormData(){
+		tfHost.setText("");
+		tfLogin.setText("");
+		tfPassword.setText("");
+		comboRepository.setText("");
+		comboRepository.setItems(new String[0]);
+		repoItems = new HashMap<String, String>();
+		tfTarget.setText("");
+		checkboxActive.setSelection(true);
+		
+		radioDirection.setSelection(true);
+		radioDirection2.setSelection(false);
+		radioDirection3.setSelection(false);
+		
+		radioSyncInterval1.setSelection(false);
+		radioSyncInterval2.setSelection(true);
+		radioSyncInterval3.setSelection(false);
+	}	
+	
+	private void loadJobComboValues(){
+		Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
+		jobComboItems = new ArrayList<Object>();
+		ArrayList<String> keys = new ArrayList<String>();
+		int currentSel = 0;
+		int i=0;
+		for(Node syncNode:nodes){
+			String label = Manager.getInstance().makeJobLabel(syncNode);
+			jobComboItems.add(syncNode);
+			keys.add(label);
+			if(currentSynchroNode != null && syncNode.id == currentSynchroNode.id) {
+				currentSel = i;
+			}
+			i++;
+		}
+		keys.add("Create a new synchronization job...");		
+		cCombo1.setItems(keys.toArray(new String[0]));
+		cCombo1.select(currentSel);
+	}
+	
+	private void initJobComboListener(){
+		
+		cCombo1.addSelectionListener(new SelectionAdapter() {
+			public void widgetSelected(SelectionEvent e) {
+				Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
+				String labelSelected = cCombo1.getText();
+				boolean found = false;
+				for(Node n:nodes){
+					if(Manager.getInstance().makeJobLabel(n).equals(labelSelected)){
+						found = true;
+						currentSynchroNode = n;
+						loadFormFromNode(currentSynchroNode);
+						break;
+					}
+				}
+				if(!found){
+					currentSynchroNode = null;
+					clearFormData();					
+				}
+			};
+		});		
+	}
+	
 	private void loadRepositories(){
 		
 		System.out.println("Loading repositories");
@@ -195,13 +273,13 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		
 		Server s;
 		try {
-			s = new Server("Test", host, login, pass, true, false);
+			s = new CipheredServer("Test", host, login, pass, true, false);
 			RestStateHolder.getInstance().setServer(s);
 			AjxpAPI.getInstance().setServer(s);
 			RestRequest rest = new RestRequest();
 			System.out.println("Will send request");
 			Document doc = rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
-			Dao<Node, String> nodeDao = Manager.getInstance().getNodeDao();
+			final Dao<Node, String> nodeDao = Manager.getInstance().getNodeDao();
 			
 			NodeList mainTag = doc.getElementsByTagName("repositories");
 			if(mainTag.getLength() == 0){
@@ -209,24 +287,30 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			}			
 			final NodeList repos = mainTag.item(0).getChildNodes();
 			repoItems = new HashMap<String, String>();
-			if (repos!=null && repos.getLength() > 0){
-				for (int i = 0; i < repos.getLength(); i++) {
-					org.w3c.dom.Node xmlNode = repos.item(i);
-					Node repository = new Node(Node.NODE_TYPE_REPOSITORY, "", null);
-					repository.properties = nodeDao.getEmptyForeignCollection("properties");
-					repository.initFromXmlNode(xmlNode);
-					boolean excluded = false;
-					for(int p =0;p<Manager.EXCLUDED_ACCESS_TYPES.length;p++){
-						if(repository.getPropertyValue("access_type").equalsIgnoreCase(Manager.EXCLUDED_ACCESS_TYPES[p])){
-							excluded = true; break;
+			
+			nodeDao.callBatchTasks(new Callable<Void>() {
+				public Void call() throws Exception{			
+					if (repos!=null && repos.getLength() > 0){
+						for (int i = 0; i < repos.getLength(); i++) {
+							org.w3c.dom.Node xmlNode = repos.item(i);
+							Node repository = new Node(Node.NODE_TYPE_REPOSITORY, "", null);
+							repository.properties = nodeDao.getEmptyForeignCollection("properties");
+							repository.initFromXmlNode(xmlNode);
+							boolean excluded = false;
+							for(int p =0;p<Manager.EXCLUDED_ACCESS_TYPES.length;p++){
+								if(repository.getPropertyValue("access_type").equalsIgnoreCase(Manager.EXCLUDED_ACCESS_TYPES[p])){
+									excluded = true; break;
+								}
+							}
+							repoItems.put(repository.getLabel(), repository.getPropertyValue("repository_id"));
+							if(excluded) {
+								continue;
+							}
 						}
 					}
-					repoItems.put(repository.getLabel(), repository.getPropertyValue("repository_id"));
-					if(excluded) {
-						continue;
-					}
+					return null;
 				}
-			}
+			});
 			System.out.println("Parsed response!");
 
 			comboRepository.setText("");
@@ -269,8 +353,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 				cCombo1LData.width = 387;
 				cCombo1LData.height = 16;
 				cCombo1.setLayoutData(cCombo1LData);
-				cCombo1.setText("Default Synchronisation Job");
 				cCombo1.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
+				loadJobComboValues();
+				initJobComboListener();
 			}
 			{
 				Title = new Label(this, SWT.NONE);

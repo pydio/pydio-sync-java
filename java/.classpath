@@ -18,5 +18,6 @@
 	<classpathentry kind="lib" path="G:/DEV/JARS/SWT/swt.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/json-rpc-1.0.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/sqlite-jdbc-3.6.20.jar"/>
+	<classpathentry kind="lib" path="G:/DEV/JARS/commons-codec-1.6/commons-codec-1.6.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
