@@ -26,8 +26,8 @@ import org.eclipse.swt.widgets.Widget;
  */
 public class SWTResourceManager {
 
-	private static HashMap resources = new HashMap();
-	private static Vector users = new Vector();
+	private static HashMap<Object, Object> resources = new HashMap<Object, Object>();
+	private static Vector<Object> users = new Vector<Object>();
 	private static SWTResourceManager instance = new SWTResourceManager();
 
 	private static DisposeListener disposeListener = new DisposeListener() {
@@ -56,7 +56,7 @@ public class SWTResourceManager {
 	}
 
 	public static void dispose() {
-		Iterator it = resources.keySet().iterator();
+		Iterator<Object> it = resources.keySet().iterator();
 		while (it.hasNext()) {
 			Object resource = resources.get(it.next());
 			if (resource instanceof Font)
@@ -90,7 +90,7 @@ public class SWTResourceManager {
 		FontData fd = new FontData(name, size, style);
 		if (strikeout || underline) {
 			try {
-				Class lfCls = Class.forName("org.eclipse.swt.internal.win32.LOGFONT");
+				Class<?> lfCls = Class.forName("org.eclipse.swt.internal.win32.LOGFONT");
 				Object lf = FontData.class.getField("data").get(fd);
 				if (lf != null && lfCls != null) {
 					if (strikeout)

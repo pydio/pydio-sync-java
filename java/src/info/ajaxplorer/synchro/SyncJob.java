@@ -4,6 +4,7 @@ import info.ajaxplorer.client.http.AjxpAPI;
 import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
+import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.model.SyncChange;
 
@@ -42,6 +43,7 @@ import org.w3c.dom.NodeList;
 
 import com.j256.ormlite.dao.CloseableIterator;
 import com.j256.ormlite.dao.Dao;
+import com.j256.ormlite.stmt.DeleteBuilder;
 
 @DisallowConcurrentExecution
 public class SyncJob implements org.quartz.Job {
@@ -145,10 +147,12 @@ public class SyncJob implements org.quartz.Job {
         	}
         }
         
-        // TODO handle DL / UP failed! 
+        // handle DL / UP failed! 
         takeLocalSnapshot(localRootNode, d, null, true);
         takeRemoteSnapshot(remoteRootNode, null, true);
-		
+        
+		cleanDB();
+        
         Manager.getInstance().updateSynchroState(false);
 	}
 	
@@ -334,7 +338,18 @@ public class SyncJob implements org.quartz.Job {
 		}
 	}
 	
-	protected void takeLocalSnapshot(final Node rootNode, final File localFolder, final List<Node> accumulator, boolean save) throws Exception{
+	protected void cleanDB(){
+		// unlinked properties may have not been deleted
+		
+		Dao<Property, String> pao = Manager.getInstance().getPropertyDao();
+		try {
+			pao.executeRaw("DELETE FROM b WHERE node_id=0");
+		} catch (SQLException e) {			
+			e.printStackTrace();
+		}
+	}
+	
+	protected void takeLocalSnapshot(final Node rootNode, final File localFolder, final List<Node> accumulator, final boolean save) throws Exception{
 			
 		if(save){
 			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
@@ -343,7 +358,7 @@ public class SyncJob implements org.quartz.Job {
 		//final List<Node> list = new ArrayList<Node>();
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception{
-				listDirRecursive(localFolder, rootNode, accumulator);
+				listDirRecursive(localFolder, rootNode, accumulator, save);
 				return null;
 			}
 		});
@@ -357,18 +372,7 @@ public class SyncJob implements org.quartz.Job {
 		final Node root = new Node("local_tmp", "", null);
 		root.setPath(localFolder.getAbsolutePath());
 		final List<Node> list = new ArrayList<Node>();
-		takeLocalSnapshot(root, localFolder, list, false);
-		
-		/*
-		final List<Node> list = new ArrayList<Node>();
-		nodeDao.callBatchTasks(new Callable<Void>() {
-			public Void call() throws Exception{
-				listDirRecursive(localFolder, nodeDao, root, list);
-				return null;
-			}
-		});
-		//nodeDao.update(root);  // DO NOT SAVE THIS ONE
-		*/
+		takeLocalSnapshot(root, localFolder, list, false);		
 		
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot);
 		//System.out.println(diff);
@@ -376,25 +380,23 @@ public class SyncJob implements org.quartz.Job {
 		
 	}
 	
-	protected void listDirRecursive(File directory, Node root, List<Node> accumulator) throws SQLException{
+	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save) throws SQLException{
 		
 		File[] children = directory.listFiles();
 		for(int i=0;i<children.length;i++){
 			Node newNode = new Node(Node.NODE_TYPE_ENTRY, children[i].getName(), root);
-			nodeDao.create(newNode);
+			if(save) nodeDao.create(newNode);
 			String p =children[i].getAbsolutePath().substring(root.getPath(true).length()).replace("\\", "/");
-			//System.out.println(p);
 			newNode.setPath(p);
-			//System.out.println(newNode);
 			newNode.properties = nodeDao.getEmptyForeignCollection("properties");			
 			newNode.setLastModified(new Date(children[i].lastModified()));
 			if(children[i].isDirectory()){
-				listDirRecursive(children[i], root, accumulator);
+				listDirRecursive(children[i], root, accumulator, save);
 			}else{				
 				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
 				newNode.setLeaf();
 			}
-			nodeDao.update(newNode);
+			if(save) nodeDao.update(newNode);
 			if(accumulator != null){
 				accumulator.add(newNode);
 			}
@@ -402,7 +404,7 @@ public class SyncJob implements org.quartz.Job {
 		
 	}
 	
-	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, boolean save) throws Exception{
+	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception{
 		
 		if(save){
 			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
@@ -411,12 +413,13 @@ public class SyncJob implements org.quartz.Job {
 		RestRequest r = new RestRequest();
 		URI uri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode);
 		Document d = r.getDocumentContent(uri);
+		//this.logDocument(d);
 		
 		final NodeList entries = d.getDocumentElement().getChildNodes();
 		if(entries != null && entries.getLength() > 0){
 			nodeDao.callBatchTasks(new Callable<Void>() {
 				public Void call() throws Exception{
-					parseNodesRecursive(entries, rootNode, accumulator);
+					parseNodesRecursive(entries, rootNode, accumulator, save);
 					return null;
 				}
 			});			
@@ -438,19 +441,19 @@ public class SyncJob implements org.quartz.Job {
 		return diff;
 	}
 	
-	protected void parseNodesRecursive(NodeList entries, Node parentNode, List<Node> list) throws SQLException{
+	protected void parseNodesRecursive(NodeList entries, Node parentNode, List<Node> list, boolean save) throws SQLException{
 		for(int i=0; i< entries.getLength(); i++){
 			org.w3c.dom.Node xmlNode = entries.item(i);
 			Node entry = new Node(Node.NODE_TYPE_ENTRY, "", parentNode);
-			nodeDao.create(entry);
+			if(save) nodeDao.create(entry);
 			entry.properties = nodeDao.getEmptyForeignCollection("properties");
 			entry.initFromXmlNode(xmlNode);
-			nodeDao.update(entry);
+			if(save) nodeDao.update(entry);
 			if(list != null){
 				list.add(entry);
 			}
 			if(xmlNode.getChildNodes().getLength() > 0){
-				parseNodesRecursive(xmlNode.getChildNodes(), parentNode, list);				
+				parseNodesRecursive(xmlNode.getChildNodes(), parentNode, list, save);				
 			}
 		}
 		
@@ -554,7 +557,8 @@ public class SyncJob implements org.quartz.Job {
                 	long lastTimeBytes = (long)((tmpTotal-lastTimeTotal)*secondLength/1024/1000);
                 	long speed = (lastTimeBytes/(duration));
                 	double bytesleft =(double)(((double)fullLength-(double)tmpTotal)/1024); 
-                	double ETC = bytesleft/(speed*10);
+                	@SuppressWarnings("unused")
+					double ETC = bytesleft/(speed*10);
             	}
             	postedProgress=tmpProgress;
             }

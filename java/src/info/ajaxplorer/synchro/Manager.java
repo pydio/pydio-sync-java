@@ -1,46 +1,42 @@
 package info.ajaxplorer.synchro;
 
-import java.io.File;
-import java.net.URISyntaxException;
-import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
-import java.util.ResourceBundle;
-
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import static org.quartz.TriggerBuilder.newTrigger;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.gui.SysTray;
 import info.ajaxplorer.synchro.model.SyncChange;
 
+import java.io.File;
+import java.net.URISyntaxException;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.Map;
+import java.util.ResourceBundle;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.JobDetail;
-import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
 import org.quartz.JobKey;
-import org.quartz.JobListener;
-import org.quartz.Matcher;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.quartz.impl.StdSchedulerFactory;
-import org.quartz.impl.matchers.EverythingMatcher;
-import org.quartz.impl.matchers.KeyMatcher;
 
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.jdbc.JdbcConnectionSource;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
-
-import static org.quartz.JobBuilder.*;
-import static org.quartz.SimpleScheduleBuilder.*;
-import static org.quartz.TriggerBuilder.*;
 
 public class Manager {
 
@@ -78,11 +74,7 @@ public class Manager {
 		Shell shell = new Shell(display, SWT.ON_TOP | SWT.TITLE | SWT.MIN | SWT.CLOSE );
 		Manager.instanciate(shell, currentLocale);
 		
-		try {
-			Manager.getInstance().scheduleJob();
-		} catch (SchedulerException e) {
-			e.printStackTrace();
-		}		
+		Manager.getInstance().initScheduler();
 		
 		while (!shell.isDisposed ()) {
 			if (!display.readAndDispatch ()) display.sleep ();
@@ -200,46 +192,94 @@ public class Manager {
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
 			nodeDao.update(node);
 			try {
-				this.scheduleJob();
+				this.scheduleJob(node);
 			} catch (SchedulerException e) {
 				e.printStackTrace();
 			}
 		}else{
+			boolean serverChanges = false;
+			boolean intervalChanges = false;
+			
+			// UPDATE SERVER NODE
 			s = new Server(node.getParent());
-			s.setUrl(data.get("HOST"));
-			s.setUser(data.get("LOGIN"));
-			s.setPassword(data.get("PASSWORD"));
-			s.updateDbNode(nodeDao);
-			nodeDao.update(node);		
+			String crtHost = s.getUrl();
+			if(!crtHost.equals(data.get("HOST"))){
+				s.setUrl(data.get("HOST"));
+				s.setLabel(data.get("HOST"));
+				serverChanges = true;
+			}
+			if(!s.getUser().equals(data.get("LOGIN"))){
+				s.setUser(data.get("LOGIN"));
+				serverChanges = true;
+			}
+			if(!s.getPassword().equals(data.get("PASSWORD"))){
+				s.setPassword(data.get("PASSWORD"));
+				serverChanges = true;
+			}			
+			
+			// UPDATE REPOSITORY NODE
+			node.setLabel(data.get("REPOSITORY_LABEL"));
+			node.setPath("/");
 			Collection<Property> props = node.properties;
-			Iterator<Property> it = props.iterator();
-			while(it.hasNext()){
-				Property p = it.next();
-				if(p.getName().equals("repository_id")) {
+			Collection<Property> toSave = new ArrayList<Property>();
+			for(Property p:props){
+				if(p.getName().equals("repository_id")
+						&& !p.getValue().equals(data.get("REPOSITORY_ID"))) {
 					p.setValue(data.get("REPOSITORY_ID"));
-					propertyDao.update(p);
+					serverChanges = true;
+					toSave.add(p);
 				}
-				else if(p.getName().equals("target_folder")) {
+				else if(p.getName().equals("target_folder")
+						&& !p.getValue().equals(data.get("TARGET"))) {
 					p.setValue(data.get("TARGET"));
-					propertyDao.update(p);
+					serverChanges = true;
+					toSave.add(p);
 				}
-				else if(p.getName().equals("synchro_active")) {
+				else if(p.getName().equals("synchro_active")
+						&& !p.getValue().equals(data.get("ACTIVE"))) {
 					p.setValue(data.get("ACTIVE"));
-					propertyDao.update(p);
+					serverChanges = true;
+					toSave.add(p);
 				}
-				else if(p.getName().equals("synchro_direction")) {
+				else if(p.getName().equals("synchro_direction")
+						&& !p.getValue().equals(data.get("DIRECTION"))) {
 					p.setValue(data.get("DIRECTION"));
-					propertyDao.update(p);
+					serverChanges = true;
+					toSave.add(p);
 				}
-				else if(p.getName().equals("synchro_interval")) {
+				else if(p.getName().equals("synchro_interval") 
+						&& !p.getValue().equals(data.get("INTERVAL"))) {
 					p.setValue(data.get("INTERVAL"));
-					propertyDao.update(p);
+					intervalChanges = true;
+					toSave.add(p);
 				}
 			}
-			nodeDao.refresh(node);
-			
 			try {
-				this.triggerJobNow(true);
+				if(serverChanges){
+
+					// STOP CURRENT
+					this.unscheduleJob(node);
+					
+					// UPDATE DB
+					s.updateDbNode(nodeDao, propertyDao);
+					if(toSave.size() > 0){
+						for(Property ps:toSave) propertyDao.update(ps);
+					}
+					nodeDao.update(node);	
+					
+					// RESCHEDULE AND CLEAN SNAPSHOTS
+					this.scheduleJob(node, true);
+					
+				}else if(intervalChanges){
+					
+					// UPDATE DB
+					for(Property ps:toSave) propertyDao.update(ps);
+					nodeDao.refresh(node);
+					
+					// CHANGE INTERVAL
+					this.changeJobInterval(node);
+					
+				}
 			} catch (SchedulerException e) {
 				e.printStackTrace();
 			}
@@ -255,45 +295,111 @@ public class Manager {
 		return n;
 	}
 	
-	public void scheduleJob() throws SchedulerException{
-		int baseNodeId = -1;
+	public Collection<Node> listSynchroNodes(){
+		Collection<Node> n = new ArrayList<Node>();
 		try {
-			baseNodeId = nodeDao.queryForEq("resourceType", Node.NODE_TYPE_REPOSITORY).get(0).id;
-		} catch (Exception e) {
+			n =  nodeDao.queryForEq("resourceType", Node.NODE_TYPE_REPOSITORY);
+		} catch (SQLException e) {
 			// TODO Auto-generated catch block
-			// e.printStackTrace();
+			e.printStackTrace();
 		}
-		if(baseNodeId == -1){
-			return;
-		}
-		
-        JobDetail job = newJob(SyncJob.class)
-        		.withIdentity("syncJob", "ajxp")
-        		.usingJobData("node-id", String.valueOf(baseNodeId))
-        		.build();
-        
-
-        Trigger trigger = newTrigger()
-        		.withIdentity("syncTrigger", "ajxp")
-        		.startNow()        		
-        		.withSchedule(simpleSchedule()
-    				.withIntervalInSeconds(60)
-    				.repeatForever())
-        		.build();
-
-        scheduler.scheduleJob(job, trigger);		   
-
-        //scheduler.unscheduleJob(new TriggerKey("syncTrigger", "ajxp"));
-        
+		return n;
 	}
 	
-	public void triggerJobNow(boolean renewSnapshots) throws SchedulerException{
+	protected void initScheduler(){
+		try {
+			Collection<Node> l = listSynchroNodes();
+			for(Node n:l){
+				scheduleJob(n);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}		
+	}
+
+	public void scheduleJob(Node n) throws SchedulerException{				
+		this.scheduleJob(n, false);
+	}
+	
+	public void scheduleJob(Node n, boolean firstTriggerClear) throws SchedulerException{				
 		
-		JobKey jK = new JobKey("syncJob", "ajxp");
+        JobDetail job = newJob(SyncJob.class)
+        		.withIdentity(String.valueOf(n.id), "sync")
+        		.usingJobData("node-id", String.valueOf(n.id))
+        		.build();
+        
+        if(firstTriggerClear){
+        	
+            Trigger trigger1 = newTrigger()
+            		.withIdentity("onetime-"+String.valueOf(n.id), "ajxp")
+            		.usingJobData("clear-snapshots", true)
+            		.startNow()
+            		.build();
+
+            Trigger trigger2 = newTrigger()
+            		.withIdentity("periodic-"+String.valueOf(n.id), "ajxp")            		        	
+            		.withSchedule(getSSBFromString(n.getPropertyValue("synchro_interval")))
+            		.forJob(job)
+            		.build();
+            
+            scheduler.scheduleJob(job, trigger1);
+            scheduler.scheduleJob(trigger2);
+            
+        	
+        	
+        }else{
+        	
+            Trigger trigger = newTrigger()
+            		.withIdentity("periodic-"+String.valueOf(n.id), "ajxp")
+            		.startNow()        		
+            		.withSchedule(getSSBFromString(n.getPropertyValue("synchro_interval")))
+            		.build();
+
+            scheduler.scheduleJob(job, trigger);		   
+        	
+        }
+
+
+	}
+	
+	public void unscheduleJob(Node n) throws SchedulerException{
+		
+		scheduler.deleteJob(new JobKey(String.valueOf(n.id), "sync"));
+		
+	}
+	
+	protected SimpleScheduleBuilder getSSBFromString(String s){
+		SimpleScheduleBuilder ssB = null;
+		if(s.equals("hour")){
+			ssB = simpleSchedule().withIntervalInHours(1).repeatForever();
+		}else if(s.equals("minute")){
+			ssB = simpleSchedule().withIntervalInMinutes(1).repeatForever();
+		}else if(s.equals("day")){
+			ssB = simpleSchedule().withIntervalInHours(24).repeatForever();
+		}
+		return ssB;
+	}
+	
+	public void changeJobInterval(Node n) throws SchedulerException{
+		
+		SimpleScheduleBuilder ssB = getSSBFromString(n.getPropertyValue("synchro_interval"));
+		if(ssB != null){
+	        Trigger trigger = newTrigger()
+	        		.withIdentity("periodic-"+String.valueOf(n.id), "ajxp")
+	        		.startNow()        		
+	        		.withSchedule(ssB)
+	        		.build();
+	        scheduler.rescheduleJob(new TriggerKey("periodic-"+String.valueOf(n.id), "ajxp"), trigger);
+		}
+	}
+	
+	public void triggerJobNow(Node n, boolean renewSnapshots) throws SchedulerException{
+		
+		JobKey jK = new JobKey(String.valueOf(n.id), "sync");
 		JobDetail job = scheduler.getJobDetail(jK);
 		if(job != null){
 	        Trigger trigger = newTrigger()
-	        		.withIdentity("oneTimeTrigger", "ajxp")
+	        		.withIdentity("onetime-"+String.valueOf(n.id), "ajxp")
 	        		.forJob(jK)
 	        		.usingJobData("clear-snapshots", renewSnapshots)
 	        		.startNow().build();

@@ -1,7 +1,9 @@
 package info.ajaxplorer.synchro.gui;
 
+import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
 
+import java.util.Collection;
 import java.util.ResourceBundle;
 import org.eclipse.swt.*;
 import org.eclipse.swt.events.SelectionEvent;
@@ -21,12 +23,13 @@ public class SysTray {
 	private Display display;
 	private Shell shell;
 	private final TrayItem item; 
+	private Menu menu;
 	private boolean showNotifications = true;
 	ResourceBundle messages;
 	MenuItem mTrig ;
 	
 	public void notifyUser(String title, String message){
-		if(!showNotifications){
+		if(!showNotifications || menu.isVisible()){
 			return;
 		}
 		if(tip != null && tip.isVisible()) {
@@ -93,7 +96,7 @@ public class SysTray {
 					openConfiguration(shell);
 				}
 			});
-			final Menu menu = new Menu (shell, SWT.POP_UP);			
+			menu = new Menu (shell, SWT.POP_UP);			
 			MenuItem mi = new MenuItem (menu, SWT.PUSH);
 			mi.setText ( messages.getString("tray_menu_preferences") );
 			menu.setDefaultItem(mi);
@@ -108,7 +111,10 @@ public class SysTray {
 			mTrig.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					try {
-						Manager.getInstance().triggerJobNow(false);
+						Collection<Node> n = Manager.getInstance().listSynchroNodes();
+						if(n.size() > 0){
+							Manager.getInstance().triggerJobNow(n.iterator().next(), false);
+						}
 					} catch (SchedulerException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
