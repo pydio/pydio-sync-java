@@ -24,7 +24,7 @@ public class PassManager {
         SecretKey key = keyFactory.generateSecret(new PBEKeySpec(PASSWORD));
         Cipher pbeCipher = Cipher.getInstance("PBEWithMD5AndDES");
         pbeCipher.init(Cipher.ENCRYPT_MODE, key, new PBEParameterSpec(SALT, 20));
-        return base64Encode(pbeCipher.doFinal(property.getBytes()));
+        return new String(pbeCipher.doFinal(property.getBytes()));
     }
 
     private static String base64Encode(byte[] bytes) {
@@ -37,7 +37,7 @@ public class PassManager {
         SecretKey key = keyFactory.generateSecret(new PBEKeySpec(PASSWORD));
         Cipher pbeCipher = Cipher.getInstance("PBEWithMD5AndDES");
         pbeCipher.init(Cipher.DECRYPT_MODE, key, new PBEParameterSpec(SALT, 20));
-        return new String(pbeCipher.doFinal(base64Decode(property)));
+        return new String(pbeCipher.doFinal(property.getBytes()));
     }
 
     private static byte[] base64Decode(String property) throws IOException {

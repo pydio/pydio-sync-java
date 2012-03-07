@@ -302,10 +302,10 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 									excluded = true; break;
 								}
 							}
-							repoItems.put(repository.getLabel(), repository.getPropertyValue("repository_id"));
 							if(excluded) {
 								continue;
 							}
+							repoItems.put(repository.getLabel(), repository.getPropertyValue("repository_id"));
 						}
 					}
 					return null;

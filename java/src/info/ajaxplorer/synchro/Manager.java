@@ -164,10 +164,12 @@ public class Manager {
 	}
 	
 	private void initializeDAO() throws SQLException{
-		
-		boolean dbAlreadyCreated = (new File("ajxpsync.db")).exists();
-		 // this uses h2 by default but change to match your database
-       String databaseUrl = "jdbc:sqlite:ajxpsync.db";
+
+		File work = new File(System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer");
+		if(!work.exists()) work.mkdir();
+		File dbFile = new File(work, "ajxpsync.db");
+		boolean dbAlreadyCreated = dbFile.exists();
+       String databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
        ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
        // instantiate the dao
        nodeDao = DaoManager.createDao(connectionSource, Node.class);
