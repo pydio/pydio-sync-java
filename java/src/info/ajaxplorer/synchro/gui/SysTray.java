@@ -69,6 +69,28 @@ public class SysTray {
 		}		
 	}
 	
+	public void refreshJobsMenu(Manager managerInstance){
+		
+		for(MenuItem item:jobsMenu.getItems()){
+			item.dispose();
+		}			
+		Collection<Node> ns = managerInstance.listSynchroNodes();
+		for(Node syncNode:ns){
+			MenuItem mI = new MenuItem(jobsMenu, SWT.PUSH);
+			mI.setText(managerInstance.makeJobLabel(syncNode));
+			mI.setData(syncNode);
+			mI.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					try {
+						Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
+					} catch (SchedulerException e) {
+						e.printStackTrace();
+					}
+				}
+			});
+		}		
+	}
+	
 	public SysTray(final Shell shell, ResourceBundle messages, Manager managerInstance){
 		
 		this.shell = shell;
@@ -120,6 +142,8 @@ public class SysTray {
 			
 			jobsMenu = new Menu(shell, SWT.DROP_DOWN);
 			mTrig.setMenu(jobsMenu);
+			this.refreshJobsMenu(managerInstance);
+			/*
 			Collection<Node> ns = managerInstance.listSynchroNodes();
 			for(Node syncNode:ns){
 				MenuItem mI = new MenuItem(jobsMenu, SWT.PUSH);
@@ -134,7 +158,7 @@ public class SysTray {
 						}
 					}
 				});
-			}
+			}*/
 			
 			final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
 			showNotifMenu.setSelection(showNotifications);

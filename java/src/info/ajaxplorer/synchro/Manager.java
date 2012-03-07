@@ -134,6 +134,16 @@ public class Manager {
 		});
 	}
 	
+	public void updateSysTrayJobsMenu(){
+		this.sysTray.getDisplay().asyncExec(new Runnable() {			
+			public void run() {
+				if(!sysTray.isDisposed()){
+					sysTray.refreshJobsMenu(Manager.this);
+				}
+			}
+		});		
+	}
+	
 	public Manager(Shell shell, Locale locale){
 		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
 		try {
@@ -284,6 +294,7 @@ public class Manager {
 				e.printStackTrace();
 			}
 		}
+		this.updateSysTrayJobsMenu();
 		
 		
 		return node;
