@@ -94,6 +94,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 	private Button buttonLoadRepositories;
 	private Button radioSyncInterval2;
 	private Button button1;
+	private Button button11;
 	private CCombo comboRepository;
 	private Label labelRepository;
 	private Button radioSyncInterval3;
@@ -147,7 +148,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 
 	protected void saveConfig(){
 		try {
-			Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
+			currentSynchroNode = Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} catch (URISyntaxException e) {
@@ -173,6 +174,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			values.put("REPOSITORY_LABEL", baseNode.getLabel());
 			values.put("REPOSITORY_ID", baseNode.getPropertyValue("repository_id"));
 			values.put("TARGET", baseNode.getPropertyValue("target_folder"));
+			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
+			values.put("DIRECTION", baseNode.getPropertyValue("synchro_direction"));
+			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
 			this.loadFormData(values);
 			currentSynchroNode = baseNode;
 		} catch (Exception e) {
@@ -189,8 +193,16 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		values.put("PASSWORD", tfPassword.getText());		
 		values.put("REPOSITORY_LABEL", comboRepository.getText());
 		values.put("REPOSITORY_ID", repoItems.get(comboRepository.getText()));
-		values.put("TARGET", tfTarget.getText());		
-		
+		values.put("TARGET", tfTarget.getText());
+		values.put("ACTIVE", (checkboxActive.getSelection()?"true":"false"));
+		String dir = "bi";
+		if(radioDirection2.getSelection()) dir = "down";
+		else if(radioDirection3.getSelection()) dir = "up";
+		values.put("DIRECTION", dir);
+		String freq = "minute";
+		if(radioSyncInterval2.getSelection()) freq = "hour";
+		else if(radioSyncInterval3.getSelection()) freq = "day";
+		values.put("INTERVAL", freq);
 		return values;
 	}
 	
@@ -199,17 +211,28 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		tfLogin.setText(values.get("LOGIN"));
 		tfPassword.setText(values.get("PASSWORD"));
 		comboRepository.setText(values.get("REPOSITORY_LABEL"));
-		comboRepository.setEnabled(true);
 		repoItems = new HashMap<String, String>();
 		repoItems.put(values.get("REPOSITORY_LABEL"), values.get("REPOSITORY_ID"));
 		tfTarget.setText(values.get("TARGET"));
+		checkboxActive.setSelection(values.get("ACTIVE").equals("true"));
+		
+		radioDirection.setSelection(values.get("DIRECTION").equals("bi"));
+		radioDirection2.setSelection(values.get("DIRECTION").equals("down"));
+		radioDirection3.setSelection(values.get("DIRECTION").equals("up"));
+		
+		radioSyncInterval1.setSelection(values.get("INTERVAL").equals("minute"));
+		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
+		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
 	}
 
 	private void loadRepositories(){
 		
+		System.out.println("Loading repositories");
 		if(tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") ){
 			return;
 		}
+		System.out.println("Update comborepo");
+
 		comboRepository.setText("Loading ...");
 		String host = tfHost.getText();
 		String login = tfLogin.getText();
@@ -221,6 +244,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			RestStateHolder.getInstance().setServer(s);
 			AjxpAPI.getInstance().setServer(s);
 			RestRequest rest = new RestRequest();
+			System.out.println("Will send request");
 			Document doc = rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
 			Dao<Node, String> nodeDao = Manager.getInstance().getNodeDao();
 			
@@ -248,6 +272,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 					}
 				}
 			}
+			System.out.println("Parsed response!");
 
 			comboRepository.setText("");
 			comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
@@ -308,9 +333,10 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			}
 			{
 				cTabFolder = new CTabFolder(this, SWT.NONE);
+				cTabFolder.setTabHeight(20);
 				{
-					cTabItem1 = new CTabItem(cTabFolder, SWT.NONE);
-					cTabItem1.setText("Connexion data");
+					cTabItem1 = new CTabItem(cTabFolder, SWT.NONE);					
+					cTabItem1.setText(" Connexion data  ");
 					{
 						composite1 = new Composite(cTabFolder, SWT.NONE);
 						FormLayout composite1Layout = new FormLayout();
@@ -371,7 +397,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							comboRepository.setLayoutData(comboRepositoryLData);
 							comboRepository.setToolTipText("Click on the load button to get the repositories list from the server");
 							comboRepository.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-							comboRepository.setEnabled(false);
 						}
 						{
 							labelRepository = new Label(composite1, SWT.NONE);
@@ -506,8 +531,8 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							FormData saveButtonLData = new FormData();
 							saveButtonLData.width = 92;
 							saveButtonLData.height = 28;
-							saveButtonLData.right =  new FormAttachment(1000, 1000, -107);
-							saveButtonLData.top =  new FormAttachment(0, 1000, 291);
+							saveButtonLData.right =  new FormAttachment(1000, 1000, -109);
+							saveButtonLData.top =  new FormAttachment(0, 1000, 287);
 							saveButton.setLayoutData(saveButtonLData);
 							saveButton.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/editdelete.png"));
 							saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
@@ -520,8 +545,8 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							FormData button1LData = new FormData();
 							button1LData.width = 91;
 							button1LData.height = 28;
-							button1LData.right =  new FormAttachment(1000, 1000, -201);
-							button1LData.top =  new FormAttachment(0, 1000, 291);
+							button1LData.right =  new FormAttachment(1000, 1000, -13);
+							button1LData.top =  new FormAttachment(0, 1000, 287);
 							button1.setLayoutData(button1LData);
 							button1.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
 							button1.setBackground(SWTResourceManager.getColor(255,255,255));
@@ -550,7 +575,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 				}
 				{
 					cTabItem2 = new CTabItem(cTabFolder, SWT.NONE);
-					cTabItem2.setText("Job Execution");
+					cTabItem2.setText(" Job Execution  ");
 					{
 						composite2 = new Composite(cTabFolder, SWT.NONE);
 						FormLayout composite2Layout = new FormLayout();
@@ -565,7 +590,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							FormData group2LData = new FormData();
 							group2LData.width = 377;
 							group2LData.left =  new FormAttachment(0, 1000, 12);
-							group2LData.top =  new FormAttachment(0, 1000, 134);
+							group2LData.top =  new FormAttachment(0, 1000, 154);
 							group2LData.height = 75;
 							group2.setLayoutData(group2LData);
 							group2.setText("Run this job every...");
@@ -607,7 +632,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							FormData group1LData = new FormData();
 							group1LData.width = 377;
 							group1LData.left =  new FormAttachment(0, 1000, 12);
-							group1LData.top =  new FormAttachment(0, 1000, 34);
+							group1LData.top =  new FormAttachment(0, 1000, 45);
 							group1LData.height = 71;
 							group1.setLayoutData(group1LData);
 							group1.setText("Synchronisation Direction");
@@ -646,13 +671,32 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							FormData checkboxActiveLData = new FormData();
 							checkboxActiveLData.left =  new FormAttachment(0, 1000, 20);
 							checkboxActiveLData.top =  new FormAttachment(0, 1000, 12);
-							checkboxActiveLData.width = 273;
+							checkboxActiveLData.width = 375;
 							checkboxActiveLData.height = 16;
 							checkboxActive.setLayoutData(checkboxActiveLData);
 							checkboxActive.setText("This job is active");
 							checkboxActive.setBackground(SWTResourceManager.getColor(255, 255, 255));
 							checkboxActive.setSelection(true);
 						}
+						{
+							button11 = new Button(composite2, SWT.PUSH | SWT.LEFT);
+							button11.setText("Save");
+							FormData button1LData = new FormData();
+							button1LData.width = 91;
+							button1LData.height = 28;
+							button1LData.right =  new FormAttachment(1000, 1000, -13);
+							button1LData.top =  new FormAttachment(0, 1000, 287);
+							button11.setLayoutData(button1LData);
+							button11.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
+							button11.setBackground(SWTResourceManager.getColor(255,255,255));
+							button11.addListener(SWT.Selection, new Listener() {
+								
+								@Override
+								public void handleEvent(Event arg0) {
+									saveConfig();						
+								}
+							});
+						}						
 					}
 				}
 				FormData cTabFolderLData = new FormData();

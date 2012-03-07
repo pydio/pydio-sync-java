@@ -108,7 +108,7 @@ public class SysTray {
 			mTrig.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					try {
-						Manager.getInstance().triggerJobNow();
+						Manager.getInstance().triggerJobNow(false);
 					} catch (SchedulerException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();

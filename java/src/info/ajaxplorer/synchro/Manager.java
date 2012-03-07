@@ -3,6 +3,8 @@ package info.ajaxplorer.synchro;
 import java.io.File;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -49,6 +51,7 @@ public class Manager {
 	static Manager instance;
 	public static Dao<Node, String> nodeDao;
 	public static Dao<SyncChange, String> syncChangeDao;
+	public static Dao<Property, String> propertyDao;
 	private SysTray sysTray;
 	private ResourceBundle messages;
 	
@@ -102,9 +105,11 @@ public class Manager {
 	public Dao<Node, String> getNodeDao(){
 		return nodeDao;
 	}
-	
 	public Dao<SyncChange, String> getSyncChangeDao(){
 		return syncChangeDao;
+	}
+	public Dao<Property, String> getPropertyDao(){
+		return propertyDao;
 	}
 	
 	public void notifyUser(final String title, final String message){
@@ -159,22 +164,28 @@ public class Manager {
 	
 	private void initializeDAO() throws SQLException{
 		
-		boolean dbAlreadyCreated = (new File(System.getProperty("user.home")+"/ajxpsync.h2.db")).exists();
+		boolean dbAlreadyCreated = (new File("ajxpsync.db")).exists();
 		 // this uses h2 by default but change to match your database
-       String databaseUrl = "jdbc:h2:~/ajxpsync";
+       String databaseUrl = "jdbc:sqlite:ajxpsync.db";
        ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
        // instantiate the dao
        nodeDao = DaoManager.createDao(connectionSource, Node.class);
        syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
+       propertyDao = DaoManager.createDao(connectionSource, Property.class);
        if(!dbAlreadyCreated){
            TableUtils.createTable(connectionSource, Node.class);
            TableUtils.createTable(connectionSource, Property.class);
            TableUtils.createTable(connectionSource, SyncChange.class);
+           
+           nodeDao.executeRaw("CREATE TRIGGER on_delete_cascade AFTER DELETE ON a BEGIN\n" + 
+					"  DELETE FROM b WHERE node_id=old.id;\n" +
+					"  DELETE FROM a WHERE parent_id=old.id;\n" +
+					"END;");           
        }        		
 		
 	}
 	
-	public int updateSynchroNode(Map<String, String> data, Node node) throws SQLException, URISyntaxException{
+	public Node updateSynchroNode(Map<String, String> data, Node node) throws SQLException, URISyntaxException{
 		Server s;		
 		if(node == null){
 			s = new Server(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), false, false);			
@@ -185,11 +196,13 @@ public class Manager {
 			node.properties = nodeDao.getEmptyForeignCollection("properties");
 			node.addProperty("repository_id", data.get("REPOSITORY_ID"));
 			node.addProperty("target_folder", data.get("TARGET"));
+			node.addProperty("synchro_active", data.get("ACTIVE"));
+			node.addProperty("synchro_direction", data.get("DIRECTION"));
+			node.addProperty("synchro_interval", data.get("INTERVAL"));
 			nodeDao.update(node);
 			try {
 				this.scheduleJob();
 			} catch (SchedulerException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}else{
@@ -198,14 +211,43 @@ public class Manager {
 			s.setUser(data.get("LOGIN"));
 			s.setPassword(data.get("PASSWORD"));
 			s.updateDbNode(nodeDao);
-			node.addProperty("repository_id", data.get("REPOSITORY_ID"));
-			node.addProperty("target_folder", data.get("TARGET"));
 			nodeDao.update(node);		
+			Collection<Property> props = node.properties;
+			Iterator<Property> it = props.iterator();
+			while(it.hasNext()){
+				Property p = it.next();
+				if(p.getName().equals("repository_id")) {
+					p.setValue(data.get("REPOSITORY_ID"));
+					propertyDao.update(p);
+				}
+				else if(p.getName().equals("target_folder")) {
+					p.setValue(data.get("TARGET"));
+					propertyDao.update(p);
+				}
+				else if(p.getName().equals("synchro_active")) {
+					p.setValue(data.get("ACTIVE"));
+					propertyDao.update(p);
+				}
+				else if(p.getName().equals("synchro_direction")) {
+					p.setValue(data.get("DIRECTION"));
+					propertyDao.update(p);
+				}
+				else if(p.getName().equals("synchro_interval")) {
+					p.setValue(data.get("INTERVAL"));
+					propertyDao.update(p);
+				}
+			}
+			nodeDao.refresh(node);
 			
+			try {
+				this.triggerJobNow(true);
+			} catch (SchedulerException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		
-		return node.id;
+		return node;
 	}
 	
 	public Node getSynchroNode(String nodeId) throws SQLException{
@@ -246,7 +288,7 @@ public class Manager {
         
 	}
 	
-	public void triggerJobNow() throws SchedulerException{
+	public void triggerJobNow(boolean renewSnapshots) throws SchedulerException{
 		
 		JobKey jK = new JobKey("syncJob", "ajxp");
 		JobDetail job = scheduler.getJobDetail(jK);
@@ -254,6 +296,7 @@ public class Manager {
 	        Trigger trigger = newTrigger()
 	        		.withIdentity("oneTimeTrigger", "ajxp")
 	        		.forJob(jK)
+	        		.usingJobData("clear-snapshots", renewSnapshots)
 	        		.startNow().build();
 	        scheduler.scheduleJob(trigger);
 		}

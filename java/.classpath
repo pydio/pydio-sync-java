@@ -16,5 +16,6 @@
 	<classpathentry kind="lib" path="G:/DEV/JARS/QUARTZ/quartz-2.1.3/lib/log4j-1.2.16.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/SWT/swt.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/json-rpc-1.0.jar"/>
+	<classpathentry kind="lib" path="G:/DEV/JARS/sqlite-jdbc-3.6.20.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

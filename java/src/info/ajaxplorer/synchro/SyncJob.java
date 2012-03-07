@@ -19,6 +19,7 @@ import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.apache.http.HttpEntity;
 import org.json.JSONObject;
+import org.quartz.DisallowConcurrentExecution;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.w3c.dom.Document;
@@ -41,6 +43,7 @@ import org.w3c.dom.NodeList;
 import com.j256.ormlite.dao.CloseableIterator;
 import com.j256.ormlite.dao.Dao;
 
+@DisallowConcurrentExecution
 public class SyncJob implements org.quartz.Job {
 
 	public static Integer NODE_CHANGE_STATUS_FILE_CREATED = 2;
@@ -67,12 +70,17 @@ public class SyncJob implements org.quartz.Job {
 	final Dao<Node, String> nodeDao;
 	
 	private String currentJobNodeID;
-	
+	private boolean clearSnapshots = false;
 	
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
 		try {
 			currentJobNodeID = ctx.getMergedJobDataMap().getString("node-id");
+			if(ctx.getMergedJobDataMap().containsKey("clear-snapshots") && ctx.getMergedJobDataMap().getBooleanValue("clear-snapshots")){
+				clearSnapshots = true;
+			}else{
+				clearSnapshots = false;
+			}
 			this.run();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -111,7 +119,10 @@ public class SyncJob implements org.quartz.Job {
 			syncDao.delete(previouslyRemaining);
 		}
 		
-		//List<Node> emptySnapshot = new ArrayList<Node>();
+		if(clearSnapshots) {
+			this.clearSnapshot("local_snapshot");
+			this.clearSnapshot("remote_snapshot");
+		}
 		List<Node> localSnapshot = new ArrayList<Node>();
 		List<Node> remoteSnapshot = new ArrayList<Node>();
 		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, d);
@@ -291,7 +302,10 @@ public class SyncJob implements org.quartz.Job {
 
 	protected Node loadRootAndSnapshot(String type, final List<Node> snapshot, File localFolder) throws SQLException{
 		
-		List<Node> l = nodeDao.queryForEq("resourceType", type);
+		Map<String, Object> search = new HashMap<String, Object>();
+		search.put("resourceType", type);
+		search.put("parent_id", currentJobNodeID);
+		List<Node> l = nodeDao.queryForFieldValues(search);
 		final Node root;
 		if(l.size() > 0){
 			root = l.get(0);
@@ -300,20 +314,30 @@ public class SyncJob implements org.quartz.Job {
 				snapshot.add(it.next());
 			}
 		}else{
-			root = new Node(type, "", null);
-			root.properties = nodeDao.getEmptyForeignCollection("properties");
+			root = new Node(type, "", currentRepository);
+			root.properties = nodeDao.getEmptyForeignCollection("properties");			
 			if(localFolder != null) root.setPath(localFolder.getAbsolutePath());
+			else root.setPath("");
 			nodeDao.create(root);
 		}
 
 		return root;
 	}
 	
-	
+	protected void clearSnapshot(String type) throws SQLException{
+		List<Node> l = nodeDao.queryForEq("resourceType", type);
+		Node root;
+		nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+		if(l.size() > 0){
+			root = l.get(0);
+			nodeDao.delete(root);
+		}
+	}
 	
 	protected void takeLocalSnapshot(final Node rootNode, final File localFolder, final List<Node> accumulator, boolean save) throws Exception{
 			
 		if(save){
+			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
 			nodeDao.delete(rootNode.children);
 		}
 		//final List<Node> list = new ArrayList<Node>();
@@ -381,6 +405,7 @@ public class SyncJob implements org.quartz.Job {
 	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, boolean save) throws Exception{
 		
 		if(save){
+			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
 			nodeDao.delete(rootNode.children);
 		}
 		RestRequest r = new RestRequest();
