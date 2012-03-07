@@ -112,7 +112,7 @@ public class SyncJob implements org.quartz.Job {
         Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
 
     	Dao<SyncChange,String> syncDao = Manager.getInstance().getSyncChangeDao();
-    	List<SyncChange> previouslyRemaining = syncDao.queryForEq("jobId", "unique-job");
+    	List<SyncChange> previouslyRemaining = syncDao.queryForEq("jobId", currentJobNodeID);
 		Map<String, Object[]> previousChanges = SyncChange.syncChangesToTreeMap(previouslyRemaining);
 		Map<String, Object[]> again = null;
 		if(previousChanges.size() > 0){
@@ -141,7 +141,7 @@ public class SyncJob implements org.quartz.Job {
         }
         //System.out.println(remainingChanges);
         if(remainingChanges.size() > 0){
-        	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, "unique-job");
+        	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
         	for(int i=0;i<c.size();i++){
         		syncDao.create(c.get(i));
         	}
