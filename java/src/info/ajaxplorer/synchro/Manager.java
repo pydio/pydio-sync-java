@@ -143,8 +143,7 @@ public class Manager {
 	}
 	
 	public Manager(Shell shell, Locale locale){
-		//messages = ResourceBundle.getBundle("info/ajaxplorer/synchro/resources/MessagesBundle", locale);
-		messages = ResourceBundle.getBundle("info/ajaxplorer/synchro/resources/MessagesBundle");
+		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
 		sysTray = new SysTray(shell, messages);
 		try {
 			initializeDAO();

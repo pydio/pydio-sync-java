@@ -72,7 +72,7 @@ public class SysTray {
 			item = null;			
 		} else {
 			boolean isMac = SWTResourceManager.isMac();
-			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("info/ajaxplorer/synchro/resources/images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
+			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
 		    //tip.setMessage("Here is a message for the user. When the message is too long it wraps. I should say something cool but nothing comes to my mind.");
 
 			item = new TrayItem (tray, SWT.NONE);

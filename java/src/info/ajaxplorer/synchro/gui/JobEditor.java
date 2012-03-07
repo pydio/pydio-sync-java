@@ -377,7 +377,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							buttonLoadRepositoriesLData.height = 28;
 							buttonLoadRepositoriesLData.right =  new FormAttachment(1000, 1000, -22);
 							buttonLoadRepositories.setLayoutData(buttonLoadRepositoriesLData);
-							buttonLoadRepositories.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/reload.png"));
+							buttonLoadRepositories.setImage(SWTResourceManager.getImage("images/reload.png"));
 							buttonLoadRepositories.setText("Load");
 							buttonLoadRepositories.addListener(SWT.Selection, new Listener() {
 								@Override
@@ -512,7 +512,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							buttonFileChooserLData.height = 28;
 							buttonFileChooserLData.right =  new FormAttachment(1000, 1000, -22);
 							buttonFileChooser.setLayoutData(buttonFileChooserLData);
-							buttonFileChooser.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/view_tree.png"));
+							buttonFileChooser.setImage(SWTResourceManager.getImage("images/view_tree.png"));
 							buttonFileChooser.setText("Browse");
 							buttonFileChooser.addListener(SWT.Selection, new Listener() {
 								
@@ -534,7 +534,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							saveButtonLData.right =  new FormAttachment(1000, 1000, -109);
 							saveButtonLData.top =  new FormAttachment(0, 1000, 287);
 							saveButton.setLayoutData(saveButtonLData);
-							saveButton.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/editdelete.png"));
+							saveButton.setImage(SWTResourceManager.getImage("images/editdelete.png"));
 							saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
 							saveButton.setText("Delete");
 							saveButton.setEnabled(false);
@@ -548,7 +548,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							button1LData.right =  new FormAttachment(1000, 1000, -13);
 							button1LData.top =  new FormAttachment(0, 1000, 287);
 							button1.setLayoutData(button1LData);
-							button1.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
+							button1.setImage(SWTResourceManager.getImage("images/filesave.png"));
 							button1.setBackground(SWTResourceManager.getColor(255,255,255));
 							button1.addListener(SWT.Selection, new Listener() {
 								
@@ -687,7 +687,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 							button1LData.right =  new FormAttachment(1000, 1000, -13);
 							button1LData.top =  new FormAttachment(0, 1000, 287);
 							button11.setLayoutData(button1LData);
-							button11.setImage(SWTResourceManager.getImage("info/ajaxplorer/synchro/resources/images/filesave.png"));
+							button11.setImage(SWTResourceManager.getImage("images/filesave.png"));
 							button11.setBackground(SWTResourceManager.getColor(255,255,255));
 							button11.addListener(SWT.Selection, new Listener() {
 								

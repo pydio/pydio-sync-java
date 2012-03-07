@@ -29,7 +29,7 @@ public class ConfigEditor {
 		
         shell.setText("AjaXplorer Synchronizer");
         shell.setSize(450, 400);
-        shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("info/ajaxplorer/synchro/resources/images/AjxpLogo16-Bi.png")));
+        shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-Bi.png")));
         
         Point p = shell.getSize();
 
