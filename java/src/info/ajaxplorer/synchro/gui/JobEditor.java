@@ -15,10 +15,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import org.eclipse.jface.action.Action;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
@@ -154,6 +157,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 			this.loadFormData(values);		
 			if(this.form != null){
 				this.form.setText(Manager.getInstance().makeJobLabel(baseNode));
+				updateFormActions(true, true);
 			}
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
@@ -218,6 +222,12 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		radioSyncInterval1.setSelection(false);
 		radioSyncInterval2.setSelection(true);
 		radioSyncInterval3.setSelection(false);
+		
+		if(this.form != null){
+			this.form.setText("Create a new synchronization");
+			updateFormActions(true, false);
+		}
+
 	}	
 	
 	private void loadJobComboValues(){
@@ -402,7 +412,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		TableWrapLayout layout = new TableWrapLayout();
 		layout.verticalSpacing = 20;
 		layout.horizontalSpacing = 10;
-		//layout.makeColumnsEqualWidth = true;
+		layout.makeColumnsEqualWidth = true;
 		layout.numColumns = 2;
 		form.getBody().setLayout(layout);		
 
@@ -433,7 +443,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		tfPassword.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
 		Section section2 = configureSection(toolkit, form, "Synchronization Targets", "Once the remote connection is set up, load the accessible repositories and choose one, and browse the local folder to synchronize with.", 1);
-		((TableWrapData)section2.getLayoutData()).maxWidth = 430;
 		
 		Composite sectionClient2 = toolkit.createComposite(section2);
 		layout = new TableWrapLayout();
@@ -512,46 +521,47 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		td = new TableWrapData(TableWrapData.FILL_GRAB);
 		td.colspan = 2;
 		checkboxActive.setLayoutData(td);
-
-		/*
-		{
-			saveButton = new Button(composite1, SWT.PUSH | SWT.LEFT);
-			FormData saveButtonLData = new FormData();
-			saveButtonLData.width = 92;
-			saveButtonLData.height = 28;
-			saveButtonLData.right =  new FormAttachment(1000, 1000, -109);
-			saveButtonLData.top =  new FormAttachment(0, 1000, 287);
-			saveButton.setLayoutData(saveButtonLData);
-			saveButton.setImage(SWTResourceManager.getImage("images/editdelete.png"));
-			//saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
-			saveButton.setText("Delete");
-			saveButton.setEnabled(false);
-		}
-		{
-			button1 = new Button(composite1, SWT.PUSH | SWT.LEFT);
-			button1.setText("Save");
-			FormData button1LData = new FormData();
-			button1LData.width = 91;
-			button1LData.height = 28;
-			button1LData.right =  new FormAttachment(1000, 1000, -13);
-			button1LData.top =  new FormAttachment(0, 1000, 287);
-			button1.setLayoutData(button1LData);
-			button1.setImage(SWTResourceManager.getImage("images/filesave.png"));
-			//button1.setBackground(SWTResourceManager.getColor(255,255,255));
-			button1.addListener(SWT.Selection, new Listener() {
-				
-				@Override
-				public void handleEvent(Event arg0) {
-					saveConfig();						
-				}
-			});
-		}
-		*/
+		updateFormActions(true, true);
 		
 		toolkit.paintBordersFor(sectionClient);
 		toolkit.paintBordersFor(sectionClient2);
 		toolkit.paintBordersFor(sectionClient3);
 	}	
+	
+	protected void updateFormActions(boolean save, boolean delete){
+		if(form == null) return;
+		form.getToolBarManager().removeAll();
+		if(save){
+			form.getToolBarManager().add(new Action("Save", new ImageDescriptor() {
+				@Override
+				public ImageData getImageData() {
+					return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/filesave.png"));
+				}
+			}) {
+				@Override
+				public void run() {
+					super.run();
+					saveConfig();
+				}
+			});
+		}
+		if(delete){
+			form.getToolBarManager().add(new Action("Delete", new ImageDescriptor() {
+				@Override
+				public ImageData getImageData() {
+					return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/editdelete.png"));
+				}
+			}) {
+				@Override
+				public void run() {
+					super.run();
+					
+				}
+			});
+		}
+		form.getToolBarManager().update(true);			
+		
+	}
 	
 	protected Section configureSection(FormToolkit toolkit, final Form form, String title, String description, int colspan){
 		Section section = toolkit.createSection(form.getBody(), 
