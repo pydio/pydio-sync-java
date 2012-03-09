@@ -68,10 +68,11 @@ public class Manager {
 
         Locale currentLocale = new Locale(language, country);
 		
-		Display display = new Display();
+		final Display display = new Display();
 		Display.setAppName("AjaXplorer Synchronizer");
 		Display.setAppVersion("1.0");
-		Shell shell = new Shell(display, SWT.ON_TOP | SWT.TITLE | SWT.MIN | SWT.CLOSE );
+		final Shell shell = new Shell(display, SWT.ON_TOP | SWT.NONE | SWT.ALPHA);
+
 		Manager.instanciate(shell, currentLocale);
 		
 		Manager.getInstance().initScheduler();
@@ -303,10 +304,10 @@ public class Manager {
 	}
 	
 	public String makeJobLabel(Node node){
-		String s = "HOST::REPO <=> LOCAL";
+		String s = "REPO on HOST <> LOCAL";
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
-		s = s.replace("HOST", uri.getScheme()+ "://" +uri.getHost());
+		s = s.replace("HOST", uri.getHost());
 		s = s.replace("LOCAL", node.getPropertyValue("target_folder"));
 		return s.toString();
 	}

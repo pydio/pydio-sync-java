@@ -16,44 +16,36 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.CCombo;
 import org.eclipse.swt.custom.CLabel;
-import org.eclipse.swt.custom.CTabFolder;
-import org.eclipse.swt.custom.CTabItem;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Text;
+import org.eclipse.ui.forms.events.ExpansionAdapter;
+import org.eclipse.ui.forms.events.ExpansionEvent;
+import org.eclipse.ui.forms.widgets.Form;
+import org.eclipse.ui.forms.widgets.FormToolkit;
+import org.eclipse.ui.forms.widgets.Section;
+import org.eclipse.ui.forms.widgets.TableWrapData;
+import org.eclipse.ui.forms.widgets.TableWrapLayout;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
 import com.cloudgarden.resource.SWTResourceManager;
 import com.j256.ormlite.dao.Dao;
 
-/**
-* This code was edited or generated using CloudGarden's Jigloo
-* SWT/Swing GUI Builder, which is free for non-commercial
-* use. If Jigloo is being used commercially (ie, by a corporation,
-* company or business for any purpose whatever) then you
-* should purchase a license for each developer using Jigloo.
-* Please visit www.cloudgarden.com for details.
-* Use of Jigloo implies acceptance of these licensing terms.
-* A COMMERCIAL LICENSE HAS NOT BEEN PURCHASED FOR
-* THIS MACHINE, SO JIGLOO OR THIS CODE CANNOT BE USED
-* LEGALLY FOR ANY CORPORATE OR COMMERCIAL PURPOSE.
-*/
-public class JobEditor extends org.eclipse.swt.widgets.Composite {
+public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 
 	{
 		//Register as a resource user - SWTResourceManager will
@@ -61,45 +53,29 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		SWTResourceManager.registerResourceUser(this);
 	}
 	
-	private Label hostLabel;
 	private Text tfHost;
-	private Label labelLogin;
-	private CTabFolder cTabFolder;
-	private CTabItem cTabItem2;
-	private Composite composite1;
-	private CTabItem cTabItem1;
 	private Button buttonFileChooser;
 	private Text tfTarget;
-	private Label labelTarget;
 	private Text tfPassword;
-	private Label labelPass;
 	private Button radioDirection2;
-	private Label label1;
 	private CLabel cLabel1;
-	private CCombo cCombo1;
-	private Label localLabel;
-	private Label remoteTitle;
-	private Group group2;
-	private Group group1;
+	private Combo cCombo1;
 	private Label Title;
-	private Button saveButton;
 	private Button buttonLoadRepositories;
 	private Button radioSyncInterval2;
-	private Button button1;
-	private Button button11;
-	private CCombo comboRepository;
-	private Label labelRepository;
+	private Combo comboRepository;
 	private Button radioSyncInterval3;
 	private Button radioSyncInterval1;
 	private Button radioDirection3;
 	private Button radioDirection;
 	private Button checkboxActive;
-	private Composite composite2;
 	private Text tfLogin;
 	ArrayList<Object> jobComboItems;
 	
 	private HashMap<String, String> repoItems;
 	private Node currentSynchroNode;
+	
+	private Form form;
 	
 
 	/**
@@ -121,9 +97,35 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		}		
 	}
 	
-	public JobEditor(org.eclipse.swt.widgets.Composite parent, int style) {
-		super(parent, style);
+	public JobEditor(final org.eclipse.swt.widgets.Composite parent, int style) {
+		super(parent, SWT.NONE);
 		initGUI();
+		// add ability to move shell around
+	    Listener l = new Listener() {
+	      Point origin;
+
+	      public void handleEvent(Event e) {
+	        switch (e.type) {
+	        case SWT.MouseDown:
+	          origin = new Point(e.x, e.y);
+	          break;
+	        case SWT.MouseUp:
+	          origin = null;
+	          break;
+	        case SWT.MouseMove:
+	          if (origin != null) {
+	            Point p = JobEditor.this.getDisplay().map(JobEditor.this, null, e.x, e.y);
+	            JobEditor.this.getShell().setLocation(p.x - origin.x, p.y - origin.y);
+	          }
+	          break;
+	        }
+	      }
+	    };
+	    this.addListener(SWT.MouseDown, l);
+	    this.addListener(SWT.MouseUp, l);
+	    this.addListener(SWT.MouseMove, l);
+	    
+	    
 		try {
 			Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
 			if(nodes.size()>0){
@@ -150,6 +152,9 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			values.put("DIRECTION", baseNode.getPropertyValue("synchro_direction"));
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
 			this.loadFormData(values);		
+			if(this.form != null){
+				this.form.setText(Manager.getInstance().makeJobLabel(baseNode));
+			}
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		}
@@ -317,10 +322,8 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 			comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
 			
 		} catch (URISyntaxException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -331,29 +334,27 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 		try {
 			FormLayout thisLayout = new FormLayout();
 			this.setLayout(thisLayout);
-			this.setSize(411, 437);
-			this.setBackground(SWTResourceManager.getColor(94, 124, 144));
+			this.setSize(600, 600);
+			this.setBackground(SWTResourceManager.getColor(94, 124, 144));		
 			this.setBackgroundMode(1);
 			{
 				cLabel1 = new CLabel(this, SWT.NONE);
 				FormData cLabel1LData = new FormData();
 				cLabel1LData.left =  new FormAttachment(0, 1000, 11);
 				cLabel1LData.top =  new FormAttachment(0, 1000, 32);
-				cLabel1LData.width = 381;
+				cLabel1LData.width = 360;
 				cLabel1LData.height = 19;
 				cLabel1.setLayoutData(cLabel1LData);
 				cLabel1.setText("Select a synchronisation job to edit");
 				cLabel1.setForeground(SWTResourceManager.getColor(255, 255, 255));
 			}
 			{
-				cCombo1 = new CCombo(this, SWT.NONE);
+				cCombo1 = new Combo(this, SWT.BORDER);
 				FormData cCombo1LData = new FormData();
 				cCombo1LData.left =  new FormAttachment(0, 1000, 12);
 				cCombo1LData.top =  new FormAttachment(0, 1000, 56);
-				cCombo1LData.width = 387;
-				cCombo1LData.height = 16;
+				cCombo1LData.width = 360;
 				cCombo1.setLayoutData(cCombo1LData);
-				cCombo1.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
 				loadJobComboValues();
 				initJobComboListener();
 			}
@@ -362,7 +363,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 				FormData TitleLData = new FormData();
 				TitleLData.left =  new FormAttachment(0, 1000, 13);
 				TitleLData.top =  new FormAttachment(0, 1000, 9);
-				TitleLData.width = 292;
+				TitleLData.width = 360;
 				TitleLData.height = 26;
 				TitleLData.right =  new FormAttachment(1000, 1000, -106);
 				Title.setLayoutData(TitleLData);
@@ -372,390 +373,204 @@ public class JobEditor extends org.eclipse.swt.widgets.Composite {
 				Title.setFont(SWTResourceManager.getFont("Arial", 18, 0, false, false));
 			}
 			{
-				cTabFolder = new CTabFolder(this, SWT.NONE);
-				cTabFolder.setTabHeight(20);
-				{
-					cTabItem1 = new CTabItem(cTabFolder, SWT.NONE);					
-					cTabItem1.setText(" Connexion data  ");
-					{
-						composite1 = new Composite(cTabFolder, SWT.NONE);
-						FormLayout composite1Layout = new FormLayout();
-						composite1.setLayout(composite1Layout);
-						cTabItem1.setControl(composite1);
-						composite1.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						{
-							localLabel = new Label(composite1, SWT.NONE);
-							FormData localLabelLData = new FormData();
-							localLabelLData.left =  new FormAttachment(0, 1000, 12);
-							localLabelLData.top =  new FormAttachment(0, 1000, 204);
-							localLabelLData.width = 383;
-							localLabelLData.right =  new FormAttachment(1000, 1000, -12);
-							localLabelLData.height = 22;
-							localLabel.setLayoutData(localLabelLData);
-							localLabel.setText("3. Choose a local folder");
-							localLabel.setFont(SWTResourceManager.getFont("Arial", 12, 1, false, false));
-							localLabel.setForeground(SWTResourceManager.getColor(94, 124, 144));
-						}
-						{
-							remoteTitle = new Label(composite1, SWT.NONE);
-							FormData remoteTitleLData = new FormData();
-							remoteTitleLData.left =  new FormAttachment(0, 1000, 12);
-							remoteTitleLData.top =  new FormAttachment(0, 1000, 18);
-							remoteTitleLData.width = 383;
-							remoteTitleLData.right =  new FormAttachment(1000, 1000, -12);
-							remoteTitleLData.height = 22;
-							remoteTitle.setLayoutData(remoteTitleLData);
-							remoteTitle.setText("1. Set up remote connexion");
-							remoteTitle.setFont(SWTResourceManager.getFont("Arial", 12, 1, false, false));
-							remoteTitle.setForeground(SWTResourceManager.getColor(94, 124, 144));
-						}
-						{
-							buttonLoadRepositories = new Button(composite1, SWT.PUSH | SWT.CENTER);
-							FormData buttonLoadRepositoriesLData = new FormData();
-							buttonLoadRepositoriesLData.top =  new FormAttachment(0, 1000, 150);
-							buttonLoadRepositoriesLData.width = 98;
-							buttonLoadRepositoriesLData.height = 28;
-							buttonLoadRepositoriesLData.right =  new FormAttachment(1000, 1000, -22);
-							buttonLoadRepositories.setLayoutData(buttonLoadRepositoriesLData);
-							buttonLoadRepositories.setImage(SWTResourceManager.getImage("images/reload.png"));
-							buttonLoadRepositories.setText("Load");
-							buttonLoadRepositories.addListener(SWT.Selection, new Listener() {
-								@Override
-								public void handleEvent(Event arg0) {
-									loadRepositories();
-								}
-							});
-						}
-						{
-							FormData comboRepositoryLData = new FormData();
-							comboRepositoryLData.left =  new FormAttachment(0, 1000, 111);
-							comboRepositoryLData.top =  new FormAttachment(0, 1000, 154);
-							comboRepositoryLData.width = 166;
-							comboRepositoryLData.height = 18;
-							comboRepositoryLData.right =  new FormAttachment(1000, 1000, -126);
-							comboRepository = new CCombo(composite1, SWT.BORDER);
-							comboRepository.setLayoutData(comboRepositoryLData);
-							comboRepository.setToolTipText("Click on the load button to get the repositories list from the server");
-							comboRepository.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-						}
-						{
-							labelRepository = new Label(composite1, SWT.NONE);
-							FormData labelRepositoryLData = new FormData();
-							labelRepositoryLData.left =  new FormAttachment(0, 1000, 12);
-							labelRepositoryLData.top =  new FormAttachment(0, 1000, 155);
-							labelRepositoryLData.width = 90;
-							labelRepositoryLData.height = 19;
-							labelRepository.setLayoutData(labelRepositoryLData);
-							labelRepository.setText("Repository");
-							labelRepository.setAlignment(SWT.RIGHT);
-							labelRepository.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						}
-						{
-							hostLabel = new Label(composite1, SWT.NONE);
-							FormData hostLabelLData = new FormData();
-							hostLabelLData.left =  new FormAttachment(0, 1000, 12);
-							hostLabelLData.top =  new FormAttachment(0, 1000, 51);
-							hostLabelLData.width = 90;
-							hostLabelLData.height = 19;
-							hostLabel.setLayoutData(hostLabelLData);
-							hostLabel.setText("Host URL");
-							hostLabel.setAlignment(SWT.RIGHT);
-							hostLabel.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						}
-						{
-							FormData hostTextLData = new FormData();
-							hostTextLData.left =  new FormAttachment(0, 1000, 111);
-							hostTextLData.top =  new FormAttachment(0, 1000, 50);
-							hostTextLData.width = 262;
-							hostTextLData.height = 15;
-							tfHost = new Text(composite1, SWT.BORDER);
-							tfHost.setLayoutData(hostTextLData);
-							tfHost.setOrientation(SWT.HORIZONTAL);
-							tfHost.setToolTipText("Full path to ajaxplorer, e.g http://domain.tld/ajaxplorer");
-							tfHost.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-						}
-						{
-							labelLogin = new Label(composite1, SWT.NONE);
-							FormData labelLoginLData = new FormData();
-							labelLoginLData.left =  new FormAttachment(0, 1000, 12);
-							labelLoginLData.top =  new FormAttachment(0, 1000, 78);
-							labelLoginLData.width = 90;
-							labelLoginLData.height = 19;
-							labelLogin.setLayoutData(labelLoginLData);
-							labelLogin.setText("Login");
-							labelLogin.setAlignment(SWT.RIGHT);
-							labelLogin.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						}
-						{
-							FormData tfLoginLData = new FormData();
-							tfLoginLData.left =  new FormAttachment(0, 1000, 111);
-							tfLoginLData.top =  new FormAttachment(0, 1000, 77);
-							tfLoginLData.width = 76;
-							tfLoginLData.height = 15;
-							tfLogin = new Text(composite1, SWT.BORDER);
-							tfLogin.setLayoutData(tfLoginLData);
-							tfLogin.setToolTipText("User identifier");
-							tfLogin.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-						}
-						{
-							labelPass = new Label(composite1, SWT.NONE);
-							FormData labelPassLData = new FormData();
-							labelPassLData.left =  new FormAttachment(0, 1000, 205);
-							labelPassLData.top =  new FormAttachment(0, 1000, 79);
-							labelPassLData.width = 84;
-							labelPassLData.height = 19;
-							labelPass.setLayoutData(labelPassLData);
-							labelPass.setText("Password");
-							labelPass.setAlignment(SWT.RIGHT);
-							labelPass.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						}
-						{
-							FormData tfPasswordLData = new FormData();
-							tfPasswordLData.left =  new FormAttachment(0, 1000, 297);
-							tfPasswordLData.top =  new FormAttachment(0, 1000, 77);
-							tfPasswordLData.width = 76;
-							tfPasswordLData.height = 15;
-							tfPassword = new Text(composite1, SWT.BORDER|SWT.PASSWORD);
-							tfPassword.setLayoutData(tfPasswordLData);
-							tfPassword.setToolTipText("User password");
-							tfPassword.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-						}
-						{
-							labelTarget = new Label(composite1, SWT.NONE);
-							FormData labelTargetLData = new FormData();
-							labelTargetLData.left =  new FormAttachment(0, 1000, 12);
-							labelTargetLData.top =  new FormAttachment(0, 1000, 234);
-							labelTargetLData.width = 90;
-							labelTargetLData.height = 19;
-							labelTarget.setLayoutData(labelTargetLData);
-							labelTarget.setText("Target Folder");
-							labelTarget.setAlignment(SWT.RIGHT);
-							labelTarget.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						}
-						{
-							FormData tfTargetLData = new FormData();
-							tfTargetLData.left =  new FormAttachment(0, 1000, 111);
-							tfTargetLData.top =  new FormAttachment(0, 1000, 233);
-							tfTargetLData.width = 158;
-							tfTargetLData.height = 15;
-							tfTargetLData.right =  new FormAttachment(1000, 1000, -126);
-							tfTarget = new Text(composite1, SWT.BORDER);
-							tfTarget.setLayoutData(tfTargetLData);
-							tfTarget.setToolTipText("Choose a local folder for synchronization");
-							tfTarget.setFont(SWTResourceManager.getFont("Arial", 9, 0, false, false));
-						}
-						{
-							buttonFileChooser = new Button(composite1, SWT.PUSH | SWT.CENTER);
-							FormData buttonFileChooserLData = new FormData();
-							buttonFileChooserLData.top =  new FormAttachment(0, 1000, 229);
-							buttonFileChooserLData.width = 98;
-							buttonFileChooserLData.height = 28;
-							buttonFileChooserLData.right =  new FormAttachment(1000, 1000, -22);
-							buttonFileChooser.setLayoutData(buttonFileChooserLData);
-							buttonFileChooser.setImage(SWTResourceManager.getImage("images/view_tree.png"));
-							buttonFileChooser.setText("Browse");
-							buttonFileChooser.addListener(SWT.Selection, new Listener() {
-								
-								@Override
-								public void handleEvent(Event arg0) {									
-									DirectoryDialog dialog = new DirectoryDialog(JobEditor.this.getShell());
-									String res = dialog.open();
-									if(res != null){
-										tfTarget.setText(res);
-									}
-								}
-							});
-						}
-						{
-							saveButton = new Button(composite1, SWT.PUSH | SWT.LEFT);
-							FormData saveButtonLData = new FormData();
-							saveButtonLData.width = 92;
-							saveButtonLData.height = 28;
-							saveButtonLData.right =  new FormAttachment(1000, 1000, -109);
-							saveButtonLData.top =  new FormAttachment(0, 1000, 287);
-							saveButton.setLayoutData(saveButtonLData);
-							saveButton.setImage(SWTResourceManager.getImage("images/editdelete.png"));
-							saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
-							saveButton.setText("Delete");
-							saveButton.setEnabled(false);
-						}
-						{
-							button1 = new Button(composite1, SWT.PUSH | SWT.LEFT);
-							button1.setText("Save");
-							FormData button1LData = new FormData();
-							button1LData.width = 91;
-							button1LData.height = 28;
-							button1LData.right =  new FormAttachment(1000, 1000, -13);
-							button1LData.top =  new FormAttachment(0, 1000, 287);
-							button1.setLayoutData(button1LData);
-							button1.setImage(SWTResourceManager.getImage("images/filesave.png"));
-							button1.setBackground(SWTResourceManager.getColor(255,255,255));
-							button1.addListener(SWT.Selection, new Listener() {
-								
-								@Override
-								public void handleEvent(Event arg0) {
-									saveConfig();						
-								}
-							});
-						}
-						{
-							label1 = new Label(composite1, SWT.NONE);
-							FormData label1LData = new FormData();
-							label1LData.left =  new FormAttachment(0, 1000, 12);
-							label1LData.top =  new FormAttachment(0, 1000, 125);
-							label1LData.width = 383;
-							label1LData.height = 22;
-							label1.setLayoutData(label1LData);
-							label1.setText("2. Load and select a repository");
-							label1.setFont(SWTResourceManager.getFont("Arial",12,1,false,false));
-							label1.setForeground(SWTResourceManager.getColor(94,124,144));
-						}
-					}
-
-				}
-				{
-					cTabItem2 = new CTabItem(cTabFolder, SWT.NONE);
-					cTabItem2.setText(" Job Execution  ");
-					{
-						composite2 = new Composite(cTabFolder, SWT.NONE);
-						FormLayout composite2Layout = new FormLayout();
-						composite2.setLayout(composite2Layout);
-						cTabItem2.setControl(composite2);
-						composite2.setBackground(SWTResourceManager.getColor(255, 255, 255));
-						{
-							group2 = new Group(composite2, SWT.NONE);
-							GridLayout group2Layout = new GridLayout();
-							group2Layout.makeColumnsEqualWidth = true;
-							group2.setLayout(group2Layout);
-							FormData group2LData = new FormData();
-							group2LData.width = 377;
-							group2LData.left =  new FormAttachment(0, 1000, 12);
-							group2LData.top =  new FormAttachment(0, 1000, 154);
-							group2LData.height = 75;
-							group2.setLayoutData(group2LData);
-							group2.setText("Run this job every...");
-							group2.setBackground(SWTResourceManager.getColor(255, 255, 255));
-							{
-								radioSyncInterval1 = new Button(group2, SWT.RADIO | SWT.LEFT);
-								GridData radioSyncInterval1LData = new GridData();
-								radioSyncInterval1LData.widthHint = 327;
-								radioSyncInterval1LData.heightHint = 16;
-								radioSyncInterval1.setLayoutData(radioSyncInterval1LData);
-								radioSyncInterval1.setText("Minute");
-								radioSyncInterval1.setBackground(SWTResourceManager.getColor(255, 255, 255));
-							}
-							{
-								radioSyncInterval2 = new Button(group2, SWT.RADIO | SWT.LEFT);
-								GridData radioSyncInterval2LData = new GridData();
-								radioSyncInterval2LData.widthHint = 327;
-								radioSyncInterval2LData.heightHint = 16;
-								radioSyncInterval2.setLayoutData(radioSyncInterval2LData);
-								radioSyncInterval2.setText("Hour");
-								radioSyncInterval2.setBackground(SWTResourceManager.getColor(255,255,255));
-								radioSyncInterval2.setSelection(true);
-							}
-							{
-								radioSyncInterval3 = new Button(group2, SWT.RADIO | SWT.LEFT);
-								GridData radioSyncInterval3LData = new GridData();
-								radioSyncInterval3LData.widthHint = 327;
-								radioSyncInterval3LData.heightHint = 16;
-								radioSyncInterval3.setLayoutData(radioSyncInterval3LData);
-								radioSyncInterval3.setText("Day");
-								radioSyncInterval3.setBackground(SWTResourceManager.getColor(255,255,255));
-							}
-						}
-						{
-							group1 = new Group(composite2, SWT.NONE);
-							GridLayout group1Layout = new GridLayout();
-							group1Layout.makeColumnsEqualWidth = true;
-							group1.setLayout(group1Layout);
-							FormData group1LData = new FormData();
-							group1LData.width = 377;
-							group1LData.left =  new FormAttachment(0, 1000, 12);
-							group1LData.top =  new FormAttachment(0, 1000, 45);
-							group1LData.height = 71;
-							group1.setLayoutData(group1LData);
-							group1.setText("Synchronisation Direction");
-							group1.setBackground(SWTResourceManager.getColor(255, 255, 255));
-							{
-								radioDirection = new Button(group1, SWT.RADIO | SWT.LEFT);
-								GridData radioDirectionLData = new GridData();
-								radioDirectionLData.widthHint = 327;
-								radioDirectionLData.heightHint = 16;
-								radioDirection.setLayoutData(radioDirectionLData);
-								radioDirection.setText("Bidirectionnal");
-								radioDirection.setBackground(SWTResourceManager.getColor(255,255,255));
-								radioDirection.setSelection(true);
-							}
-							{
-								radioDirection2 = new Button(group1, SWT.RADIO | SWT.LEFT);
-								GridData radioDirection2LData = new GridData();
-								radioDirection2LData.widthHint = 327;
-								radioDirection2LData.heightHint = 16;
-								radioDirection2.setLayoutData(radioDirection2LData);
-								radioDirection2.setText("Download only");
-								radioDirection2.setBackground(SWTResourceManager.getColor(255, 255, 255));
-							}
-							{
-								radioDirection3 = new Button(group1, SWT.RADIO | SWT.LEFT);
-								GridData radioDirection3LData = new GridData();
-								radioDirection3LData.widthHint = 327;
-								radioDirection3LData.heightHint = 16;
-								radioDirection3.setLayoutData(radioDirection3LData);
-								radioDirection3.setText("Upload Only");
-								radioDirection3.setBackground(SWTResourceManager.getColor(255,255,255));
-							}
-						}
-						{
-							checkboxActive = new Button(composite2, SWT.CHECK | SWT.LEFT);
-							FormData checkboxActiveLData = new FormData();
-							checkboxActiveLData.left =  new FormAttachment(0, 1000, 20);
-							checkboxActiveLData.top =  new FormAttachment(0, 1000, 12);
-							checkboxActiveLData.width = 375;
-							checkboxActiveLData.height = 16;
-							checkboxActive.setLayoutData(checkboxActiveLData);
-							checkboxActive.setText("This job is active");
-							checkboxActive.setBackground(SWTResourceManager.getColor(255, 255, 255));
-							checkboxActive.setSelection(true);
-						}
-						{
-							button11 = new Button(composite2, SWT.PUSH | SWT.LEFT);
-							button11.setText("Save");
-							FormData button1LData = new FormData();
-							button1LData.width = 91;
-							button1LData.height = 28;
-							button1LData.right =  new FormAttachment(1000, 1000, -13);
-							button1LData.top =  new FormAttachment(0, 1000, 287);
-							button11.setLayoutData(button1LData);
-							button11.setImage(SWTResourceManager.getImage("images/filesave.png"));
-							button11.setBackground(SWTResourceManager.getColor(255,255,255));
-							button11.addListener(SWT.Selection, new Listener() {
-								
-								@Override
-								public void handleEvent(Event arg0) {
-									saveConfig();						
-								}
-							});
-						}						
-					}
-				}
-				FormData cTabFolderLData = new FormData();
+				Composite formComposite = new Composite(this, SWT.NONE);
+				FillLayout compositeLayout = new FillLayout(SWT.FILL);
+				formComposite.setLayout(compositeLayout);
+				FormData cTabFolderLData = new FormData();				
 				cTabFolderLData.left =  new FormAttachment(0, 1000, 0);
 				cTabFolderLData.top =  new FormAttachment(0, 1000, 85);
 				cTabFolderLData.width = 407;
 				cTabFolderLData.height = 330;
 				cTabFolderLData.right =  new FormAttachment(1000, 1000, 0);
 				cTabFolderLData.bottom =  new FormAttachment(1000, 1000, 0);
-				cTabFolder.setLayoutData(cTabFolderLData);
-				cTabFolder.setSelection(0);
-				cTabFolder.setBackground(SWTResourceManager.getColor(255, 255, 255));
-				cTabFolder.setSimple(false);
-				cTabFolder.setVisible(true);
+				formComposite.setLayoutData(cTabFolderLData);
+				populateToolkit(formComposite);
+				
 			}
 			this.layout();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public void populateToolkit(Composite parent) {
+		FormToolkit toolkit = new FormToolkit(parent.getDisplay());
+		final Form form = toolkit.createForm(parent);
+		form.setText("New job ... ");
+		this.form = form;
+		toolkit.decorateFormHeading(form);
+		TableWrapLayout layout = new TableWrapLayout();
+		layout.verticalSpacing = 20;
+		layout.horizontalSpacing = 10;
+		//layout.makeColumnsEqualWidth = true;
+		layout.numColumns = 2;
+		form.getBody().setLayout(layout);		
+
+
+		Section section = configureSection(toolkit, form, "Server Connection", "Set up the remote server connection. The URL will be the exact same adress as you would use to access AjaXplorer via a web browser.", 1);
+		Composite sectionClient = toolkit.createComposite(section);		
+		layout = new TableWrapLayout();
+		sectionClient.setLayout(layout);
+		layout.numColumns = 2;
+		layout.horizontalSpacing = 8;
+		layout.verticalSpacing = 10;
+		
+		section.setClient(sectionClient);	
+		
+		// HOST
+		toolkit.createLabel(sectionClient, "Host URL : ");
+		tfHost = toolkit.createText(sectionClient, "");
+		tfHost.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
+		
+		// LOGIN
+		toolkit.createLabel(sectionClient, "Login : ");
+		tfLogin = toolkit.createText(sectionClient, "");
+		tfLogin.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
+		
+		// PASSWORD
+		toolkit.createLabel(sectionClient, "Password : ");
+		tfPassword = toolkit.createText(sectionClient, "", SWT.PASSWORD);
+		tfPassword.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
+		
+		Section section2 = configureSection(toolkit, form, "Synchronization Targets", "Once the remote connection is set up, load the accessible repositories and choose one, and browse the local folder to synchronize with.", 1);
+		((TableWrapData)section2.getLayoutData()).maxWidth = 430;
+		
+		Composite sectionClient2 = toolkit.createComposite(section2);
+		layout = new TableWrapLayout();
+		sectionClient2.setLayout(layout);
+		layout.numColumns = 3;		
+		section2.setClient(sectionClient2);	
+		
+		// REPOSITORY CHOOSER
+		toolkit.createLabel(sectionClient2, "Repository : ");
+		comboRepository = new Combo(sectionClient2, SWT.BORDER);
+		comboRepository.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
+		toolkit.adapt(comboRepository, true, true);
+		
+		buttonLoadRepositories = toolkit.createButton(sectionClient2, "Load", SWT.PUSH);
+		buttonLoadRepositories.addListener(SWT.Selection, new Listener() {
+			@Override
+			public void handleEvent(Event arg0) {
+				loadRepositories();
+			}
+		});
+		buttonLoadRepositories.setLayoutData(new TableWrapData());
+
+		// TARGET FOLDER CHOOSER
+		toolkit.createLabel(sectionClient2, "Local Folder : ");
+		tfTarget = toolkit.createText(sectionClient2, "");
+		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
+		td.valign = TableWrapData.MIDDLE;
+		tfTarget.setLayoutData(td);
+		
+		buttonFileChooser = toolkit.createButton(sectionClient2, "Browse", SWT.PUSH);
+		td = new TableWrapData(TableWrapData.FILL_GRAB);
+		td.valign = TableWrapData.MIDDLE;
+		buttonFileChooser.setLayoutData(td);
+		buttonFileChooser.addListener(SWT.Selection, new Listener() {
+			
+			@Override
+			public void handleEvent(Event arg0) {									
+				DirectoryDialog dialog = new DirectoryDialog(JobEditor.this.getShell());
+				String res = dialog.open();
+				if(res != null){
+					tfTarget.setText(res);
+				}
+			}
+		});
+		
+		Section section3 = configureSection(toolkit, form, "Job Execution Parameters", "Set how this synchronization job must be executed and when", 2);		
+		Composite sectionClient3 = toolkit.createComposite(section3);
+		layout = new TableWrapLayout();
+		sectionClient3.setLayout(layout);
+		layout.numColumns = 2;
+		section3.setClient(sectionClient3);			
+		
+		Label lab = toolkit.createLabel(sectionClient3, "Synchronisation direction : ");
+		lab.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
+		Composite rComp = toolkit.createComposite(sectionClient3);
+		rComp.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
+		layout = new TableWrapLayout();
+		layout.numColumns = 3;
+		rComp.setLayout(layout);
+		radioDirection = toolkit.createButton(rComp, "Bidirectionnal", SWT.RADIO);
+		radioDirection2 = toolkit.createButton(rComp, "Download only", SWT.RADIO);
+		radioDirection3 = toolkit.createButton(rComp, "Upload only", SWT.RADIO);
+				
+		Label lab2 = toolkit.createLabel(sectionClient3, "Execute synchro every : ");
+		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
+		Composite rComp2= toolkit.createComposite(sectionClient3);
+		rComp2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
+		layout = new TableWrapLayout();
+		layout.numColumns = 3;
+		rComp2.setLayout(layout);
+		radioSyncInterval1 = toolkit.createButton(rComp2, "Minutes", SWT.RADIO);
+		radioSyncInterval2 = toolkit.createButton(rComp2, "Hours", SWT.RADIO);
+		radioSyncInterval3 = toolkit.createButton(rComp2, "Days", SWT.RADIO);
+		
+		checkboxActive = toolkit.createButton(sectionClient3, "This job is active", SWT.CHECK | SWT.SELECTED);
+		td = new TableWrapData(TableWrapData.FILL_GRAB);
+		td.colspan = 2;
+		checkboxActive.setLayoutData(td);
+
+		/*
+		{
+			saveButton = new Button(composite1, SWT.PUSH | SWT.LEFT);
+			FormData saveButtonLData = new FormData();
+			saveButtonLData.width = 92;
+			saveButtonLData.height = 28;
+			saveButtonLData.right =  new FormAttachment(1000, 1000, -109);
+			saveButtonLData.top =  new FormAttachment(0, 1000, 287);
+			saveButton.setLayoutData(saveButtonLData);
+			saveButton.setImage(SWTResourceManager.getImage("images/editdelete.png"));
+			//saveButton.setBackground(SWTResourceManager.getColor(255,255,255));
+			saveButton.setText("Delete");
+			saveButton.setEnabled(false);
+		}
+		{
+			button1 = new Button(composite1, SWT.PUSH | SWT.LEFT);
+			button1.setText("Save");
+			FormData button1LData = new FormData();
+			button1LData.width = 91;
+			button1LData.height = 28;
+			button1LData.right =  new FormAttachment(1000, 1000, -13);
+			button1LData.top =  new FormAttachment(0, 1000, 287);
+			button1.setLayoutData(button1LData);
+			button1.setImage(SWTResourceManager.getImage("images/filesave.png"));
+			//button1.setBackground(SWTResourceManager.getColor(255,255,255));
+			button1.addListener(SWT.Selection, new Listener() {
+				
+				@Override
+				public void handleEvent(Event arg0) {
+					saveConfig();						
+				}
+			});
+		}
+		*/
+		
+		toolkit.paintBordersFor(sectionClient);
+		toolkit.paintBordersFor(sectionClient2);
+		toolkit.paintBordersFor(sectionClient3);
+	}	
+	
+	protected Section configureSection(FormToolkit toolkit, final Form form, String title, String description, int colspan){
+		Section section = toolkit.createSection(form.getBody(), 
+				Section.DESCRIPTION|Section.TITLE_BAR|
+				Section.TWISTIE|Section.EXPANDED);
+		section.descriptionVerticalSpacing = 5;
+		section.clientVerticalSpacing = 10;
+		
+		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
+		td.colspan = colspan;
+		section.setLayoutData(td);
+		section.addExpansionListener(new ExpansionAdapter() {
+			public void expansionStateChanged(ExpansionEvent e) {
+				//form.reflow(true);
+			}
+		});
+		section.setText(title);
+		section.setDescription(description);
+		return section;
 	}
 
 }
