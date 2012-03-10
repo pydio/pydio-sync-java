@@ -392,7 +392,11 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		try {
 			FormLayout thisLayout = new FormLayout();
 			this.setLayout(thisLayout);
-			this.setSize(600, 500);			
+			if(System.getProperty("os.name").toLowerCase().indexOf("mac") >= 0){
+				this.setSize(750, 550);
+			}else{
+				this.setSize(600, 500);
+			}
 			//this.setBackground(SWTResourceManager.getColor(94, 124, 144));
 			this.applyGradientBG(this);
 			this.setBackgroundMode(1);

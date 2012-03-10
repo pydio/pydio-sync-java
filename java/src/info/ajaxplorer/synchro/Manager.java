@@ -85,6 +85,10 @@ public class Manager {
 		
 	}
 	
+	public static void stop(String[] args){
+		System.exit(0);
+	}
+	
 	public static String getMessage(String s){
 		return Manager.instance.messages.getString(s);
 	}
