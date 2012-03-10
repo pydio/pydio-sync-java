@@ -73,6 +73,7 @@ public class SyncJob implements org.quartz.Job {
 	
 	private String currentJobNodeID;
 	private boolean clearSnapshots = false;
+	private String direction;
 	
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
@@ -108,6 +109,7 @@ public class SyncJob implements org.quartz.Job {
 		AjxpAPI.getInstance().setServer(s);		
 		
 		final File d = new File(currentRepository.getPropertyValue("target_folder"));
+		direction = currentRepository.getPropertyValue("synchro_direction");
 
         Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
 
@@ -130,8 +132,18 @@ public class SyncJob implements org.quartz.Job {
 		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, d);
 		Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 		
-        Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot, d);        
-        Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
+		Map<String, Object[]> localDiff;
+		Map<String, Object[]> remoteDiff;
+		//if(direction.equals("up") || direction.equals("bi")){
+			localDiff = loadLocalChanges(localSnapshot, d);
+//		}else{
+//			localDiff = new TreeMap<String, Object[]>();
+//		}
+//		if(direction.equals("down") || direction.equals("bi")){
+			remoteDiff = loadRemoteChanges(remoteSnapshot);
+//		}else{
+//			remoteDiff = new TreeMap<String, Object[]>();
+//		}
 
         Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
         //System.out.println(changes);
@@ -274,12 +286,22 @@ public class SyncJob implements org.quartz.Job {
 				localDiff.remove(k);
 			}
 			if(v == NODE_CHANGE_STATUS_FILE_CREATED || v == NODE_CHANGE_STATUS_MODIFIED){
-				value[0] = TASK_LOCAL_GET_CONTENT;
-				changes.put(k, value);
+				if(direction.equals("up")){					
+					if(v == NODE_CHANGE_STATUS_MODIFIED) localDiff.put(k, value);
+				}else{
+					value[0] = TASK_LOCAL_GET_CONTENT;
+					changes.put(k, value);
+				}
 			}else if(v == NODE_CHANGE_STATUS_FILE_DELETED || v == NODE_CHANGE_STATUS_DIR_DELETED){
-				value[0] = TASK_LOCAL_REMOVE;
-				changes.put(k, value);
-			}else if(v == NODE_CHANGE_STATUS_DIR_CREATED){
+				if(direction.equals("up")){
+					if(v == NODE_CHANGE_STATUS_FILE_DELETED) value[0] = NODE_CHANGE_STATUS_MODIFIED;
+					else value[0] = NODE_CHANGE_STATUS_DIR_CREATED;
+					localDiff.put(k, value);
+				}else{
+					value[0] = TASK_LOCAL_REMOVE;
+					changes.put(k, value);
+				}
+			}else if(v == NODE_CHANGE_STATUS_DIR_CREATED && !direction.equals("up")){
 				value[0] = TASK_LOCAL_MKDIR;
 				changes.put(k, value);
 			}
@@ -291,18 +313,32 @@ public class SyncJob implements org.quartz.Job {
 			Object[] value = entry.getValue();
 			Integer v = (Integer)value[0]; 
 			if(v == NODE_CHANGE_STATUS_FILE_CREATED || v == NODE_CHANGE_STATUS_MODIFIED){
-				value[0] = TASK_REMOTE_PUT_CONTENT;
+				if(direction.equals("down")){
+					if(v == NODE_CHANGE_STATUS_FILE_CREATED) value[0] = TASK_LOCAL_REMOVE;
+					else value[0] = TASK_LOCAL_GET_CONTENT;
+				}else{
+					value[0] = TASK_REMOTE_PUT_CONTENT;
+				}
 				changes.put(k, value);
 			}else if(v == NODE_CHANGE_STATUS_FILE_DELETED || v == NODE_CHANGE_STATUS_DIR_DELETED){
-				value[0] = TASK_REMOTE_REMOVE;
+				if(direction.equals("down")){
+					if(v == NODE_CHANGE_STATUS_FILE_DELETED) value[0] = TASK_LOCAL_GET_CONTENT;
+					else value[0] = TASK_LOCAL_MKDIR;
+				}else{
+					value[0] = TASK_REMOTE_REMOVE;
+				}
 				changes.put(k, value);
 			}else if(v == NODE_CHANGE_STATUS_DIR_CREATED){
-				value[0] = TASK_REMOTE_MKDIR;
+				if(direction.equals("down")){
+					value[0] = TASK_LOCAL_REMOVE;
+				}else{				
+					value[0] = TASK_REMOTE_MKDIR;
+				}
 				changes.put(k, value);
 			}			
 		}
 		return changes;
-	}
+	}		
 
 	protected Node loadRootAndSnapshot(String type, final List<Node> snapshot, File localFolder) throws SQLException{
 		

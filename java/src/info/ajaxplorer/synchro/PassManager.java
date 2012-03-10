@@ -37,6 +37,7 @@ public class PassManager {
         SecretKey key = keyFactory.generateSecret(new PBEKeySpec(PASSWORD));
         Cipher pbeCipher = Cipher.getInstance("PBEWithMD5AndDES");
         pbeCipher.init(Cipher.DECRYPT_MODE, key, new PBEParameterSpec(SALT, 20));
+        if(property.getBytes().length % 8 != 0) return property;
         return new String(pbeCipher.doFinal(property.getBytes()));
     }
 

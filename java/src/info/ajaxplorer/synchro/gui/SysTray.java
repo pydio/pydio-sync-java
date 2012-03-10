@@ -206,15 +206,13 @@ public class SysTray {
 		image.dispose();
 	}
 	
-	protected void openConfiguration(Shell shell){
+	public void openConfiguration(Shell shell){
 		if(!shellInitialized){
 			ConfigEditor c = new ConfigEditor();
 			c.initShell(shell);
 			shellInitialized = true;
 		}
 		shell.setVisible(true);
-		//shell.setMinimized(true);
-		//shell.setMinimized(false);		
 	}
 	
 }

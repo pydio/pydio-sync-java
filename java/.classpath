@@ -19,5 +19,9 @@
 	<classpathentry kind="lib" path="G:/DEV/JARS/json-rpc-1.0.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/sqlite-jdbc-3.6.20.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/commons-codec-1.6/commons-codec-1.6.jar"/>
+	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.ui.forms_3.5.100.v20110425.jar"/>
+	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.jface_3.7.0.I20110522-1430.jar"/>
+	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.equinox.common_3.6.0.v20110523.jar"/>
+	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.core.commands_3.6.0.I20110111-0800.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

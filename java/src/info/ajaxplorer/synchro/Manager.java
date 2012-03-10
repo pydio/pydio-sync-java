@@ -145,7 +145,7 @@ public class Manager {
 		});		
 	}
 	
-	public Manager(Shell shell, Locale locale){
+	public Manager(final Shell shell, Locale locale){
 		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
 		try {
 			initializeDAO();
@@ -161,7 +161,14 @@ public class Manager {
         } catch (SchedulerException se) {
             se.printStackTrace();
         }		
-	    
+	    shell.getDisplay().asyncExec(new Runnable() {
+			
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				sysTray.openConfiguration(shell);
+			}
+		});
 	}
 	
 	private void initializeDAO() throws SQLException{
@@ -187,6 +194,11 @@ public class Manager {
 					"END;");           
        }        		
 		
+	}
+	
+	public void deleteSynchroNode(Node node) throws SchedulerException, SQLException{
+		this.unscheduleJob(node);		
+		nodeDao.delete(node);
 	}
 	
 	public Node updateSynchroNode(Map<String, String> data, Node node) throws SQLException, URISyntaxException{
@@ -290,7 +302,9 @@ public class Manager {
 					nodeDao.refresh(node);
 					
 					// CHANGE INTERVAL
-					this.changeJobInterval(node);
+					if(node.getPropertyValue("synchro_active").equals("true")){
+						this.changeJobInterval(node);						
+					}
 					
 				}
 			} catch (SchedulerException e) {
@@ -307,8 +321,13 @@ public class Manager {
 		String s = "REPO on HOST <> LOCAL";
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
-		s = s.replace("HOST", uri.getHost());
+		if(uri != null){
+			s = s.replace("HOST", uri.getHost());
+		}
 		s = s.replace("LOCAL", node.getPropertyValue("target_folder"));
+		if(node.getPropertyValue("synchro_active").equals("false")){
+			s = s + " (inactive)";
+		}
 		return s.toString();
 	}
 	
@@ -352,6 +371,8 @@ public class Manager {
 	}
 	
 	public void scheduleJob(Node n, boolean firstTriggerClear) throws SchedulerException{				
+		
+		if(n.getPropertyValue("synchro_active").equals("false")) return;
 		
         JobDetail job = newJob(SyncJob.class)
         		.withIdentity(String.valueOf(n.id), "sync")

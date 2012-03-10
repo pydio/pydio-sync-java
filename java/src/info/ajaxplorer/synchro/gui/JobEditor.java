@@ -19,10 +19,16 @@ import org.eclipse.jface.action.Action;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CLabel;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.GC;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
@@ -34,6 +40,7 @@ import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.forms.events.ExpansionAdapter;
 import org.eclipse.ui.forms.events.ExpansionEvent;
@@ -42,12 +49,27 @@ import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.forms.widgets.Section;
 import org.eclipse.ui.forms.widgets.TableWrapData;
 import org.eclipse.ui.forms.widgets.TableWrapLayout;
+import org.quartz.SchedulerException;
 import org.w3c.dom.Document;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 
 import com.cloudgarden.resource.SWTResourceManager;
 import com.j256.ormlite.dao.Dao;
 
+
+/**
+* This code was edited or generated using CloudGarden's Jigloo
+* SWT/Swing GUI Builder, which is free for non-commercial
+* use. If Jigloo is being used commercially (ie, by a corporation,
+* company or business for any purpose whatever) then you
+* should purchase a license for each developer using Jigloo.
+* Please visit www.cloudgarden.com for details.
+* Use of Jigloo implies acceptance of these licensing terms.
+* A COMMERCIAL LICENSE HAS NOT BEEN PURCHASED FOR
+* THIS MACHINE, SO JIGLOO OR THIS CODE CANNOT BE USED
+* LEGALLY FOR ANY CORPORATE OR COMMERCIAL PURPOSE.
+*/
 public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 
 	{
@@ -61,6 +83,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 	private Text tfTarget;
 	private Text tfPassword;
 	private Button radioDirection2;
+	private Label minimize;
 	private CLabel cLabel1;
 	private Combo cCombo1;
 	private Label Title;
@@ -91,6 +114,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		try {
 			currentSynchroNode = Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
 			loadJobComboValues();
+			this.form.setText(Manager.getInstance().makeJobLabel(currentSynchroNode));
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} catch (URISyntaxException e) {
@@ -98,6 +122,28 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		} catch (Exception e) {
 			e.printStackTrace();
 		}		
+	}
+	
+	protected void deleteConfig(){
+		try {
+			Manager.getInstance().deleteSynchroNode(currentSynchroNode);
+			currentSynchroNode = null;
+			try {
+				Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
+				if(nodes.size()>0){
+					currentSynchroNode = nodes.iterator().next();
+					loadFormFromNode(currentSynchroNode);
+				}
+			} catch (Exception e) {
+			}			
+			loadJobComboValues();
+		} catch (SchedulerException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	public JobEditor(final org.eclipse.swt.widgets.Composite parent, int style) {
@@ -281,7 +327,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		}
 		System.out.println("Update comborepo");
 
-		comboRepository.setText("Loading ...");
+		buttonLoadRepositories.setText("Loading ...");
 		String host = tfHost.getText();
 		String login = tfLogin.getText();
 		String pass = tfPassword.getText();
@@ -294,7 +340,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 			RestRequest rest = new RestRequest();
 			System.out.println("Will send request");
 			Document doc = rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
-			final Dao<Node, String> nodeDao = Manager.getInstance().getNodeDao();
 			
 			NodeList mainTag = doc.getElementsByTagName("repositories");
 			if(mainTag.getLength() == 0){
@@ -303,34 +348,37 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 			final NodeList repos = mainTag.item(0).getChildNodes();
 			repoItems = new HashMap<String, String>();
 			
-			nodeDao.callBatchTasks(new Callable<Void>() {
-				public Void call() throws Exception{			
-					if (repos!=null && repos.getLength() > 0){
-						for (int i = 0; i < repos.getLength(); i++) {
-							org.w3c.dom.Node xmlNode = repos.item(i);
-							Node repository = new Node(Node.NODE_TYPE_REPOSITORY, "", null);
-							repository.properties = nodeDao.getEmptyForeignCollection("properties");
-							repository.initFromXmlNode(xmlNode);
-							boolean excluded = false;
-							for(int p =0;p<Manager.EXCLUDED_ACCESS_TYPES.length;p++){
-								if(repository.getPropertyValue("access_type").equalsIgnoreCase(Manager.EXCLUDED_ACCESS_TYPES[p])){
-									excluded = true; break;
-								}
-							}
-							if(excluded) {
-								continue;
-							}
-							repoItems.put(repository.getLabel(), repository.getPropertyValue("repository_id"));
+			if (repos!=null && repos.getLength() > 0){
+				for (int i = 0; i < repos.getLength(); i++) {
+					org.w3c.dom.Node xmlNode = repos.item(i);
+					NamedNodeMap attributes = xmlNode.getAttributes();
+					NodeList children = xmlNode.getChildNodes();
+					String label= "";
+					for(int k=0;k<children.getLength();k++){
+						if(children.item(k).getNodeName().equals("label")){
+							label = children.item(k).getTextContent(); 
 						}
 					}
-					return null;
+					String accessType = attributes.getNamedItem("access_type").getNodeValue();
+					String repositoryId = attributes.getNamedItem("id").getNodeValue();
+					boolean excluded = false;
+					for(int p =0;p<Manager.EXCLUDED_ACCESS_TYPES.length;p++){
+						if(accessType.equalsIgnoreCase(Manager.EXCLUDED_ACCESS_TYPES[p])){
+							excluded = true; break;
+						}
+					}
+					if(excluded) {
+						continue;
+					}
+					repoItems.put(label, repositoryId);
 				}
-			});
+			}
 			System.out.println("Parsed response!");
-
 			comboRepository.setText("");
 			comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
+			comboRepository.setListVisible(true);
 			
+			buttonLoadRepositories.setText("Load");
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		} catch (Exception e) {
@@ -344,15 +392,61 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		try {
 			FormLayout thisLayout = new FormLayout();
 			this.setLayout(thisLayout);
-			this.setSize(600, 600);
-			this.setBackground(SWTResourceManager.getColor(94, 124, 144));		
+			this.setSize(600, 500);			
+			//this.setBackground(SWTResourceManager.getColor(94, 124, 144));
+			this.applyGradientBG(this);
 			this.setBackgroundMode(1);
+			{
+				minimize = new Label(this, SWT.NONE);
+				FormData minimizeLData = new FormData();
+				minimizeLData.width = 16;
+				minimizeLData.height = 16;
+				minimizeLData.top =  new FormAttachment(0, 1000, 4);
+				minimizeLData.right =  new FormAttachment(1000, 1000, -4);
+				minimize.setLayoutData(minimizeLData);
+				minimize.setImage(SWTResourceManager.getImage("images/minimize.png"));
+				minimize.setToolTipText("Close this window");
+				minimize.addMouseListener(new MouseListener() {
+					
+					@Override
+					public void mouseUp(MouseEvent arg0) {
+						// TODO Auto-generated method stub
+						
+					}
+					
+					@Override
+					public void mouseDown(MouseEvent arg0) {
+						// TODO Auto-generated method stub
+						getShell().setVisible(false);
+					}
+					
+					@Override
+					public void mouseDoubleClick(MouseEvent arg0) {
+						// TODO Auto-generated method stub
+						
+					}
+				});
+			}
+			{
+				Title = new Label(this, SWT.NONE);
+				FormData TitleLData = new FormData();
+				TitleLData.left =  new FormAttachment(0, 1000, 13);
+				TitleLData.top =  new FormAttachment(0, 1000, 10);
+				TitleLData.width = 463;
+				TitleLData.height = 26;
+				TitleLData.right =  new FormAttachment(1000, 1000, -124);
+				Title.setLayoutData(TitleLData);
+				Title.setText("AjaXplorer Synchronizer");
+				Title.setForeground(SWTResourceManager.getColor(255, 255, 255));
+				//Title.setForeground(SWTResourceManager.getColor(94, 124, 144));
+				Title.setFont(SWTResourceManager.getFont("Arial", 18, 0, false, false));
+			}
 			{
 				cLabel1 = new CLabel(this, SWT.NONE);
 				FormData cLabel1LData = new FormData();
-				cLabel1LData.left =  new FormAttachment(0, 1000, 11);
-				cLabel1LData.top =  new FormAttachment(0, 1000, 32);
-				cLabel1LData.width = 360;
+				cLabel1LData.left =  new FormAttachment(0, 1000, 12);
+				cLabel1LData.top =  new FormAttachment(0, 1000, 52);
+				cLabel1LData.width = 317;
 				cLabel1LData.height = 19;
 				cLabel1.setLayoutData(cLabel1LData);
 				cLabel1.setText("Select a synchronisation job to edit");
@@ -362,25 +456,12 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 				cCombo1 = new Combo(this, SWT.BORDER);
 				FormData cCombo1LData = new FormData();
 				cCombo1LData.left =  new FormAttachment(0, 1000, 12);
-				cCombo1LData.top =  new FormAttachment(0, 1000, 56);
-				cCombo1LData.width = 360;
+				cCombo1LData.top =  new FormAttachment(0, 1000, 73);
+				cCombo1LData.width = 289;
+				cCombo1LData.height = 21;
 				cCombo1.setLayoutData(cCombo1LData);
 				loadJobComboValues();
 				initJobComboListener();
-			}
-			{
-				Title = new Label(this, SWT.NONE);
-				FormData TitleLData = new FormData();
-				TitleLData.left =  new FormAttachment(0, 1000, 13);
-				TitleLData.top =  new FormAttachment(0, 1000, 9);
-				TitleLData.width = 360;
-				TitleLData.height = 26;
-				TitleLData.right =  new FormAttachment(1000, 1000, -106);
-				Title.setLayoutData(TitleLData);
-				Title.setText("AjaXplorer Synchronizer");
-				Title.setForeground(SWTResourceManager.getColor(255, 255, 255));
-				Title.setBackground(SWTResourceManager.getColor(94, 124, 144));
-				Title.setFont(SWTResourceManager.getFont("Arial", 18, 0, false, false));
 			}
 			{
 				Composite formComposite = new Composite(this, SWT.NONE);
@@ -388,7 +469,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 				formComposite.setLayout(compositeLayout);
 				FormData cTabFolderLData = new FormData();				
 				cTabFolderLData.left =  new FormAttachment(0, 1000, 0);
-				cTabFolderLData.top =  new FormAttachment(0, 1000, 85);
+				cTabFolderLData.top =  new FormAttachment(0, 1000, 105);
 				cTabFolderLData.width = 407;
 				cTabFolderLData.height = 330;
 				cTabFolderLData.right =  new FormAttachment(1000, 1000, 0);
@@ -404,6 +485,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 	}
 	
 	public void populateToolkit(Composite parent) {
+		
 		FormToolkit toolkit = new FormToolkit(parent.getDisplay());
 		final Form form = toolkit.createForm(parent);
 		form.setText("New job ... ");
@@ -451,9 +533,10 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		section2.setClient(sectionClient2);	
 		
 		// REPOSITORY CHOOSER
-		toolkit.createLabel(sectionClient2, "Repository : ");
+		Label l = toolkit.createLabel(sectionClient2, "Repository : ");
+		l.setLayoutData(getTWDataFillMiddle());
 		comboRepository = new Combo(sectionClient2, SWT.BORDER);
-		comboRepository.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
+		comboRepository.setLayoutData(getTWDataFillMiddle());
 		toolkit.adapt(comboRepository, true, true);
 		
 		buttonLoadRepositories = toolkit.createButton(sectionClient2, "Load", SWT.PUSH);
@@ -463,19 +546,16 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 				loadRepositories();
 			}
 		});
-		buttonLoadRepositories.setLayoutData(new TableWrapData());
+		buttonLoadRepositories.setLayoutData(getTWDataFillMiddle());
 
 		// TARGET FOLDER CHOOSER
-		toolkit.createLabel(sectionClient2, "Local Folder : ");
+		l = toolkit.createLabel(sectionClient2, "Local Folder : ");
+		l.setLayoutData(getTWDataFillMiddle());
 		tfTarget = toolkit.createText(sectionClient2, "");
-		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
-		td.valign = TableWrapData.MIDDLE;
-		tfTarget.setLayoutData(td);
+		tfTarget.setLayoutData(getTWDataFillMiddle());
 		
 		buttonFileChooser = toolkit.createButton(sectionClient2, "Browse", SWT.PUSH);
-		td = new TableWrapData(TableWrapData.FILL_GRAB);
-		td.valign = TableWrapData.MIDDLE;
-		buttonFileChooser.setLayoutData(td);
+		buttonFileChooser.setLayoutData(getTWDataFillMiddle());
 		buttonFileChooser.addListener(SWT.Selection, new Listener() {
 			
 			@Override
@@ -488,12 +568,17 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 			}
 		});
 		
-		Section section3 = configureSection(toolkit, form, "Job Execution Parameters", "Set how this synchronization job must be executed and when", 2);		
+		Section section3 = configureSection(toolkit, form, "Job Execution Parameters", "Set how this synchronization job must be executed and when. The direction will determine whether the files should be automatically copied only from your local folder to the remote server (upload), the other way round (download), or in both sides (bidirectionnal).", 2);		
 		Composite sectionClient3 = toolkit.createComposite(section3);
 		layout = new TableWrapLayout();
 		sectionClient3.setLayout(layout);
 		layout.numColumns = 2;
 		section3.setClient(sectionClient3);			
+		
+		checkboxActive = toolkit.createButton(sectionClient3, "This job is active", SWT.CHECK | SWT.SELECTED);
+		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
+		td.colspan = 2;
+		checkboxActive.setLayoutData(td);
 		
 		Label lab = toolkit.createLabel(sectionClient3, "Synchronisation direction : ");
 		lab.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
@@ -517,10 +602,6 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		radioSyncInterval2 = toolkit.createButton(rComp2, "Hours", SWT.RADIO);
 		radioSyncInterval3 = toolkit.createButton(rComp2, "Days", SWT.RADIO);
 		
-		checkboxActive = toolkit.createButton(sectionClient3, "This job is active", SWT.CHECK | SWT.SELECTED);
-		td = new TableWrapData(TableWrapData.FILL_GRAB);
-		td.colspan = 2;
-		checkboxActive.setLayoutData(td);
 		updateFormActions(true, true);
 		
 		toolkit.paintBordersFor(sectionClient);
@@ -528,6 +609,11 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		toolkit.paintBordersFor(sectionClient3);
 	}	
 	
+	protected TableWrapData getTWDataFillMiddle(){
+		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
+		td.valign = TableWrapData.MIDDLE;
+		return td;
+	}
 	protected void updateFormActions(boolean save, boolean delete){
 		if(form == null) return;
 		form.getToolBarManager().removeAll();
@@ -555,7 +641,11 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 				@Override
 				public void run() {
 					super.run();
-					
+					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
+					dialog.setText("Delete Synchronization Job");
+					dialog.setMessage("Are you sure you want to remove this job? This operation cannot be undone!");
+					int returnCode = dialog.open();					
+					if(returnCode == SWT.OK) deleteConfig();
 				}
 			});
 		}
@@ -565,8 +655,7 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 	
 	protected Section configureSection(FormToolkit toolkit, final Form form, String title, String description, int colspan){
 		Section section = toolkit.createSection(form.getBody(), 
-				Section.DESCRIPTION|Section.TITLE_BAR|
-				Section.TWISTIE|Section.EXPANDED);
+				Section.DESCRIPTION|Section.TITLE_BAR|Section.EXPANDED);
 		section.descriptionVerticalSpacing = 5;
 		section.clientVerticalSpacing = 10;
 		
@@ -582,5 +671,23 @@ public class JobEditor extends org.eclipse.swt.widgets.Canvas{
 		section.setDescription(description);
 		return section;
 	}
+	
+	private static Image oldImage = null;
+
+	protected void applyGradientBG(Composite composite) {
+		Rectangle rect = composite.getClientArea();
+		Image newImage = new Image(composite.getDisplay(), 1, Math.max(1,
+				rect.height));
+		GC gc = new GC(newImage);
+		gc.setBackground(composite.getDisplay().getSystemColor(SWT.COLOR_WHITE));
+		gc.setForeground(SWTResourceManager.getColor(94, 124, 144));
+		gc.fillGradientRectangle(0, 0, 1, 135, true);
+		gc.dispose();
+		composite.setBackgroundImage(newImage);
+
+		if (oldImage != null)
+			oldImage.dispose();
+		oldImage = newImage;
+	}	
 
 }
