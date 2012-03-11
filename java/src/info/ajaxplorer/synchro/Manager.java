@@ -16,10 +16,14 @@ import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Set;
 
+import org.apache.log4j.Logger;
+import org.eclipse.jface.action.GroupMarker;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
@@ -31,6 +35,7 @@ import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.TriggerKey;
 import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.matchers.GroupMatcher;
 
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
@@ -51,21 +56,32 @@ public class Manager {
 	private SysTray sysTray;
 	private ResourceBundle messages;
 	
+	private boolean daemon;
+	
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
 		
-		String language;
-        String country;
-        if (args.length != 2) {
+		String language = null;
+        String country = null;
+        boolean daemon = false;
+        if(args.length > 0){        	
+        	if(args[0].equals("daemon")){
+        		daemon = true;
+        	}
+        	if(args.length == 3){
+                language = new String(args[1]);
+                country = new String(args[2]);        		
+        	}else if(args.length == 2){
+                language = new String(args[0]);
+                country = new String(args[1]);        		        		
+        	}
+        }
+        if (language == null) {
             language = new String("en");
             country = new String("US");
-        } else {
-            language = new String(args[0]);
-            country = new String(args[1]);
-        }
-
+        } 
         Locale currentLocale = new Locale(language, country);
 		
 		final Display display = new Display();
@@ -73,7 +89,7 @@ public class Manager {
 		Display.setAppVersion("1.0");
 		final Shell shell = new Shell(display, SWT.ON_TOP | SWT.NONE | SWT.ALPHA);
 
-		Manager.instanciate(shell, currentLocale);
+		Manager.instanciate(shell, currentLocale, daemon);
 		
 		Manager.getInstance().initScheduler();
 		
@@ -86,15 +102,16 @@ public class Manager {
 	}
 	
 	public static void stop(String[] args){
-		System.exit(0);
+		int res = Manager.getInstance().close();
+		System.exit(res);
 	}
 	
 	public static String getMessage(String s){
 		return Manager.instance.messages.getString(s);
 	}
 	
-	public static void instanciate(Shell shell, Locale locale){
-		Manager.instance = new Manager(shell, locale);
+	public static void instanciate(Shell shell, Locale locale, boolean daemon){
+		Manager.instance = new Manager(shell, locale, daemon);
 	}
 	public static Manager getInstance(){
 		return Manager.instance;
@@ -149,8 +166,9 @@ public class Manager {
 		});		
 	}
 	
-	public Manager(final Shell shell, Locale locale){
+	public Manager(final Shell shell, Locale locale, boolean daemon){
 		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
+		this.daemon = daemon;
 		try {
 			initializeDAO();
 		}catch(SQLException e){
@@ -165,14 +183,36 @@ public class Manager {
         } catch (SchedulerException se) {
             se.printStackTrace();
         }		
-	    shell.getDisplay().asyncExec(new Runnable() {
-			
-			@Override
-			public void run() {
-				// TODO Auto-generated method stub
-				sysTray.openConfiguration(shell);
+	    if(!daemon){
+		    shell.getDisplay().asyncExec(new Runnable() {
+				
+				@Override
+				public void run() {
+					// TODO Auto-generated method stub
+					sysTray.openConfiguration(shell);
+				}
+			});
+	    }
+	}
+	
+	public boolean isDaemon(){
+		return this.daemon;
+	}
+	
+	public int close(){
+		try {
+			this.notifyUser("Shutting down", "Please wait, interrupting running jobs...");
+			Set<JobKey> keys = scheduler.getJobKeys(GroupMatcher.jobGroupEquals("sync"));
+			Iterator<JobKey> it = keys.iterator();
+			while(it.hasNext()){
+				scheduler.interrupt(it.next());
 			}
-		});
+			scheduler.shutdown(true);
+			return 0;
+		} catch (SchedulerException e) {
+			Logger.getLogger("main").error("Closing scheduler", e);
+			return 1;
+		}
 	}
 	
 	private void initializeDAO() throws SQLException{
@@ -363,7 +403,8 @@ public class Manager {
 		try {
 			Collection<Node> l = listSynchroNodes();
 			for(Node n:l){
-				scheduleJob(n);
+				boolean notCorrectlyShutdown = (n.getStatus() == Node.NODE_STATUS_LOADING);
+				scheduleJob(n, notCorrectlyShutdown);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -406,7 +447,7 @@ public class Manager {
         	
             Trigger trigger = newTrigger()
             		.withIdentity("periodic-"+String.valueOf(n.id), "ajxp")
-            		.startNow()        		
+            		//.startNow()        		
             		.withSchedule(getSSBFromString(n.getPropertyValue("synchro_interval")))
             		.build();
 

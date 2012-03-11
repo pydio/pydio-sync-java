@@ -173,15 +173,18 @@ public class SysTray {
 				public void widgetDefaultSelected(SelectionEvent event) {}
 			});
 			
-			new MenuItem(menu, SWT.SEPARATOR);
+			if(!managerInstance.isDaemon()){
+				new MenuItem(menu, SWT.SEPARATOR);
 
-			MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
-			mi2.setText (messages.getString("tray_menu_quit"));
-			mi2.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					System.exit(0);
-				}
-			});
+				MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
+				mi2.setText (messages.getString("tray_menu_quit"));
+				mi2.addListener (SWT.Selection, new Listener () {
+					public void handleEvent (Event event) {
+						int res = Manager.getInstance().close();
+						System.exit(res);
+					}
+				});				
+			}
 			
 			item.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {

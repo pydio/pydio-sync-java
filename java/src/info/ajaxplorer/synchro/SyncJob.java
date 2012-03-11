@@ -37,6 +37,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.http.HttpEntity;
 import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
+import org.quartz.InterruptableJob;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.w3c.dom.Document;
@@ -46,7 +47,7 @@ import com.j256.ormlite.dao.CloseableIterator;
 import com.j256.ormlite.dao.Dao;
 
 @DisallowConcurrentExecution
-public class SyncJob implements org.quartz.Job {
+public class SyncJob implements InterruptableJob {
 
 	public static Integer NODE_CHANGE_STATUS_FILE_CREATED = 2;
 	public static Integer NODE_CHANGE_STATUS_FILE_DELETED = 4;
@@ -67,6 +68,7 @@ public class SyncJob implements org.quartz.Job {
 	public static Integer STATUS_ERROR = 8;
 	public static Integer STATUS_CONFLICT = 16;
 	public static Integer STATUS_PROGRESS = 32;
+	public static Integer STATUS_INTERRUPTED = 64;
 	
 	Node currentRepository ;
 	final Dao<Node, String> nodeDao;
@@ -74,6 +76,8 @@ public class SyncJob implements org.quartz.Job {
 	private String currentJobNodeID;
 	private boolean clearSnapshots = false;
 	private String direction;
+	
+	boolean interruptRequired = false;
 	
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
@@ -90,6 +94,9 @@ public class SyncJob implements org.quartz.Job {
 		}
 	}
 	
+	public void interrupt(){
+		interruptRequired = true;
+	}
 	
 	
 	public SyncJob() throws URISyntaxException, Exception{
@@ -102,7 +109,9 @@ public class SyncJob implements org.quartz.Job {
 		
 		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
 		
-		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);		
+		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
+		currentRepository.setStatus(Node.NODE_STATUS_LOADING);
+		nodeDao.update(currentRepository);
 		Server s = new CipheredServer(currentRepository.getParent());
 		RestStateHolder.getInstance().setServer(s);		
 		RestStateHolder.getInstance().setRepository(currentRepository);
@@ -111,17 +120,12 @@ public class SyncJob implements org.quartz.Job {
 		final File d = new File(currentRepository.getPropertyValue("target_folder"));
 		direction = currentRepository.getPropertyValue("synchro_direction");
 
-        Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
+        //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
 
     	Dao<SyncChange,String> syncDao = Manager.getInstance().getSyncChangeDao();
     	List<SyncChange> previouslyRemaining = syncDao.queryForEq("jobId", currentJobNodeID);
 		Map<String, Object[]> previousChanges = SyncChange.syncChangesToTreeMap(previouslyRemaining);
 		Map<String, Object[]> again = null;
-		if(previousChanges.size() > 0){
-			System.out.println("Getting sync from previous job");
-			again = applyChanges(previousChanges, d);
-			syncDao.delete(previouslyRemaining);
-		}
 		
 		if(clearSnapshots) {
 			this.clearSnapshot("local_snapshot");
@@ -132,19 +136,16 @@ public class SyncJob implements org.quartz.Job {
 		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, d);
 		Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 		
-		Map<String, Object[]> localDiff;
-		Map<String, Object[]> remoteDiff;
-		//if(direction.equals("up") || direction.equals("bi")){
-			localDiff = loadLocalChanges(localSnapshot, d);
-//		}else{
-//			localDiff = new TreeMap<String, Object[]>();
-//		}
-//		if(direction.equals("down") || direction.equals("bi")){
-			remoteDiff = loadRemoteChanges(remoteSnapshot);
-//		}else{
-//			remoteDiff = new TreeMap<String, Object[]>();
-//		}
+		Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot, d);
+		Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 
+		if(previousChanges.size() > 0){
+			System.out.println("Getting sync from previous job");
+			again = applyChanges(previousChanges, d);
+			syncDao.delete(previouslyRemaining);
+			this.clearSnapshot("remaining_nodes");
+		}
+		
         Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
         //System.out.println(changes);
         Map<String, Object[]> remainingChanges = applyChanges(changes, d);
@@ -154,7 +155,11 @@ public class SyncJob implements org.quartz.Job {
         //System.out.println(remainingChanges);
         if(remainingChanges.size() > 0){
         	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
+        	Node remainingRoot = loadRootAndSnapshot("remaining_nodes", null, null);
         	for(int i=0;i<c.size();i++){
+        		Node changeNode = c.get(i).getChangeValue().n;
+        		changeNode.setParent(remainingRoot);
+        		nodeDao.update(changeNode);
         		syncDao.create(c.get(i));
         	}
         }
@@ -166,6 +171,10 @@ public class SyncJob implements org.quartz.Job {
 		cleanDB();
         
         Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+        // INDICATES THAT THE JOB WAS CORRECTLY SHUTDOWN
+		currentRepository.setStatus(Node.NODE_STATUS_LOADED);
+		nodeDao.update(currentRepository);
+        
 	}
 	
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, File localFolder) throws Exception{
@@ -178,6 +187,12 @@ public class SyncJob implements org.quartz.Job {
 			Object[] value = entry.getValue().clone();
 			Integer v = (Integer)value[0];
 			Node n = (Node)value[1];
+			if(this.interruptRequired){
+				value[2] = STATUS_INTERRUPTED;
+				notApplied.put(k, value);
+				continue;
+			}
+			//Thread.sleep(2000);
 			try{
 				
 				if(v == TASK_LOCAL_GET_CONTENT){
@@ -349,9 +364,11 @@ public class SyncJob implements org.quartz.Job {
 		final Node root;
 		if(l.size() > 0){
 			root = l.get(0);
-			CloseableIterator<Node> it = root.children.iteratorThrow();
-			while(it.hasNext()){
-				snapshot.add(it.next());
+			if(snapshot != null){
+				CloseableIterator<Node> it = root.children.iteratorThrow();
+				while(it.hasNext()){
+					snapshot.add(it.next());
+				}
 			}
 		}else{
 			root = new Node(type, "", currentRepository);
