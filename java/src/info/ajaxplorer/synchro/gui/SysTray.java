@@ -211,8 +211,7 @@ public class SysTray {
 	
 	public void openConfiguration(Shell shell){
 		if(!shellInitialized){
-			ConfigEditor c = new ConfigEditor();
-			c.initShell(shell);
+			new ConfigPanel(shell);
 			shellInitialized = true;
 		}
 		shell.setVisible(true);
