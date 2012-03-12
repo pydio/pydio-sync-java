@@ -93,8 +93,8 @@ public class JobEditor extends Composite{
 	protected void checkSubclass() {
 	}
 	
-	public JobEditor(ConfigPanel configPanel) {
-		super(configPanel, SWT.NONE);
+	public JobEditor(Composite parent, ConfigPanel configPanel) {
+		super(parent, SWT.NONE);
 		this.configPanel = configPanel;
 		//populateToolkit(parent);		
 	}	

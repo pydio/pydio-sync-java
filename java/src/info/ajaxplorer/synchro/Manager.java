@@ -9,6 +9,7 @@ import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.gui.SysTray;
 import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
+import info.ajaxplorer.synchro.model.SyncLog;
 
 import java.io.File;
 import java.net.URI;
@@ -52,6 +53,7 @@ public class Manager {
 	static Manager instance;
 	public static Dao<Node, String> nodeDao;
 	public static Dao<SyncChange, String> syncChangeDao;
+	public static Dao<SyncLog, String> syncLogDao;
 	public static Dao<Property, String> propertyDao;
 	private SysTray sysTray;
 	private ResourceBundle messages;
@@ -124,6 +126,9 @@ public class Manager {
 	}
 	public Dao<Property, String> getPropertyDao(){
 		return propertyDao;
+	}
+	public Dao<SyncLog, String> getSyncLogDao(){
+		return syncLogDao;
 	}
 	
 	public void notifyUser(final String title, final String message){
@@ -223,14 +228,18 @@ public class Manager {
 		boolean dbAlreadyCreated = dbFile.exists();
        String databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
        ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
-       // instantiate the dao
+       
+       // instantiate the daos
        nodeDao = DaoManager.createDao(connectionSource, Node.class);
        syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
+       syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
        propertyDao = DaoManager.createDao(connectionSource, Property.class);
+       
        if(!dbAlreadyCreated){
            TableUtils.createTable(connectionSource, Node.class);
            TableUtils.createTable(connectionSource, Property.class);
            TableUtils.createTable(connectionSource, SyncChange.class);
+           TableUtils.createTable(connectionSource, SyncLog.class);
            
            nodeDao.executeRaw("CREATE TRIGGER on_delete_cascade AFTER DELETE ON a BEGIN\n" + 
 					"  DELETE FROM b WHERE node_id=old.id;\n" +

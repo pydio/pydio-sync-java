@@ -8,6 +8,7 @@ import java.util.TreeMap;
 
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.SyncJob;
 
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.field.DatabaseField;
@@ -55,7 +56,7 @@ public class SyncChange {
 			Object[] value = new Object[3];
 			value[0] = changes.get(i).getChangeValue().task;
 			value[1] = changes.get(i).getChangeValue().n;
-			value[2] = changes.get(i).getChangeValue().status;
+			value[2] = changes.get(i).getChangeValue().status;			
 			tree.put(changes.get(i).getKey(), value);
 		}
 		return tree;
