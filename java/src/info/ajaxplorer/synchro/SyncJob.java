@@ -8,6 +8,7 @@ import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
+import info.ajaxplorer.synchro.model.SyncLog;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -67,6 +68,7 @@ public class SyncJob implements InterruptableJob {
 	public static Integer STATUS_DONE = 4;
 	public static Integer STATUS_ERROR = 8;
 	public static Integer STATUS_CONFLICT = 16;
+	public static Integer STATUS_CONFLICT_SOLVED = 128;
 	public static Integer STATUS_PROGRESS = 32;
 	public static Integer STATUS_INTERRUPTED = 64;
 	
@@ -78,6 +80,13 @@ public class SyncJob implements InterruptableJob {
 	private String direction;
 	
 	boolean interruptRequired = false;
+	
+	private int countResourcesSynchronized = 0;
+	private int countFilesUploaded = 0;
+	private int countFilesDownloaded = 0;
+	private int countResourcesInterrupted = 0;
+	private int countResourcesErrors = 0;
+	private int countConflictsDetected = 0;
 	
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
@@ -124,8 +133,14 @@ public class SyncJob implements InterruptableJob {
 
     	Dao<SyncChange,String> syncDao = Manager.getInstance().getSyncChangeDao();
     	List<SyncChange> previouslyRemaining = syncDao.queryForEq("jobId", currentJobNodeID);
-		Map<String, Object[]> previousChanges = SyncChange.syncChangesToTreeMap(previouslyRemaining);
+    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
+		boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
 		Map<String, Object[]> again = null;
+		if(unsolvedConflicts){
+			Manager.getInstance().notifyUser("Unsolved conflicts", "Synchronization cannot be performed as long as there are conflicts!");
+	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);			
+			return;
+		}
 		
 		if(clearSnapshots) {
 			this.clearSnapshot("local_snapshot");
@@ -143,6 +158,8 @@ public class SyncJob implements InterruptableJob {
 			System.out.println("Getting sync from previous job");
 			again = applyChanges(previousChanges, d);
 			syncDao.delete(previouslyRemaining);
+			// TODO NOT GOOD : THE NODES REFERENCES BY "again" ARE DELETED
+			// AND THE CONFLICTS ARE LOST!
 			this.clearSnapshot("remaining_nodes");
 		}
 		
@@ -175,6 +192,39 @@ public class SyncJob implements InterruptableJob {
 		currentRepository.setStatus(Node.NODE_STATUS_LOADED);
 		nodeDao.update(currentRepository);
         
+		Dao<SyncLog, String> slDao = Manager.getInstance().getSyncLogDao();
+		SyncLog sl = new SyncLog();
+		String status;
+		String summary = "";
+		if(countConflictsDetected > 0) {
+			status = SyncLog.LOG_STATUS_CONFLICTS;
+			summary = countConflictsDetected + " conflicts detected. Please fix them before next synchro!";
+		}
+		else if(countResourcesErrors > 0) {
+			status = SyncLog.LOG_STATUS_ERRORS;
+			summary = countResourcesErrors + " errors detected";
+		}else {
+			if(countResourcesInterrupted > 0) status = SyncLog.LOG_STATUS_INTERRUPT;
+			else status = SyncLog.LOG_STATUS_SUCCESS;
+			if(countFilesDownloaded > 0){
+				summary = countFilesDownloaded + " files downloaded, ";
+			}
+			if(countFilesUploaded > 0){
+				summary += countFilesUploaded + " files uploaded, ";
+			}
+			if(countResourcesSynchronized > 0){
+				summary += countResourcesSynchronized + " resources synchronized";
+			}
+			if(summary.equals("")){
+				summary = "No actions necessary";
+			}
+		}
+		sl.jobDate = (new Date()).getTime();
+		sl.jobStatus = status;
+		sl.jobSummary = summary;
+		sl.synchroNode = currentRepository;
+		slDao.create(sl);
+		
 	}
 	
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, File localFolder) throws Exception{
@@ -205,6 +255,7 @@ public class SyncJob implements InterruptableJob {
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Error while downloading file from server");
 					}
+					countFilesDownloaded++;
 					
 				}else if(v == TASK_LOCAL_MKDIR){
 					
@@ -215,6 +266,7 @@ public class SyncJob implements InterruptableJob {
 						if(!res){
 							throw new Exception("Error while creating local folder");
 						}
+						countResourcesSynchronized++;
 					}
 					
 				}else if(v == TASK_LOCAL_REMOVE){
@@ -226,6 +278,7 @@ public class SyncJob implements InterruptableJob {
 						if(!res){
 							throw new Exception("Error while removing local resource");
 						}
+						countResourcesSynchronized++;
 					}
 					
 				}else if(v == TASK_REMOTE_MKDIR){
@@ -240,6 +293,7 @@ public class SyncJob implements InterruptableJob {
 					if(!object.has("mtime")){
 						throw new Exception("Could not create remote folder");
 					}
+					countResourcesSynchronized ++;
 					
 				}else if(v == TASK_REMOTE_PUT_CONTENT){
 	
@@ -253,6 +307,7 @@ public class SyncJob implements InterruptableJob {
 					if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Could not upload file to the server");
 					}
+					countFilesUploaded ++;
 					
 				}else if(v == TASK_REMOTE_REMOVE){
 					
@@ -265,15 +320,18 @@ public class SyncJob implements InterruptableJob {
 					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
 					if(object.has("mtime")){ // Still exists, should be empty!
 						throw new Exception("Could not remove the resource from the server");
-					}
+					}	
+					countResourcesSynchronized ++;
 					
 				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
 					
 					this.logChange("Conflict detected on this resource!", k);
 					notApplied.put(k, value);
+					countConflictsDetected ++;
 					
 				}			
 			}catch(Exception e){
+				countResourcesErrors ++;
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
 			}				
@@ -299,6 +357,7 @@ public class SyncJob implements InterruptableJob {
 				value[2] = STATUS_CONFLICT;
 				changes.put(k, value);
 				localDiff.remove(k);
+				continue;
 			}
 			if(v == NODE_CHANGE_STATUS_FILE_CREATED || v == NODE_CHANGE_STATUS_MODIFIED){
 				if(direction.equals("up")){					

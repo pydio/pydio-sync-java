@@ -50,16 +50,18 @@ public class SyncChange {
 		return changes;
 	}
 	
-	public static Map<String, Object[]> syncChangesToTreeMap(List<SyncChange> changes){
-		Map<String, Object[]> tree = new TreeMap<String, Object[]>();
+	public static boolean syncChangesToTreeMap(List<SyncChange> changes, Map<String, Object[]> tree){
+		boolean detectConflicts = false;
+		 //= new TreeMap<String, Object[]>();
 		for(int i=0;i<changes.size();i++){
 			Object[] value = new Object[3];
 			value[0] = changes.get(i).getChangeValue().task;
 			value[1] = changes.get(i).getChangeValue().n;
-			value[2] = changes.get(i).getChangeValue().status;			
+			value[2] = changes.get(i).getChangeValue().status;
+			if(value[2] == SyncJob.STATUS_CONFLICT) detectConflicts = true;
 			tree.put(changes.get(i).getKey(), value);
 		}
-		return tree;
+		return detectConflicts;
 	}
 
 	public String getJobId() {

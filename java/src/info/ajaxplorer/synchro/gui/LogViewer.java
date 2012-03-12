@@ -1,8 +1,10 @@
 package info.ajaxplorer.synchro.gui;
 
 import java.sql.SQLException;
+import java.text.Collator;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Locale;
 
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
@@ -18,7 +20,9 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Shell;
@@ -35,6 +39,10 @@ import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
+
+import com.j256.ormlite.stmt.PreparedQuery;
+import com.j256.ormlite.stmt.QueryBuilder;
+import com.j256.ormlite.stmt.Where;
 
 
 public class LogViewer extends org.eclipse.swt.widgets.Composite {
@@ -74,9 +82,13 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	}
 	
 	public void loadSynchroLog(Node synchroNode){
-		try {
+		try {			
+			QueryBuilder<SyncLog, String> builder = Manager.getInstance().getSyncLogDao().queryBuilder();
+			builder.where().eq("synchroNode_id", synchroNode.id);
+			builder.orderBy("jobDate", false);
+			PreparedQuery<SyncLog> preparedQuery = builder.prepare();
 			table1.removeAll();
-			Collection<SyncLog> logs = Manager.getInstance().getSyncLogDao().queryForEq("synchroNode_id", synchroNode.id);
+			Collection<SyncLog> logs = Manager.getInstance().getSyncLogDao().query(preparedQuery);
 			for(SyncLog log:logs){
 				TableItem it = new TableItem(table1, SWT.NONE);
 				it.setText(0, new Date(log.jobDate).toString());
@@ -89,6 +101,9 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 		        column.pack();
 		    }
 			table1.getColumn(2).setWidth(table1.getBounds().width - table1.getColumn(0).getWidth() - table1.getColumn(1).getWidth()-20);
+			table1.setSortColumn(table1ColumnDate);
+			table1.setSortDirection(SWT.DOWN);
+			
 			
 			table2.removeAll();
 			Collection<SyncChange> changes = Manager.getInstance().getSyncChangeDao().queryForEq("jobId", synchroNode.id);
@@ -153,22 +168,58 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						table1FormData.right = new FormAttachment(1000, 1000, 0);
 						table1FormData.bottom = new FormAttachment(1000, 1000, 0);
 						table1FormData.height = 10;
+						 Listener sortListener = new Listener() {  
+						        public void handleEvent(Event e) {
+						        	if(table1.getSortDirection() == SWT.UP){
+						        		table1.setSortDirection(SWT.DOWN);
+						        	}else{
+						        		table1.setSortDirection(SWT.UP);
+						        	}
+						        	int dir = table1.getSortDirection();
+						            TableItem[] items = table1.getItems();  
+						            Collator collator = Collator.getInstance(Locale.getDefault());  
+						            TableColumn column = (TableColumn)e.widget;  
+						            int index=0;
+						            if(column.getData().equals("date")) index = 0;
+						            else if(column.getData().equals("result")) index = 1;
+						            else if(column.getData().equals("summary")) index = 2;
+						            for (int i = 1; i < items.length; i++) {  
+						                String value1 = items[i].getText(index);  
+						                for (int j = 0; j < i; j++){  
+						                    String value2 = items[j].getText(index);  
+						                    if ((dir == SWT.UP && collator.compare(value1, value2) < 0) || (dir == SWT.DOWN && collator.compare(value1, value2) > 0)) {
+						                        String[] values = {items[i].getText(0), items[i].getText(1), items[i].getText(2)};  
+						                        items[i].dispose();  
+						                        TableItem item = new TableItem(table1, SWT.NONE, j);  
+						                        item.setText(values);  
+						                        items = table1.getItems();  
+						                        break;  
+						                    }  
+						                }  
+						            }  
+						            table1.setSortColumn(column);
+						        }  
+						    };  						
+						
 						table1.setLayoutData(table1FormData);
 						{
 							table1ColumnDate = new TableColumn(table1, SWT.NONE);
 							table1ColumnDate.setText("Date");
-							//table1ColumnDate.setWidth(120);
+							table1ColumnDate.setData("date");
+							table1ColumnDate.addListener(SWT.Selection, sortListener);							
 						}
 						{
 							table1ColumnResult = new TableColumn(table1, SWT.NONE);
 							table1ColumnResult.setText("Result");
-							//table1ColumnResult.setWidth(129);
+							table1ColumnResult.setData("result");
+							table1ColumnResult.addListener(SWT.Selection, sortListener);
 						}
 						{
 							table1ColumnSummary = new TableColumn(table1, SWT.NONE);
 							table1ColumnSummary.setText("Summary");
-							//table1ColumnSummary.setWidth(317);
-						}
+							table1ColumnSummary.setData("summary");
+							table1ColumnSummary.addListener(SWT.Selection, sortListener);
+						}					
 					}
 				}
 				{
