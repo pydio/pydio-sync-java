@@ -6,6 +6,8 @@ import java.util.Date;
 
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.model.SyncChange;
+import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 
 import org.eclipse.swt.layout.FillLayout;
@@ -17,30 +19,24 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
 
 
-/**
-* This code was edited or generated using CloudGarden's Jigloo
-* SWT/Swing GUI Builder, which is free for non-commercial
-* use. If Jigloo is being used commercially (ie, by a corporation,
-* company or business for any purpose whatever) then you
-* should purchase a license for each developer using Jigloo.
-* Please visit www.cloudgarden.com for details.
-* Use of Jigloo implies acceptance of these licensing terms.
-* A COMMERCIAL LICENSE HAS NOT BEEN PURCHASED FOR
-* THIS MACHINE, SO JIGLOO OR THIS CODE CANNOT BE USED
-* LEGALLY FOR ANY CORPORATE OR COMMERCIAL PURPOSE.
-*/
 public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	private SashForm sashForm1;
 	private Table table1;
@@ -54,22 +50,18 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	private Composite composite2;
 	private TableColumn table2ColumnStatus;
 	private TableColumn table2ColumnFile;
+	
+	Menu solveMenu;
+	MenuItem itemSolveKeepMine;
+	MenuItem itemSolveKeepTheir;
+	MenuItem itemSolveKeepBoth;
+	TableItem currentTarget;
 
-	/**
-	* Auto-generated main method to display this 
-	* org.eclipse.swt.widgets.Composite inside a new Shell.
-	*/
-		
 	/**
 	* Overriding checkSubclass allows this class to extend org.eclipse.swt.widgets.Composite
 	*/	
 	protected void checkSubclass() {
 	}
-	
-	/**
-	* Auto-generated method to display this 
-	* org.eclipse.swt.widgets.Composite inside a new Shell.
-	*/
 	
 	public LogViewer(org.eclipse.swt.widgets.Composite parent, int style) {
 		super(parent, style);
@@ -78,6 +70,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 
 	public void clearSynchroLog(){
 		table1.removeAll();
+		table2.removeAll();
 	}
 	
 	public void loadSynchroLog(Node synchroNode){
@@ -89,12 +82,31 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				it.setText(0, new Date(log.jobDate).toString());
 				it.setText(1, log.jobStatus);
 				it.setText(2, log.jobSummary);
+				it.setData(log);
 			}
 			for (int i = 0; i < 2; i++) {
 		        TableColumn column = table1.getColumn(i);
 		        column.pack();
 		    }
-			table1.getColumn(2).setWidth(table1.getBounds().width - table1.getColumn(0).getWidth() - table1.getColumn(1).getWidth());
+			table1.getColumn(2).setWidth(table1.getBounds().width - table1.getColumn(0).getWidth() - table1.getColumn(1).getWidth()-20);
+			
+			table2.removeAll();
+			Collection<SyncChange> changes = Manager.getInstance().getSyncChangeDao().queryForEq("jobId", synchroNode.id);
+			for(SyncChange change:changes){
+				TableItem it = new TableItem(table2, SWT.NONE);
+				SyncChangeValue v = change.getChangeValue();
+				it.setText(0, change.getKey());
+				it.setText(1, "Status : "+v.getStatusString());
+				it.setText(2, "Task : "+v.getTaskString());
+				it.setData(change);
+			}
+			
+			for (int i = 0; i < 2; i++) {
+		        TableColumn column = table2.getColumn(i);
+		        column.pack();
+		    }
+			table2.getColumn(2).setWidth(table2.getBounds().width - table2.getColumn(0).getWidth() - table2.getColumn(1).getWidth()-20);
+			
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -187,15 +199,65 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						{
 							table2ColumnFile = new TableColumn(table2, SWT.NONE);
 							table2ColumnFile.setText("File/Folder name");
-							table2ColumnFile.setWidth(311);
 						}
 						{
 							table2ColumnStatus = new TableColumn(table2, SWT.NONE);
 							table2ColumnStatus.setText("Status");
-							table2ColumnStatus.setWidth(248);
+						}
+						{
+							TableColumn table2ColumnTask = new TableColumn(table2, SWT.NONE);
+							table2ColumnTask.setText("Task");
 						}
 					}
-				}			}
+				}			
+			}
+			table2.addMouseListener(new MouseListener() {
+				
+				@Override
+				public void mouseUp(MouseEvent arg0) {					
+				}
+				
+				@Override
+				public void mouseDown(MouseEvent arg0) {
+					if(arg0.button != 3) return;
+					Point p = new Point(arg0.x, arg0.y);
+					Point p2 = new Point(arg0.x + getShell().getBounds().x, arg0.y + getShell().getBounds().y);					
+					currentTarget = table2.getItem(p);	
+					p2 = table2.toDisplay(p);
+					if(currentTarget != null){
+						solveMenu.setLocation(p2);
+						solveMenu.setVisible(true);
+					}
+				}
+				
+				@Override
+				public void mouseDoubleClick(MouseEvent arg0) {
+				}
+			});
+			 solveMenu = new Menu(this.getShell(),
+                     SWT.POP_UP);
+			 itemSolveKeepMine = new MenuItem(solveMenu, SWT.PUSH);
+			 itemSolveKeepMine.setText("Keep my version");
+			 itemSolveKeepMine.setData("mine");
+			 SelectionListener listener = new SelectionListener() {				 
+				 public void widgetSelected(SelectionEvent arg0) {
+					 if(currentTarget == null) return;
+					 String k = ((SyncChange)currentTarget.getData()).getKey();
+					 System.out.println("Should solve " + k + " with command " + arg0.widget.getData());
+					 currentTarget = null;
+					 solveMenu.setVisible(false);
+				 }				 
+				 public void widgetDefaultSelected(SelectionEvent arg0) {}
+			 };			 
+			 itemSolveKeepMine.addSelectionListener(listener);
+			 itemSolveKeepTheir = new MenuItem(solveMenu, SWT.PUSH);
+			 itemSolveKeepTheir.setText("Keep remote version");
+			 itemSolveKeepTheir.setData("their");
+			 itemSolveKeepTheir.addSelectionListener(listener);
+             itemSolveKeepBoth = new MenuItem(solveMenu, SWT.PUSH);
+             itemSolveKeepBoth.setText("Keep both versions");
+             itemSolveKeepBoth.setData("both");
+             itemSolveKeepMine.addSelectionListener(listener);
 			this.layout();
 		} catch (Exception e) {
 			e.printStackTrace();
