@@ -8,6 +8,7 @@ import java.util.Locale;
 
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.SyncJob;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
@@ -40,6 +41,7 @@ import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
 
+import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.stmt.PreparedQuery;
 import com.j256.ormlite.stmt.QueryBuilder;
 import com.j256.ormlite.stmt.Where;
@@ -64,6 +66,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	MenuItem itemSolveKeepTheir;
 	MenuItem itemSolveKeepBoth;
 	TableItem currentTarget;
+	Node currentSynchroNode;
 
 	/**
 	* Overriding checkSubclass allows this class to extend org.eclipse.swt.widgets.Composite
@@ -81,8 +84,15 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 		table2.removeAll();
 	}
 	
+	public void reload(){
+		if( currentSynchroNode != null){
+			this.loadSynchroLog(currentSynchroNode);
+		}
+	}
+	
 	public void loadSynchroLog(Node synchroNode){
 		try {			
+			this.currentSynchroNode = synchroNode;
 			QueryBuilder<SyncLog, String> builder = Manager.getInstance().getSyncLogDao().queryBuilder();
 			builder.where().eq("synchroNode_id", synchroNode.id);
 			builder.orderBy("jobDate", false);
@@ -293,8 +303,22 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 SelectionListener listener = new SelectionListener() {				 
 				 public void widgetSelected(SelectionEvent arg0) {
 					 if(currentTarget == null) return;
-					 String k = ((SyncChange)currentTarget.getData()).getKey();
-					 System.out.println("Should solve " + k + " with command " + arg0.widget.getData());
+					 SyncChange c = (SyncChange)currentTarget.getData();
+					 String command = (String)arg0.widget.getData();
+					 Dao<SyncChange, String> sCDao = Manager.getInstance().getSyncChangeDao();
+					 SyncChangeValue v = c.getChangeValue();
+					 if(command.equals("mine")) v.task = SyncJob.TASK_SOLVE_KEEP_MINE;
+					 else if(command.equals("their")) v.task = SyncJob.TASK_SOLVE_KEEP_THEIR;
+					 else v.task = SyncJob.TASK_SOLVE_KEEP_BOTH;
+					 v.status = SyncJob.STATUS_CONFLICT_SOLVED;
+					 c.setChangeValue(v);
+					 try {
+						System.out.println("Updating " + c.getKey() + " with task " + v.getTaskString());
+						sCDao.update(c);
+						reload();
+					} catch (SQLException e) {
+						e.printStackTrace();
+					}
 					 currentTarget = null;
 					 solveMenu.setVisible(false);
 				 }				 
@@ -308,7 +332,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
              itemSolveKeepBoth = new MenuItem(solveMenu, SWT.PUSH);
              itemSolveKeepBoth.setText("Keep both versions");
              itemSolveKeepBoth.setData("both");
-             itemSolveKeepMine.addSelectionListener(listener);
+             itemSolveKeepBoth.addSelectionListener(listener);
 			this.layout();
 		} catch (Exception e) {
 			e.printStackTrace();

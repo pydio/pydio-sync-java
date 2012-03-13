@@ -8,14 +8,17 @@ import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
+import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -63,6 +66,10 @@ public class SyncJob implements InterruptableJob {
 	public static Integer TASK_LOCAL_REMOVE = 16;
 	public static Integer TASK_LOCAL_MKDIR = 32;
 	public static Integer TASK_LOCAL_GET_CONTENT = 64;
+	
+	public static Integer TASK_SOLVE_KEEP_MINE = 128;
+	public static Integer TASK_SOLVE_KEEP_THEIR = 256;
+	public static Integer TASK_SOLVE_KEEP_BOTH = 512;
 	
 	public static Integer STATUS_TODO = 2;
 	public static Integer STATUS_DONE = 4;
@@ -173,10 +180,27 @@ public class SyncJob implements InterruptableJob {
         if(remainingChanges.size() > 0){
         	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
         	Node remainingRoot = loadRootAndSnapshot("remaining_nodes", null, null);
+			Dao<Property, String> pDao = Manager.getInstance().getPropertyDao();
         	for(int i=0;i<c.size();i++){
-        		Node changeNode = c.get(i).getChangeValue().n;
+        		SyncChangeValue cv = c.get(i).getChangeValue();
+        		Node changeNode = cv.n;
         		changeNode.setParent(remainingRoot);
-        		nodeDao.update(changeNode);
+        		if(changeNode.id == 0){ // Not yet created!
+        			nodeDao.create(changeNode);
+        			Map<String, String> pValues = new HashMap<String, String>();
+        			for(Property p:changeNode.properties){
+        				pValues.put(p.getName(), p.getValue());
+        			}
+        			pDao.delete(changeNode.properties);
+        			Iterator<Map.Entry<String, String>> it = pValues.entrySet().iterator();
+        			while(it.hasNext()){
+        				Map.Entry<String, String> ent = it.next();
+        				changeNode.addProperty(ent.getKey(), ent.getValue());
+        			}
+        			c.get(i).setChangeValue(cv);
+        		}else{
+        			nodeDao.update(changeNode);
+        		}
         		syncDao.create(c.get(i));
         	}
         }
@@ -244,6 +268,29 @@ public class SyncJob implements InterruptableJob {
 			}
 			//Thread.sleep(2000);
 			try{
+				if(n.isLeaf() && value[2].equals(STATUS_CONFLICT_SOLVED)){
+					if(v.equals(TASK_SOLVE_KEEP_MINE)) {
+						v = TASK_REMOTE_PUT_CONTENT;
+					}
+					else if(v.equals(TASK_SOLVE_KEEP_THEIR)) {
+						v = TASK_LOCAL_GET_CONTENT;
+					}
+					else if(v.equals(TASK_SOLVE_KEEP_BOTH)){
+						// COPY LOCAL FILE AND GET REMOTE COPY
+						File origFile = new File(localFolder, k);
+						File targetFile = new File(localFolder, k + ".mine");
+						InputStream in = new FileInputStream(origFile);
+						OutputStream out = new FileOutputStream(targetFile);
+						byte[] buf = new byte[1024];
+						int len;
+						while ((len = in.read(buf)) > 0){
+							out.write(buf, 0, len);
+						}
+						in.close();
+						out.close();
+						v = TASK_LOCAL_GET_CONTENT;
+					}
+				}
 				
 				if(v == TASK_LOCAL_GET_CONTENT){
 					
@@ -331,6 +378,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}			
 			}catch(Exception e){
+				e.printStackTrace();
 				countResourcesErrors ++;
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
@@ -343,6 +391,18 @@ public class SyncJob implements InterruptableJob {
 		Manager.getInstance().notifyUser("AjaXplorer Synchro", action+ " : "+path);
 	}
 	
+	protected boolean ignoreTreeConflict(Integer remoteChange, Integer localChange){
+		if(remoteChange != localChange){
+			return false;
+		}
+		if(localChange == NODE_CHANGE_STATUS_DIR_CREATED ||
+				localChange == NODE_CHANGE_STATUS_DIR_DELETED
+				|| localChange == NODE_CHANGE_STATUS_FILE_DELETED){
+			return true;
+		}
+		return false;
+	}
+	
 	protected Map<String, Object[]> mergeChanges(Map<String, Object[]> remoteDiff, Map<String, Object[]> localDiff){
 		Map<String, Object[]> changes = new TreeMap<String, Object[]>();
 		Iterator<Map.Entry<String, Object[]>> it = remoteDiff.entrySet().iterator();
@@ -350,13 +410,20 @@ public class SyncJob implements InterruptableJob {
 			Map.Entry<String, Object[]> entry = it.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue();
-			Integer v = (Integer)value[0]; 		
+			Integer v = (Integer)value[0];
 			
 			if(localDiff.containsKey(k)){
-				value[0] = TASK_DO_NOTHING;
-				value[2] = STATUS_CONFLICT;
-				changes.put(k, value);
-				localDiff.remove(k);
+				Object[] localValue = localDiff.get(k);
+				Integer localChange = (Integer)localValue[0];
+				if(ignoreTreeConflict(v, localChange)){
+					localDiff.remove(k);
+					continue;
+				}else{				
+					value[0] = TASK_DO_NOTHING;
+					value[2] = STATUS_CONFLICT;
+					localDiff.remove(k);				
+					changes.put(k, value);
+				}
 				continue;
 			}
 			if(v == NODE_CHANGE_STATUS_FILE_CREATED || v == NODE_CHANGE_STATUS_MODIFIED){

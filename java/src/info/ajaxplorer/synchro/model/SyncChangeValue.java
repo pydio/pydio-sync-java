@@ -37,7 +37,7 @@ public class SyncChangeValue {
 			return "Done";
 		}else if (status == SyncJob.STATUS_CONFLICT){				
 			return "Conflict";
-		}else if (status == SyncJob.STATUS_CONFLICT_SOLVED){
+		}else if (status.equals(SyncJob.STATUS_CONFLICT_SOLVED)){
 			return "Solved";
 		}else if (status == SyncJob.STATUS_PROGRESS){
 			return "In progress";
@@ -63,6 +63,12 @@ public class SyncChangeValue {
 			return "Send content to server";
 		}else if (task == SyncJob.TASK_REMOTE_REMOVE){
 			return "Remove remote resource";
+		}else if (task.equals(SyncJob.TASK_SOLVE_KEEP_BOTH)){
+			return "Keep both version (rename local version)";
+		}else if (task.equals(SyncJob.TASK_SOLVE_KEEP_MINE)){
+			return "Keep my version (override remote version)";
+		}else if (task.equals(SyncJob.TASK_SOLVE_KEEP_THEIR)){
+			return "Keep remote version (override local version)";
 		}
 		return s;
 		
