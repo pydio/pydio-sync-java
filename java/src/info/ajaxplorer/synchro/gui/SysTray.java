@@ -28,6 +28,7 @@ public class SysTray {
 	ResourceBundle messages;
 	MenuItem mTrig ;
 	Menu jobsMenu;
+	private ConfigPanel cPanel;
 	
 	public void notifyUser(String title, String message){
 		if(!showNotifications || menu.isVisible()){
@@ -53,6 +54,9 @@ public class SysTray {
 		return display;
 	}
 	public void setMenuTriggerRunning(String nodeId, boolean state){
+		if(this.cPanel != null){
+			this.cPanel.notifyJobStateChanged(nodeId, state);
+		}
 		if(mTrig == null) return;
 		for(MenuItem item:jobsMenu.getItems()){
 			if(item.getData() == null || !(item.getData() instanceof Node)) continue;
@@ -211,7 +215,7 @@ public class SysTray {
 	
 	public void openConfiguration(Shell shell){
 		if(!shellInitialized){
-			new ConfigPanel(shell);
+			cPanel = new ConfigPanel(shell);
 			shellInitialized = true;
 		}
 		shell.setVisible(true);

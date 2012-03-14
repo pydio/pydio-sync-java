@@ -146,6 +146,10 @@ public class ConfigPanel extends Canvas {
 	    
 	}		
 	
+	public void notifyJobStateChanged(String nodeId, boolean running){
+		this.logViewer.reload();
+	}
+	
 	private void initGUI() {
 		try {
 			FormLayout thisLayout = new FormLayout();

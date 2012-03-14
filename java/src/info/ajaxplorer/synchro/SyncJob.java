@@ -17,11 +17,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.StringWriter;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -85,6 +89,7 @@ public class SyncJob implements InterruptableJob {
 	private String currentJobNodeID;
 	private boolean clearSnapshots = false;
 	private String direction;
+	private File currentLocalFolder;
 	
 	boolean interruptRequired = false;
 	
@@ -133,7 +138,7 @@ public class SyncJob implements InterruptableJob {
 		RestStateHolder.getInstance().setRepository(currentRepository);
 		AjxpAPI.getInstance().setServer(s);		
 		
-		final File d = new File(currentRepository.getPropertyValue("target_folder"));
+		currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 		direction = currentRepository.getPropertyValue("synchro_direction");
 
         //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
@@ -155,15 +160,15 @@ public class SyncJob implements InterruptableJob {
 		}
 		List<Node> localSnapshot = new ArrayList<Node>();
 		List<Node> remoteSnapshot = new ArrayList<Node>();
-		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, d);
+		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
 		Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 		
-		Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot, d);
+		Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
 		Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 
 		if(previousChanges.size() > 0){
 			System.out.println("Getting sync from previous job");
-			again = applyChanges(previousChanges, d);
+			again = applyChanges(previousChanges);
 			syncDao.delete(previouslyRemaining);
 			// TODO NOT GOOD : THE NODES REFERENCES BY "again" ARE DELETED
 			// AND THE CONFLICTS ARE LOST!
@@ -172,7 +177,7 @@ public class SyncJob implements InterruptableJob {
 		
         Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
         //System.out.println(changes);
-        Map<String, Object[]> remainingChanges = applyChanges(changes, d);
+        Map<String, Object[]> remainingChanges = applyChanges(changes);
         if(again != null && again.size() > 0){
         	remainingChanges.putAll(again);
         }
@@ -206,12 +211,11 @@ public class SyncJob implements InterruptableJob {
         }
         
         // handle DL / UP failed! 
-        takeLocalSnapshot(localRootNode, d, null, true);
+        takeLocalSnapshot(localRootNode, null, true);
         takeRemoteSnapshot(remoteRootNode, null, true);
         
 		cleanDB();
         
-        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
         // INDICATES THAT THE JOB WAS CORRECTLY SHUTDOWN
 		currentRepository.setStatus(Node.NODE_STATUS_LOADED);
 		nodeDao.update(currentRepository);
@@ -249,9 +253,11 @@ public class SyncJob implements InterruptableJob {
 		sl.synchroNode = currentRepository;
 		slDao.create(sl);
 		
+        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+		
 	}
 	
-	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, File localFolder) throws Exception{
+	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) throws Exception{
 		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet().iterator();
 		Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
 		RestRequest rest = new RestRequest();
@@ -277,8 +283,8 @@ public class SyncJob implements InterruptableJob {
 					}
 					else if(v.equals(TASK_SOLVE_KEEP_BOTH)){
 						// COPY LOCAL FILE AND GET REMOTE COPY
-						File origFile = new File(localFolder, k);
-						File targetFile = new File(localFolder, k + ".mine");
+						File origFile = new File(currentLocalFolder, k);
+						File targetFile = new File(currentLocalFolder, k + ".mine");
 						InputStream in = new FileInputStream(origFile);
 						OutputStream out = new FileOutputStream(targetFile);
 						byte[] buf = new byte[1024];
@@ -296,7 +302,7 @@ public class SyncJob implements InterruptableJob {
 					
 					Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					node.setPath(k);
-					File targetFile = new File(localFolder, k);
+					File targetFile = new File(currentLocalFolder, k);
 					this.logChange("Downloading file from server", k);
 					this.synchronousDL(node, targetFile);
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
@@ -306,7 +312,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_LOCAL_MKDIR){
 					
-					File f = new File(localFolder, k);
+					File f = new File(currentLocalFolder, k);
 					if(!f.exists()) {
 						this.logChange("Creating local folder", k);
 						boolean res = f.mkdirs();
@@ -319,7 +325,7 @@ public class SyncJob implements InterruptableJob {
 				}else if(v == TASK_LOCAL_REMOVE){
 					
 					this.logChange("Remove local resource", k);
-					File f = new File(localFolder, k);
+					File f = new File(currentLocalFolder, k);
 					if(f.exists()){
 						boolean res = f.delete();
 						if(!res){
@@ -349,7 +355,7 @@ public class SyncJob implements InterruptableJob {
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
 					RestStateHolder.getInstance().setDirectory(currentDirectory);
-					this.synchronousUP(currentDirectory, new File(localFolder, k));
+					this.synchronousUP(currentDirectory, new File(currentLocalFolder, k));
 					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
 					if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Could not upload file to the server");
@@ -391,7 +397,7 @@ public class SyncJob implements InterruptableJob {
 		Manager.getInstance().notifyUser("AjaXplorer Synchro", action+ " : "+path);
 	}
 	
-	protected boolean ignoreTreeConflict(Integer remoteChange, Integer localChange){
+	protected boolean ignoreTreeConflict(Integer remoteChange, Integer localChange, Node remoteNode, Node localNode){
 		if(remoteChange != localChange){
 			return false;
 		}
@@ -399,6 +405,15 @@ public class SyncJob implements InterruptableJob {
 				localChange == NODE_CHANGE_STATUS_DIR_DELETED
 				|| localChange == NODE_CHANGE_STATUS_FILE_DELETED){
 			return true;
+		}else if(remoteNode.getPropertyValue("md5") != null){
+			// Get local node md5
+			File f = new File(currentLocalFolder, localNode.getPath());
+			String localMd5 = SyncJob.computeMD5(f);
+			if(remoteNode.getPropertyValue("md5").equals(localMd5)){
+				System.out.println("MD5 Are the same! Ignore!");
+				return true;
+			}
+			System.out.println("MD5 differ " + remoteNode.getPropertyValue("md5") + " - " + localMd5);
 		}
 		return false;
 	}
@@ -415,7 +430,7 @@ public class SyncJob implements InterruptableJob {
 			if(localDiff.containsKey(k)){
 				Object[] localValue = localDiff.get(k);
 				Integer localChange = (Integer)localValue[0];
-				if(ignoreTreeConflict(v, localChange)){
+				if(ignoreTreeConflict(v, localChange, (Node)value[1], (Node)localValue[1])){
 					localDiff.remove(k);
 					continue;
 				}else{				
@@ -528,7 +543,7 @@ public class SyncJob implements InterruptableJob {
 		}
 	}
 	
-	protected void takeLocalSnapshot(final Node rootNode, final File localFolder, final List<Node> accumulator, final boolean save) throws Exception{
+	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception{
 			
 		if(save){
 			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
@@ -537,7 +552,7 @@ public class SyncJob implements InterruptableJob {
 		//final List<Node> list = new ArrayList<Node>();
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception{
-				listDirRecursive(localFolder, rootNode, accumulator, save);
+				listDirRecursive(currentLocalFolder, rootNode, accumulator, save);
 				return null;
 			}
 		});
@@ -546,12 +561,12 @@ public class SyncJob implements InterruptableJob {
 		}
 	}
 	
-	protected Map<String, Object[]> loadLocalChanges(List<Node> snapshot, final File localFolder) throws Exception{
+	protected Map<String, Object[]> loadLocalChanges(List<Node> snapshot) throws Exception{
 	
 		final Node root = new Node("local_tmp", "", null);
-		root.setPath(localFolder.getAbsolutePath());
+		root.setPath(currentLocalFolder.getAbsolutePath());
 		final List<Node> list = new ArrayList<Node>();
-		takeLocalSnapshot(root, localFolder, list, false);		
+		takeLocalSnapshot(root, list, false);		
 		
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot);
 		//System.out.println(diff);
@@ -749,6 +764,48 @@ public class SyncJob implements InterruptableJob {
         if(in != null) in.close();
 		
 	}
+	
+	public static String computeMD5(File f){
+		MessageDigest digest;
+		try {
+			digest = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e1) {
+			e1.printStackTrace();
+			return "";
+		}
+		InputStream is;
+		try {
+			is = new FileInputStream(f);
+		} catch (FileNotFoundException e1) {
+			e1.printStackTrace();
+			return "";
+		}				
+		byte[] buffer = new byte[8192];
+		int read = 0;
+		try {
+			while( (read = is.read(buffer)) > 0) {
+				digest.update(buffer, 0, read);
+			}		
+			byte[] md5sum = digest.digest();
+			BigInteger bigInt = new BigInteger(1, md5sum);
+			String output = bigInt.toString(16);
+			return output;
+		}
+		catch(IOException e) {
+			//throw new RuntimeException("Unable to process file for MD5", e);
+			return "";
+		}
+		finally {
+			try {
+				is.close();
+			}
+			catch(IOException e) {
+				//throw new RuntimeException("Unable to close input stream for MD5 calculation", e);
+				return "";
+			}
+		}		
+	}
+	
 	
 	protected void logMemory(){
 		System.out.println("Total memory (bytes): " + 
