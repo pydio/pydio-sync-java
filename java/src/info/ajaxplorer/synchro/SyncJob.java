@@ -6,7 +6,6 @@ import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
-import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
@@ -133,7 +132,7 @@ public class SyncJob implements InterruptableJob {
 		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
 		currentRepository.setStatus(Node.NODE_STATUS_LOADING);
 		nodeDao.update(currentRepository);
-		Server s = new CipheredServer(currentRepository.getParent());
+		Server s = new Server(currentRepository.getParent());
 		RestStateHolder.getInstance().setServer(s);		
 		RestStateHolder.getInstance().setRepository(currentRepository);
 		AjxpAPI.getInstance().setServer(s);		

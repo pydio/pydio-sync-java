@@ -5,7 +5,6 @@ import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.Manager;
-import info.ajaxplorer.synchro.model.CipheredServer;
 
 import java.net.URISyntaxException;
 import java.sql.SQLException;
@@ -102,7 +101,7 @@ public class JobEditor extends Composite{
 	protected void loadFormFromNode(Node baseNode){
 		Server s;
 		try {
-			s = new CipheredServer(baseNode.getParent());
+			s = new Server(baseNode.getParent());
 			HashMap<String, String> values = new HashMap<String, String>();
 			values.put("HOST", s.getUrl());
 			values.put("LOGIN", s.getUser());
@@ -204,7 +203,7 @@ public class JobEditor extends Composite{
 		
 		Server s;
 		try {
-			s = new CipheredServer("Test", host, login, pass, true, false);
+			s = new Server("Test", host, login, pass, true, false);
 			RestStateHolder.getInstance().setServer(s);
 			AjxpAPI.getInstance().setServer(s);
 			RestRequest rest = new RestRequest();

@@ -7,7 +7,6 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.gui.SysTray;
-import info.ajaxplorer.synchro.model.CipheredServer;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
 
@@ -257,7 +256,7 @@ public class Manager {
 	public Node updateSynchroNode(Map<String, String> data, Node node) throws SQLException, URISyntaxException{
 		Server s;		
 		if(node == null){
-			s = new CipheredServer(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), true, false);			
+			s = new Server(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), true, false);			
 			Node serverNode = s.createDbNode(nodeDao);
 			node = new Node(Node.NODE_TYPE_REPOSITORY, data.get("REPOSITORY_LABEL"), serverNode);
 			nodeDao.create(node);
