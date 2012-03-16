@@ -39,7 +39,6 @@ import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
 import org.quartz.SchedulerException;
 
-import com.cloudgarden.resource.SWTResourceManager;
 
 
 /**

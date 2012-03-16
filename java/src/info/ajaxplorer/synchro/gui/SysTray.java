@@ -12,7 +12,6 @@ import org.eclipse.swt.graphics.*;
 import org.eclipse.swt.widgets.*;
 import org.quartz.SchedulerException;
 
-import com.cloudgarden.resource.SWTResourceManager;
 
 
 public class SysTray {

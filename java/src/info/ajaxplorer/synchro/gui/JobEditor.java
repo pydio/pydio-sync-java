@@ -53,7 +53,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 
-import com.cloudgarden.resource.SWTResourceManager;
 import com.j256.ormlite.dao.Dao;
 
 

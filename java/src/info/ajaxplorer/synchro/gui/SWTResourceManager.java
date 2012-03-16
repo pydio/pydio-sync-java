@@ -1,4 +1,4 @@
-package com.cloudgarden.resource;
+package info.ajaxplorer.synchro.gui;
 
 import java.util.HashMap;
 import java.util.Iterator;
