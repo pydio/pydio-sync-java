@@ -1,0 +1,8 @@
+#!/bin/sh
+BASEDIR=`dirname $0`
+exec java \
+	-XstartOnFirstThread \
+	-d32 \
+	-Dorg.eclipse.swt.internal.carbon.smallFonts=true \
+	-classpath $BASEDIR \
+	-jar $BASEDIR/AjaXplorerSynchro.jar
