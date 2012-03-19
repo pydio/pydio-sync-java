@@ -5,6 +5,8 @@ import info.ajaxplorer.synchro.Manager;
 
 import java.util.Collection;
 import java.util.ResourceBundle;
+
+import org.eclipse.core.commands.common.EventManager;
 import org.eclipse.swt.*;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -60,7 +62,7 @@ public class SysTray {
 		for(MenuItem item:jobsMenu.getItems()){
 			if(item.getData() == null || !(item.getData() instanceof Node)) continue;
 			if(Integer.parseInt(nodeId) == ((Node)item.getData()).id){
-				String label = Manager.getInstance().makeJobLabel((Node)item.getData());
+				String label = Manager.getInstance().makeJobLabel((Node)item.getData(), false);
 				if(state){
 					item.setEnabled(false);
 					item.setText(label + " : " +messages.getString("tray_menu_running"));
@@ -80,7 +82,7 @@ public class SysTray {
 		Collection<Node> ns = managerInstance.listSynchroNodes();
 		for(Node syncNode:ns){
 			MenuItem mI = new MenuItem(jobsMenu, SWT.PUSH);
-			mI.setText(managerInstance.makeJobLabel(syncNode));
+			mI.setText(managerInstance.makeJobLabel(syncNode, false));
 			mI.setData(syncNode);
 			mI.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
@@ -216,8 +218,9 @@ public class SysTray {
 		if(!shellInitialized){
 			cPanel = new ConfigPanel(shell);
 			shellInitialized = true;
-		}
+		}		
 		shell.setVisible(true);
+		shell.forceActive();
 	}
 	
 }

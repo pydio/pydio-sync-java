@@ -36,6 +36,7 @@ import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.SWT;
@@ -104,6 +105,11 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				it.setText(0, new Date(log.jobDate).toString());
 				it.setText(1, log.jobStatus);
 				it.setText(2, log.jobSummary);
+				if(log.jobStatus.equals("conflicts") || log.jobStatus.equals("errors")){
+					it.setForeground(SWTResourceManager.getColor(180, 0, 0));
+				}else if(log.jobStatus.equals("running")){
+					it.setForeground(SWTResourceManager.getColor(180, 180, 180));
+				}
 				it.setData(log);
 			}
 			for (int i = 0; i < 2; i++) {
@@ -200,7 +206,13 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						                    if ((dir == SWT.UP && collator.compare(value1, value2) < 0) || (dir == SWT.DOWN && collator.compare(value1, value2) > 0)) {
 						                        String[] values = {items[i].getText(0), items[i].getText(1), items[i].getText(2)};  
 						                        items[i].dispose();  
-						                        TableItem item = new TableItem(table1, SWT.NONE, j);  
+						                        TableItem item = new TableItem(table1, SWT.NONE, j);
+						        				if(values[1].equals("conflicts") || values[1].equals("errors")){
+						        					item.setForeground(SWTResourceManager.getColor(180, 0, 0));
+						        				}else if(values[1].equals("running")){
+						        					item.setForeground(SWTResourceManager.getColor(180, 180, 180));
+						        				}
+						                        
 						                        item.setText(values);  
 						                        items = table1.getItems();  
 						                        break;  

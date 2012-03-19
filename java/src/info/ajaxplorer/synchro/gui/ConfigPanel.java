@@ -154,7 +154,7 @@ public class ConfigPanel extends Canvas {
 			FormLayout thisLayout = new FormLayout();
 			this.setLayout(thisLayout);
 			if(System.getProperty("os.name").toLowerCase().indexOf("mac") >= 0){
-				this.setSize(750, 550);
+				this.setSize(680, 520);
 			}else{
 				this.setSize(600, 500);
 			}
@@ -223,7 +223,7 @@ public class ConfigPanel extends Canvas {
 				cCombo1LData.left =  new FormAttachment(0, 1000, 12);
 				cCombo1LData.top =  new FormAttachment(0, 1000, 73);
 				cCombo1LData.width = 289;
-				cCombo1LData.height = 21;
+				//cCombo1LData.height = 21;
 				cCombo1.setLayoutData(cCombo1LData);
 				loadJobComboValues();
 				initJobComboListener();
@@ -245,7 +245,7 @@ public class ConfigPanel extends Canvas {
 						jobEditor = new JobEditor(tabFolder1, this);				
 						tabItem1.setControl(jobEditor);
 						FillLayout compositeLayout = new FillLayout();
-						compositeLayout.type = SWT.HORIZONTAL;
+						compositeLayout.type = SWT.HORIZONTAL|SWT.VERTICAL;
 						jobEditor.setLayout(compositeLayout);
 						jobEditor.populateToolkit();
 					}
@@ -329,7 +329,7 @@ public class ConfigPanel extends Canvas {
 		int currentSel = 0;
 		int i=0;
 		for(Node syncNode:nodes){
-			String label = Manager.getInstance().makeJobLabel(syncNode);
+			String label = Manager.getInstance().makeJobLabel(syncNode, false);
 			jobComboItems.add(syncNode);
 			keys.add(label);
 			if(currentSynchroNode != null && syncNode.id == currentSynchroNode.id) {
@@ -350,7 +350,7 @@ public class ConfigPanel extends Canvas {
 				String labelSelected = cCombo1.getText();
 				boolean found = false;
 				for(Node n:nodes){
-					if(Manager.getInstance().makeJobLabel(n).equals(labelSelected)){
+					if(Manager.getInstance().makeJobLabel(n, false).equals(labelSelected)){
 						found = true;
 						setCurrentNode(n);
 						break;

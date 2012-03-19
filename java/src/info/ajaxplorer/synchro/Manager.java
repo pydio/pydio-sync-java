@@ -88,7 +88,8 @@ public class Manager {
 		final Display display = new Display();
 		Display.setAppName("AjaXplorer Synchronizer");
 		Display.setAppVersion("1.0");
-		final Shell shell = new Shell(display, SWT.ON_TOP | SWT.NONE | SWT.ALPHA);
+		final Shell shell = new Shell(display, SWT.NONE | SWT.ALPHA);
+		shell.setActive();
 
 		Manager.instanciate(shell, currentLocale, daemon);
 		
@@ -369,14 +370,19 @@ public class Manager {
 		return node;
 	}
 	
-	public String makeJobLabel(Node node){
+	public String makeJobLabel(Node node, boolean shortFormat){
 		String s = "REPO on HOST <> LOCAL";
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
 		if(uri != null){
 			s = s.replace("HOST", uri.getHost());
 		}
-		s = s.replace("LOCAL", node.getPropertyValue("target_folder"));
+		if(!shortFormat){
+			s = s.replace("LOCAL", node.getPropertyValue("target_folder"));
+		}else{
+			File f = new File(node.getPropertyValue("target_folder"));
+			s = s.replace("LOCAL", f.getName());			
+		}
 		if(node.getPropertyValue("synchro_active").equals("false")){
 			s = s + " (inactive)";
 		}

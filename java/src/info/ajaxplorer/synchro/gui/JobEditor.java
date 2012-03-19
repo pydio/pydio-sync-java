@@ -16,6 +16,7 @@ import java.util.concurrent.Callable;
 
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.viewers.CellEditor.LayoutData;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.events.MouseEvent;
@@ -113,7 +114,7 @@ public class JobEditor extends Composite{
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
 			this.loadFormData(values);		
 			if(this.form != null){
-				this.form.setText(Manager.getInstance().makeJobLabel(baseNode));
+				this.form.setText(Manager.getInstance().makeJobLabel(baseNode, true));
 				updateFormActions(true, true);
 			}
 		} catch (URISyntaxException e) {
@@ -297,6 +298,7 @@ public class JobEditor extends Composite{
 		tfPassword.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
 		Section section2 = configureSection(toolkit, form, "Synchronization Targets", "Once the remote connection is set up, load the accessible repositories and choose one, and browse the local folder to synchronize with.", 1);
+
 		
 		Composite sectionClient2 = toolkit.createComposite(section2);
 		layout = new TableWrapLayout();
