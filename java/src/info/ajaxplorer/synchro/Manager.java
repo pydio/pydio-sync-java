@@ -84,9 +84,9 @@ public class Manager {
         } 
         Locale currentLocale = new Locale(language, country);
 		
-		final Display display = new Display();
 		Display.setAppName("AjaXplorer Synchronizer");
 		Display.setAppVersion("1.0");
+		final Display display = new Display();
 		final Shell shell = new Shell(display, SWT.NONE | SWT.ALPHA);
 		shell.setActive();
 
