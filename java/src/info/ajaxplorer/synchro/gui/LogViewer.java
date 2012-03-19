@@ -1,11 +1,5 @@
 package info.ajaxplorer.synchro.gui;
 
-import java.sql.SQLException;
-import java.text.Collator;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Locale;
-
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
 import info.ajaxplorer.synchro.SyncJob;
@@ -13,39 +7,37 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 
-import org.eclipse.swt.layout.FillLayout;
+import java.sql.SQLException;
+import java.text.Collator;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Locale;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
-import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
-import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.MouseListener;
-import org.eclipse.swt.events.PaintEvent;
-import org.eclipse.swt.events.PaintListener;
-import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.SelectionListener;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.Point;
-import org.eclipse.swt.graphics.Rectangle;
-import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.SashForm;
+import org.quartz.SchedulerException;
 
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.stmt.PreparedQuery;
 import com.j256.ormlite.stmt.QueryBuilder;
-import com.j256.ormlite.stmt.Where;
 
 
 public class LogViewer extends org.eclipse.swt.widgets.Composite {
@@ -66,8 +58,8 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	MenuItem itemSolveKeepMine;
 	MenuItem itemSolveKeepTheir;
 	MenuItem itemSolveKeepBoth;
-	TableItem currentTarget;
 	Node currentSynchroNode;
+	int currentConflictsCount;
 
 	/**
 	* Overriding checkSubclass allows this class to extend org.eclipse.swt.widgets.Composite
@@ -92,6 +84,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	}
 	
 	public void loadSynchroLog(Node synchroNode){
+		currentConflictsCount = 0;
 		try {			
 			this.currentSynchroNode = synchroNode;
 			QueryBuilder<SyncLog, String> builder = Manager.getInstance().getSyncLogDao().queryBuilder();
@@ -130,6 +123,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				it.setText(1, "Status : "+v.getStatusString());
 				it.setText(2, "Task : "+v.getTaskString());
 				it.setData(change);
+				if(v.status == SyncJob.STATUS_CONFLICT) currentConflictsCount ++;
 			}
 			
 			for (int i = 0; i < 2; i++) {
@@ -283,7 +277,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						}
 					}
 				}			
-			}
+			}			
 			table2.addMouseListener(new MouseListener() {
 				
 				@Override
@@ -294,10 +288,9 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				public void mouseDown(MouseEvent arg0) {
 					if(arg0.button != 3) return;
 					Point p = new Point(arg0.x, arg0.y);
-					Point p2 = new Point(arg0.x + getShell().getBounds().x, arg0.y + getShell().getBounds().y);					
-					currentTarget = table2.getItem(p);	
-					p2 = table2.toDisplay(p);
-					if(currentTarget != null){
+					Point p2 = new Point(arg0.x + getShell().getBounds().x, arg0.y + getShell().getBounds().y);
+					if(table2.getItem(p) != null){
+						p2 = table2.toDisplay(p);
 						solveMenu.setLocation(p2);
 						solveMenu.setVisible(true);
 					}
@@ -314,25 +307,38 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 itemSolveKeepMine.setData("mine");
 			 SelectionListener listener = new SelectionListener() {				 
 				 public void widgetSelected(SelectionEvent arg0) {
-					 if(currentTarget == null) return;
-					 SyncChange c = (SyncChange)currentTarget.getData();
-					 String command = (String)arg0.widget.getData();
-					 Dao<SyncChange, String> sCDao = Manager.getInstance().getSyncChangeDao();
-					 SyncChangeValue v = c.getChangeValue();
-					 if(command.equals("mine")) v.task = SyncJob.TASK_SOLVE_KEEP_MINE;
-					 else if(command.equals("their")) v.task = SyncJob.TASK_SOLVE_KEEP_THEIR;
-					 else v.task = SyncJob.TASK_SOLVE_KEEP_BOTH;
-					 v.status = SyncJob.STATUS_CONFLICT_SOLVED;
-					 c.setChangeValue(v);
-					 try {
-						System.out.println("Updating " + c.getKey() + " with task " + v.getTaskString());
-						sCDao.update(c);
-						reload();
-					} catch (SQLException e) {
-						e.printStackTrace();
-					}
-					 currentTarget = null;
+					 boolean changes = false;
+					 for(TableItem currentTarget:table2.getSelection()){
+						 SyncChange c = (SyncChange)currentTarget.getData();
+						 String command = (String)arg0.widget.getData();
+						 Dao<SyncChange, String> sCDao = Manager.getInstance().getSyncChangeDao();
+						 SyncChangeValue v = c.getChangeValue();
+						 if(command.equals("mine")) v.task = SyncJob.TASK_SOLVE_KEEP_MINE;
+						 else if(command.equals("their")) v.task = SyncJob.TASK_SOLVE_KEEP_THEIR;
+						 else v.task = SyncJob.TASK_SOLVE_KEEP_BOTH;
+						 v.status = SyncJob.STATUS_CONFLICT_SOLVED;
+						 c.setChangeValue(v);
+						 try {
+							System.out.println("Updating " + c.getKey() + " with task " + v.getTaskString());
+							sCDao.update(c);
+							changes = true;
+						} catch (SQLException e) {
+							e.printStackTrace();
+						}						 
+					 }					 
+					 if(changes) reload();
 					 solveMenu.setVisible(false);
+					 if(currentConflictsCount == 0){
+						MessageBox messageBox = new MessageBox(LogViewer.this.getShell(), SWT.ICON_QUESTION|SWT.YES|SWT.NO);
+					    messageBox.setMessage("Conflicts are marked as solved, do you want to re-run the synchronization now?");
+					    if(messageBox.open() == SWT.YES){
+					    	try {
+								Manager.getInstance().triggerJobNow(currentSynchroNode, false);
+							} catch (SchedulerException e) {
+								e.printStackTrace();
+							}
+					    }
+					 }
 				 }				 
 				 public void widgetDefaultSelected(SelectionEvent arg0) {}
 			 };			 

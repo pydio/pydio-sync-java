@@ -1,14 +1,13 @@
 package info.ajaxplorer.synchro.model;
 
+import info.ajaxplorer.client.model.Node;
+import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.SyncJob;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-
-import info.ajaxplorer.client.model.Node;
-import info.ajaxplorer.synchro.Manager;
-import info.ajaxplorer.synchro.SyncJob;
 
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.field.DatabaseField;

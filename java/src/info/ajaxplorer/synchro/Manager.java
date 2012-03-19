@@ -23,7 +23,6 @@ import java.util.ResourceBundle;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jface.action.GroupMarker;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
