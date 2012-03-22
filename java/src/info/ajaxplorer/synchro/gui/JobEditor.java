@@ -30,6 +30,7 @@ import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.forms.widgets.Section;
 import org.eclipse.ui.forms.widgets.TableWrapData;
 import org.eclipse.ui.forms.widgets.TableWrapLayout;
+import org.eclipse.ui.internal.forms.widgets.FormHeading;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
@@ -71,7 +72,7 @@ public class JobEditor extends Composite{
 	}
 	
 	public JobEditor(Composite parent, ConfigPanel configPanel) {
-		super(parent, SWT.NONE);
+		super(parent, SWT.WRAP);
 		this.configPanel = configPanel;
 		//populateToolkit(parent);		
 	}	
@@ -92,7 +93,7 @@ public class JobEditor extends Composite{
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
 			this.loadFormData(values);		
 			if(this.form != null){
-				this.form.setText(Manager.getInstance().makeJobLabel(baseNode, true));
+				((FormHeading)this.form.getHead()).setText(Manager.getInstance().makeJobLabel(baseNode, true));				
 				updateFormActions(true, true);
 			}
 		} catch (URISyntaxException e) {
@@ -160,7 +161,7 @@ public class JobEditor extends Composite{
 		radioSyncInterval3.setSelection(false);
 		
 		if(this.form != null){
-			this.form.setText("Create a new synchronization");
+			this.form.setText("Create a new synchronization... ");
 			updateFormActions(true, false);
 		}
 
@@ -239,7 +240,6 @@ public class JobEditor extends Composite{
 		
 		FormToolkit toolkit = new FormToolkit(this.getDisplay());
 		final Form form = toolkit.createForm(this);
-		form.setText("New job ... ");
 		this.form = form;
 		toolkit.decorateFormHeading(form);
 		TableWrapLayout layout = new TableWrapLayout();
@@ -360,6 +360,7 @@ public class JobEditor extends Composite{
 		toolkit.paintBordersFor(sectionClient2);
 		toolkit.paintBordersFor(sectionClient3);
 		
+		this.form.setText("looooooooooooooooooo  nnnnnnnnnnn gggStart text");		
 		this.layout();
 	}	
 	
