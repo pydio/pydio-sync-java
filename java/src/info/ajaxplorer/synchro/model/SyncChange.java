@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.Map;
 
 import com.j256.ormlite.dao.Dao;
+import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.field.DatabaseField;
+import com.j256.ormlite.support.ConnectionSource;
 
 public class SyncChange {
 
@@ -81,12 +83,15 @@ public class SyncChange {
 
 	public SyncChangeValue getChangeValue() {
 		if(value == null){
-			value = new SyncChangeValue(changeValue);
+			value = new SyncChangeValue(changeValue);			
 			try{
-				Dao<Node, String> nodeDao = Manager.getInstance().getNodeDao();
+				ConnectionSource cs = Manager.getInstance().getConnection();
+				Dao<Node, String> nodeDao = DaoManager.createDao(cs, Node.class);
 				value.n = nodeDao.queryForId(value.nodeId);
 			}catch (Exception e) {
 				System.out.println("Could not load node for SyncChangeValue!");
+			} finally{
+				Manager.getInstance().releaseConnection();
 			}
 		}
 		return value;

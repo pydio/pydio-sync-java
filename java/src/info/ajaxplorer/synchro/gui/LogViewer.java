@@ -36,8 +36,10 @@ import org.eclipse.swt.widgets.TableItem;
 import org.quartz.SchedulerException;
 
 import com.j256.ormlite.dao.Dao;
+import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.stmt.PreparedQuery;
 import com.j256.ormlite.stmt.QueryBuilder;
+import com.j256.ormlite.support.ConnectionSource;
 
 
 public class LogViewer extends org.eclipse.swt.widgets.Composite {
@@ -85,14 +87,18 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	
 	public void loadSynchroLog(Node synchroNode){
 		currentConflictsCount = 0;
+		ConnectionSource cs;
 		try {			
+			cs = Manager.getInstance().getConnection();
+			Dao<SyncLog, String> logDao = DaoManager.createDao(cs, SyncLog.class);
+			Dao<SyncChange, String> changeDao = DaoManager.createDao(cs, SyncChange.class);
 			this.currentSynchroNode = synchroNode;
-			QueryBuilder<SyncLog, String> builder = Manager.getInstance().getSyncLogDao().queryBuilder();
+			QueryBuilder<SyncLog, String> builder = logDao.queryBuilder();
 			builder.where().eq("synchroNode_id", synchroNode.id);
 			builder.orderBy("jobDate", false);
 			PreparedQuery<SyncLog> preparedQuery = builder.prepare();
 			table1.removeAll();
-			Collection<SyncLog> logs = Manager.getInstance().getSyncLogDao().query(preparedQuery);
+			Collection<SyncLog> logs = logDao.query(preparedQuery);
 			for(SyncLog log:logs){
 				TableItem it = new TableItem(table1, SWT.NONE);
 				it.setText(0, new Date(log.jobDate).toString());
@@ -115,7 +121,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			
 			
 			table2.removeAll();
-			Collection<SyncChange> changes = Manager.getInstance().getSyncChangeDao().queryForEq("jobId", synchroNode.id);
+			Collection<SyncChange> changes = changeDao.queryForEq("jobId", synchroNode.id);
 			for(SyncChange change:changes){
 				TableItem it = new TableItem(table2, SWT.NONE);
 				SyncChangeValue v = change.getChangeValue();
@@ -134,6 +140,8 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			
 		} catch (SQLException e) {
 			e.printStackTrace();
+		} finally{
+			Manager.getInstance().releaseConnection();
 		}
 	}
 	
@@ -308,10 +316,12 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 SelectionListener listener = new SelectionListener() {				 
 				 public void widgetSelected(SelectionEvent arg0) {
 					 boolean changes = false;
+					 ConnectionSource cs = Manager.getInstance().getConnection();
+					 try{
 					 for(TableItem currentTarget:table2.getSelection()){
 						 SyncChange c = (SyncChange)currentTarget.getData();
 						 String command = (String)arg0.widget.getData();
-						 Dao<SyncChange, String> sCDao = Manager.getInstance().getSyncChangeDao();
+						 Dao<SyncChange, String> sCDao = DaoManager.createDao(cs, SyncChange.class);
 						 SyncChangeValue v = c.getChangeValue();
 						 if(command.equals("mine")) v.task = SyncJob.TASK_SOLVE_KEEP_MINE;
 						 else if(command.equals("their")) v.task = SyncJob.TASK_SOLVE_KEEP_THEIR;
@@ -325,7 +335,12 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						} catch (SQLException e) {
 							e.printStackTrace();
 						}						 
-					 }					 
+					 }		
+					 }catch(SQLException e){
+						 e.printStackTrace();
+					 }finally{
+						 Manager.getInstance().releaseConnection();
+					 }
 					 if(changes) reload();
 					 solveMenu.setVisible(false);
 					 if(currentConflictsCount == 0){

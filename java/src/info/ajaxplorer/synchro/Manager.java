@@ -48,11 +48,7 @@ public class Manager {
 	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "mysql", "imap", "jsapi"};
 
 	Scheduler scheduler;
-	static Manager instance;
-	public static Dao<Node, String> nodeDao;
-	public static Dao<SyncChange, String> syncChangeDao;
-	public static Dao<SyncLog, String> syncLogDao;
-	public static Dao<Property, String> propertyDao;
+	static Manager instance;	
 	private SysTray sysTray;
 	private ResourceBundle messages;
 	
@@ -117,18 +113,6 @@ public class Manager {
 	public static Manager getInstance(){
 		return Manager.instance;
 	}
-	public Dao<Node, String> getNodeDao(){
-		return nodeDao;
-	}
-	public Dao<SyncChange, String> getSyncChangeDao(){
-		return syncChangeDao;
-	}
-	public Dao<Property, String> getPropertyDao(){
-		return propertyDao;
-	}
-	public Dao<SyncLog, String> getSyncLogDao(){
-		return syncLogDao;
-	}
 	
 	public void notifyUser(final String title, final String message){
 		if(this.sysTray == null) {
@@ -178,21 +162,18 @@ public class Manager {
 		}catch(SQLException e){
 			e.printStackTrace();
 		}
-		
 		sysTray = new SysTray(shell, messages, this);
 	    try {			
             scheduler = StdSchedulerFactory.getDefaultScheduler();
             scheduler.start();
-            //scheduler.shutdown();
         } catch (SchedulerException se) {
             se.printStackTrace();
-        }		
+        }
 	    if(!daemon){
 		    shell.getDisplay().asyncExec(new Runnable() {
 				
 				@Override
 				public void run() {
-					// TODO Auto-generated method stub
 					sysTray.openConfiguration(shell);
 				}
 			});
@@ -219,55 +200,101 @@ public class Manager {
 		}
 	}
 	
+	private int connectionRefs = 0;
+	private String databaseUrl;
+	private ConnectionSource connectionSource;
+	
+	public synchronized ConnectionSource getConnection(){
+		//System.out.println("Incrementing refs");
+		if(connectionRefs > 0 && connectionSource != null){
+			connectionRefs ++;
+			return connectionSource;
+		}else{
+			try {
+				connectionSource = new JdbcConnectionSource(databaseUrl);
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				return null;
+			}
+			connectionRefs ++;
+			return connectionSource;
+		}
+	}
+	
+	public synchronized void releaseConnection(){
+		//System.out.println("Decrementing refs");
+		connectionRefs --;
+		if(connectionRefs == 0){
+			try {
+				connectionSource.close();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			connectionSource = null;
+			System.gc();
+			//System.out.println("Releasing connection");
+		}
+	}
+	
 	private void initializeDAO() throws SQLException{
 
 		File work = new File(System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer");
 		if(!work.exists()) work.mkdir();
 		File dbFile = new File(work, "ajxpsync.db");
 		boolean dbAlreadyCreated = dbFile.exists();
-       String databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
-       ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
-       
-       // instantiate the daos
-       nodeDao = DaoManager.createDao(connectionSource, Node.class);
-       syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
-       syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
-       propertyDao = DaoManager.createDao(connectionSource, Property.class);
-       
-       if(!dbAlreadyCreated){
-           TableUtils.createTable(connectionSource, Node.class);
-           TableUtils.createTable(connectionSource, Property.class);
-           TableUtils.createTable(connectionSource, SyncChange.class);
-           TableUtils.createTable(connectionSource, SyncLog.class);
-           
-           nodeDao.executeRaw("CREATE TRIGGER on_delete_cascade AFTER DELETE ON a BEGIN\n" + 
+		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
+		
+		//ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
+
+		// instantiate the daos
+		//nodeDao = DaoManager.createDao(connectionSource, Node.class);				
+		//syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
+		//syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
+		//propertyDao = DaoManager.createDao(connectionSource, Property.class);
+
+		if(!dbAlreadyCreated){
+			ConnectionSource cs = this.getConnection();
+			TableUtils.createTable(cs, Node.class);
+			TableUtils.createTable(cs, Property.class);
+			TableUtils.createTable(cs, SyncChange.class);
+			TableUtils.createTable(cs, SyncLog.class);
+
+			DaoManager.createDao(cs, Node.class).executeRaw("CREATE TRIGGER on_delete_cascade AFTER DELETE ON a BEGIN\n" + 
 					"  DELETE FROM b WHERE node_id=old.id;\n" +
 					"  DELETE FROM a WHERE parent_id=old.id;\n" +
-					"END;");           
-       }        		
+					"END;");
+			this.releaseConnection();
+		}        		
 		
 	}
 	
 	public void deleteSynchroNode(Node node) throws SchedulerException, SQLException{
 		this.unscheduleJob(node);		
-		nodeDao.delete(node);
+		ConnectionSource cSource = this.getConnection();
+		DaoManager.createDao(cSource, Node.class).delete(node);
+		this.releaseConnection();
 	}
 	
 	public Node updateSynchroNode(Map<String, String> data, Node node) throws SQLException, URISyntaxException{
 		Server s;		
+		ConnectionSource cSource = this.getConnection();
+		Dao<Node, String> nDao = DaoManager.createDao(cSource, Node.class);
+		Dao<Property, String> pDao = DaoManager.createDao(cSource, Property.class);
 		if(node == null){
 			s = new Server(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), true, false);			
-			Node serverNode = s.createDbNode(nodeDao);
+			Node serverNode = s.createDbNode(nDao);
 			node = new Node(Node.NODE_TYPE_REPOSITORY, data.get("REPOSITORY_LABEL"), serverNode);
-			nodeDao.create(node);
+			nDao.create(node);
 			node.setParent(serverNode);
-			node.properties = nodeDao.getEmptyForeignCollection("properties");
+			node.properties = nDao.getEmptyForeignCollection("properties");
 			node.addProperty("repository_id", data.get("REPOSITORY_ID"));
 			node.addProperty("target_folder", data.get("TARGET"));
 			node.addProperty("synchro_active", data.get("ACTIVE"));
 			node.addProperty("synchro_direction", data.get("DIRECTION"));
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
-			nodeDao.update(node);
+			nDao.update(node);
 			try {
 				this.scheduleJob(node);
 			} catch (SchedulerException e) {
@@ -338,11 +365,11 @@ public class Manager {
 					this.unscheduleJob(node);
 					
 					// UPDATE DB
-					s.updateDbNode(nodeDao, propertyDao);
+					s.updateDbNode(nDao, pDao);
 					if(toSave.size() > 0){
-						for(Property ps:toSave) propertyDao.update(ps);
+						for(Property ps:toSave) pDao.update(ps);
 					}
-					nodeDao.update(node);	
+					nDao.update(node);	
 					
 					// RESCHEDULE AND CLEAN SNAPSHOTS
 					this.scheduleJob(node, true);
@@ -350,8 +377,8 @@ public class Manager {
 				}else if(intervalChanges){
 					
 					// UPDATE DB
-					for(Property ps:toSave) propertyDao.update(ps);
-					nodeDao.refresh(node);
+					for(Property ps:toSave) pDao.update(ps);
+					nDao.refresh(node);
 					
 					// CHANGE INTERVAL
 					if(node.getPropertyValue("synchro_active").equals("true")){
@@ -364,7 +391,7 @@ public class Manager {
 			}
 		}
 		this.updateSysTrayJobsMenu();
-		
+		this.releaseConnection();
 		
 		return node;
 	}
@@ -388,16 +415,28 @@ public class Manager {
 		return s.toString();
 	}
 	
-	public Node getSynchroNode(String nodeId) throws SQLException{
-		Node n = this.getNodeDao().queryForId(nodeId);
-		n.setParent(this.getNodeDao().queryForId(String.valueOf(n.getParent().id)));
-		return n;
+	public Node getSynchroNode(String nodeId){
+		ConnectionSource cSource = this.getConnection();
+		Dao<Node, String> nDao;
+		try {
+			nDao = DaoManager.createDao(cSource, Node.class);
+			Node n = nDao.queryForId(nodeId);
+			n.setParent(nDao.queryForId(String.valueOf(n.getParent().id)));
+			this.releaseConnection();
+			return n;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			this.releaseConnection();
+			return null;
+		}
 	}
 	
 	public Collection<Node> listSynchroNodes(){
+		ConnectionSource cSource = this.getConnection();
 		Collection<Node> n = new ArrayList<Node>();
 		try {
-			Collection<Node> servers  =  nodeDao.queryForEq("resourceType", Node.NODE_TYPE_SERVER);
+			Dao<Node, String> nDao = DaoManager.createDao(cSource, Node.class);
+			Collection<Node> servers  =  nDao.queryForEq("resourceType", Node.NODE_TYPE_SERVER);
 			for(Node s:servers){
 				for(Node c:s.children){
 					if(c.getResourceType().equals(Node.NODE_TYPE_REPOSITORY)){
@@ -406,8 +445,9 @@ public class Manager {
 				}
 			}
 		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} finally {
+			this.releaseConnection();
 		}
 		return n;
 	}

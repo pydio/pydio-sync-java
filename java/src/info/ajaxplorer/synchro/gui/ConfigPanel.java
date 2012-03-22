@@ -69,15 +69,16 @@ public class ConfigPanel extends Canvas {
 	private CTabFolder tabFolder1;
 	private Node currentSynchroNode;
 	LogViewer logViewer;
+	private SysTray sTray;
 	
 	private JobEditor jobEditor;
 	
-	public ConfigPanel(Composite shell) {
+	public ConfigPanel(Composite shell, SysTray sysTray) {
 		super(shell, SWT.NONE);
 		this.initShell((Shell) shell);
 		this.initGUI();
         shell.pack();
-        
+        this.sTray = sysTray;
 		
 		try {
 			Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
@@ -94,7 +95,7 @@ public class ConfigPanel extends Canvas {
 		
 		shell.addListener(SWT.Close, new Listener() {
 			public void handleEvent(Event event) {
-				shell.setVisible(false);
+				shell.setVisible(false);				
 				event.doit = false;
 			}
 		});		
@@ -179,7 +180,10 @@ public class ConfigPanel extends Canvas {
 					@Override
 					public void mouseDown(MouseEvent arg0) {
 						// TODO Auto-generated method stub
-						getShell().setVisible(false);
+						//getShell().setVisible(false);
+						//ConfigPanel.this.dispose();
+						//System.gc();
+						sTray.closeConfiguration();
 					}
 					
 					@Override

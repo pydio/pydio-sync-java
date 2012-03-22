@@ -81,6 +81,9 @@ public class SysTray {
 		}		
 	}
 	
+	public void refreshJobsMenu(){
+		refreshJobsMenu(Manager.getInstance());
+	}
 	public void refreshJobsMenu(Manager managerInstance){
 		
 		for(MenuItem item:jobsMenu.getItems()){
@@ -154,23 +157,7 @@ public class SysTray {
 			
 			jobsMenu = new Menu(shell, SWT.DROP_DOWN);
 			mTrig.setMenu(jobsMenu);
-			this.refreshJobsMenu(managerInstance);
-			/*
-			Collection<Node> ns = managerInstance.listSynchroNodes();
-			for(Node syncNode:ns){
-				MenuItem mI = new MenuItem(jobsMenu, SWT.PUSH);
-				mI.setText(managerInstance.makeJobLabel(syncNode));
-				mI.setData(syncNode);
-				mI.addListener (SWT.Selection, new Listener () {
-					public void handleEvent (Event event) {
-						try {
-							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
-						} catch (SchedulerException e) {
-							e.printStackTrace();
-						}
-					}
-				});
-			}*/
+			//this.refreshJobsMenu(managerInstance);
 			
 			final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
 			showNotifMenu.setSelection(showNotifications);
@@ -207,6 +194,7 @@ public class SysTray {
 			item.addListener (SWT.MenuDetect, new Listener () {
 				public void handleEvent (Event event) {
 					menu.setVisible (true);
+					refreshJobsMenu();
 				}
 			});
 			item.setImage (image);
@@ -221,11 +209,20 @@ public class SysTray {
 		image.dispose();
 	}
 	
+	public void closeConfiguration(){
+		shell.setVisible(false);
+		cPanel.dispose();
+		cPanel = null;
+		System.gc();
+	}
+	
 	public void openConfiguration(Shell shell){
-		if(!shellInitialized){
+		/*
+		if(!shellInitialized || cPanel.isDisposed()){
 			cPanel = new ConfigPanel(shell);
 			shellInitialized = true;
-		}		
+		}*/
+		cPanel = new ConfigPanel(shell, this);
 		shell.setVisible(true);
 		shell.forceActive();
 	}

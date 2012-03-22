@@ -52,6 +52,8 @@ import org.w3c.dom.NodeList;
 
 import com.j256.ormlite.dao.CloseableIterator;
 import com.j256.ormlite.dao.Dao;
+import com.j256.ormlite.dao.DaoManager;
+import com.j256.ormlite.support.ConnectionSource;
 
 @DisallowConcurrentExecution
 public class SyncJob implements InterruptableJob {
@@ -83,7 +85,11 @@ public class SyncJob implements InterruptableJob {
 	public static Integer STATUS_INTERRUPTED = 64;
 	
 	Node currentRepository ;
-	final Dao<Node, String> nodeDao;
+	Dao<Node, String> nodeDao;
+	Dao<SyncChange, String> syncChangeDao;
+	Dao<SyncLog, String> syncLogDao;
+	Dao<Property, String> propertyDao;
+	
 	
 	private String currentJobNodeID;
 	private boolean clearSnapshots = false;
@@ -121,13 +127,21 @@ public class SyncJob implements InterruptableJob {
 	
 	public SyncJob() throws URISyntaxException, Exception{
 		
-        nodeDao = Manager.getInstance().getNodeDao();		
+        //nodeDao = Manager.getInstance().getNodeDao();		
 		
 	}
 	
 	public void run()  throws URISyntaxException, Exception{
 		
 		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
+		
+		// instantiate the daos
+		ConnectionSource connectionSource = Manager.getInstance().getConnection();
+		nodeDao = DaoManager.createDao(connectionSource, Node.class);				
+		syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
+		syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
+		propertyDao = DaoManager.createDao(connectionSource, Property.class);
+		
 		
 		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
 		currentRepository.setStatus(Node.NODE_STATUS_LOADING);
@@ -142,14 +156,14 @@ public class SyncJob implements InterruptableJob {
 
         //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
 
-    	Dao<SyncChange,String> syncDao = Manager.getInstance().getSyncChangeDao();
-    	List<SyncChange> previouslyRemaining = syncDao.queryForEq("jobId", currentJobNodeID);
+    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
     	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
 		boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
 		Map<String, Object[]> again = null;
 		if(unsolvedConflicts){
 			Manager.getInstance().notifyUser("Unsolved conflicts", "Synchronization cannot be performed as long as there are conflicts!");
-	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);			
+	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);		
+	        Manager.getInstance().releaseConnection();
 			return;
 		}
 		
@@ -168,7 +182,7 @@ public class SyncJob implements InterruptableJob {
 		if(previousChanges.size() > 0){
 			System.out.println("Getting sync from previous job");
 			again = applyChanges(previousChanges);
-			syncDao.delete(previouslyRemaining);
+			syncChangeDao.delete(previouslyRemaining);
 			// TODO NOT GOOD : THE NODES REFERENCES BY "again" ARE DELETED
 			// AND THE CONFLICTS ARE LOST!
 			this.clearSnapshot("remaining_nodes");
@@ -184,7 +198,6 @@ public class SyncJob implements InterruptableJob {
         if(remainingChanges.size() > 0){
         	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
         	Node remainingRoot = loadRootAndSnapshot("remaining_nodes", null, null);
-			Dao<Property, String> pDao = Manager.getInstance().getPropertyDao();
         	for(int i=0;i<c.size();i++){
         		SyncChangeValue cv = c.get(i).getChangeValue();
         		Node changeNode = cv.n;
@@ -195,7 +208,7 @@ public class SyncJob implements InterruptableJob {
         			for(Property p:changeNode.properties){
         				pValues.put(p.getName(), p.getValue());
         			}
-        			pDao.delete(changeNode.properties);
+        			propertyDao.delete(changeNode.properties);
         			Iterator<Map.Entry<String, String>> it = pValues.entrySet().iterator();
         			while(it.hasNext()){
         				Map.Entry<String, String> ent = it.next();
@@ -205,7 +218,7 @@ public class SyncJob implements InterruptableJob {
         		}else{
         			nodeDao.update(changeNode);
         		}
-        		syncDao.create(c.get(i));
+        		syncChangeDao.create(c.get(i));
         	}
         }
         
@@ -219,7 +232,6 @@ public class SyncJob implements InterruptableJob {
 		currentRepository.setStatus(Node.NODE_STATUS_LOADED);
 		nodeDao.update(currentRepository);
         
-		Dao<SyncLog, String> slDao = Manager.getInstance().getSyncLogDao();
 		SyncLog sl = new SyncLog();
 		String status;
 		String summary = "";
@@ -250,9 +262,10 @@ public class SyncJob implements InterruptableJob {
 		sl.jobStatus = status;
 		sl.jobSummary = summary;
 		sl.synchroNode = currentRepository;
-		slDao.create(sl);
+		syncLogDao.create(sl);
 		
         Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+        Manager.getInstance().releaseConnection();
 		
 	}
 	
@@ -409,7 +422,6 @@ public class SyncJob implements InterruptableJob {
 			File f = new File(currentLocalFolder, localNode.getPath());
 			String localMd5 = SyncJob.computeMD5(f);
 			if(remoteNode.getPropertyValue("md5").equals(localMd5)){
-				System.out.println("MD5 Are the same! Ignore!");
 				return true;
 			}
 			System.out.println("MD5 differ " + remoteNode.getPropertyValue("md5") + " - " + localMd5);
@@ -533,10 +545,8 @@ public class SyncJob implements InterruptableJob {
 	
 	protected void cleanDB(){
 		// unlinked properties may have not been deleted
-		
-		Dao<Property, String> pao = Manager.getInstance().getPropertyDao();
 		try {
-			pao.executeRaw("DELETE FROM b WHERE node_id=0");
+			propertyDao.executeRaw("DELETE FROM b WHERE node_id=0");
 		} catch (SQLException e) {			
 			e.printStackTrace();
 		}
@@ -788,6 +798,10 @@ public class SyncJob implements InterruptableJob {
 			byte[] md5sum = digest.digest();
 			BigInteger bigInt = new BigInteger(1, md5sum);
 			String output = bigInt.toString(16);
+			if(output.length() < 32){
+				// PAD WITH 0
+				while(output.length() < 32) output = "0" + output;
+			}
 			return output;
 		}
 		catch(IOException e) {
