@@ -162,7 +162,8 @@ public class SyncJob implements InterruptableJob {
 		Map<String, Object[]> again = null;
 		if(unsolvedConflicts){
 			Manager.getInstance().notifyUser("Unsolved conflicts", "Synchronization cannot be performed as long as there are conflicts!");
-	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);		
+			currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
+	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
 			return;
 		}
@@ -230,6 +231,7 @@ public class SyncJob implements InterruptableJob {
         
         // INDICATES THAT THE JOB WAS CORRECTLY SHUTDOWN
 		currentRepository.setStatus(Node.NODE_STATUS_LOADED);
+		currentRepository.setLastModified(new Date());
 		nodeDao.update(currentRepository);
         
 		SyncLog sl = new SyncLog();

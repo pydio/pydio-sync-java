@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.JobDetail;
@@ -169,6 +170,7 @@ public class Manager {
         } catch (SchedulerException se) {
             se.printStackTrace();
         }
+	    /*
 	    if(!daemon){
 		    shell.getDisplay().asyncExec(new Runnable() {
 				
@@ -178,6 +180,7 @@ public class Manager {
 				}
 			});
 	    }
+	    */
 	}
 	
 	public boolean isDaemon(){
@@ -394,6 +397,19 @@ public class Manager {
 		this.releaseConnection();
 		
 		return node;
+	}
+	
+	public boolean openLocalTarget(Node synchroNode){
+		File f = new File(synchroNode.getPropertyValue("target_folder"));
+		if(f.exists()){
+			Program.launch(synchroNode.getPropertyValue("target_folder"));
+		}
+		return true;
+	}
+	
+	public boolean openRemoteTarget(Node synchroNode){
+		Program.launch(synchroNode.getParent().getLabel() + "?repository_id=" + synchroNode.getPropertyValue("repository_id") + "&folder=%2F");
+		return true;
 	}
 	
 	public String makeJobLabel(Node node, boolean shortFormat){

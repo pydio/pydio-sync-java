@@ -10,6 +10,7 @@ import info.ajaxplorer.synchro.model.SyncLog;
 import java.awt.Color;
 import java.sql.SQLException;
 import java.text.Collator;
+import java.text.DateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Locale;
@@ -100,9 +101,10 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			PreparedQuery<SyncLog> preparedQuery = builder.prepare();
 			table1.removeAll();
 			Collection<SyncLog> logs = logDao.query(preparedQuery);
+			DateFormat df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.getDefault());
 			for(SyncLog log:logs){
 				TableItem it = new TableItem(table1, SWT.NONE);
-				it.setText(0, new Date(log.jobDate).toString());
+				it.setText(0, df.format(new Date(log.jobDate)));
 				it.setText(1, log.jobStatus);
 				it.setText(2, log.jobSummary);
 				if(log.jobStatus.equals("conflicts") || log.jobStatus.equals("errors")){

@@ -3,7 +3,10 @@ package info.ajaxplorer.synchro.gui;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
 
+import java.text.DateFormat;
 import java.util.Collection;
+import java.util.Date;
+import java.util.Locale;
 import java.util.ResourceBundle;
 
 import org.eclipse.swt.SWT;
@@ -33,8 +36,6 @@ public class SysTray {
 	private Menu menu;
 	private boolean showNotifications = true;
 	ResourceBundle messages;
-	MenuItem mTrig ;
-	Menu jobsMenu;
 	private ConfigPanel cPanel;
 	
 	public void notifyUser(String title, String message){
@@ -64,20 +65,6 @@ public class SysTray {
 		if(this.cPanel != null){
 			this.cPanel.notifyJobStateChanged(nodeId, state);
 		}
-		if(mTrig == null) return;
-		for(MenuItem item:jobsMenu.getItems()){
-			if(item.getData() == null || !(item.getData() instanceof Node)) continue;
-			if(Integer.parseInt(nodeId) == ((Node)item.getData()).id){
-				String label = Manager.getInstance().makeJobLabel((Node)item.getData(), false);
-				if(state){
-					item.setEnabled(false);
-					item.setText(label + " : " +messages.getString("tray_menu_running"));
-				}else{			
-					item.setEnabled(true);
-					item.setText(label);
-				}
-			}
-		}		
 	}
 	
 	public void refreshJobsMenu(){
@@ -85,14 +72,70 @@ public class SysTray {
 	}
 	public void refreshJobsMenu(Manager managerInstance){
 		
-		for(MenuItem item:jobsMenu.getItems()){
+		for(MenuItem item:menu.getItems()){
 			item.dispose();
 		}			
+		
+		MenuItem mi = new MenuItem (menu, SWT.PUSH);
+		mi.setText ( messages.getString("tray_menu_preferences") );
+		menu.setDefaultItem(mi);
+		mi.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				openConfiguration(shell);
+			}
+		});
+		
+		final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
+		showNotifMenu.setSelection(showNotifications);
+		showNotifMenu.setText (messages.getString("tray_menu_notif"));
+		showNotifMenu.addSelectionListener (new SelectionListener() {				
+			@Override
+			public void widgetSelected(SelectionEvent event) {
+				showNotifications = ((MenuItem)event.widget).getSelection();
+			}
+			
+			@Override
+			public void widgetDefaultSelected(SelectionEvent event) {}
+		});
+		
+		new MenuItem(menu, SWT.SEPARATOR);		
+
+		
 		Collection<Node> ns = managerInstance.listSynchroNodes();
 		for(Node syncNode:ns){
-			MenuItem mI = new MenuItem(jobsMenu, SWT.PUSH);
-			mI.setText(managerInstance.makeJobLabel(syncNode, false));
+			
+			boolean running = false;
+			String syncStatus = "";
+			if(syncNode.getStatus() == Node.NODE_STATUS_LOADING){
+				syncStatus = messages.getString("tray_menu_status_running");
+				running = true;
+			}else if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
+				syncStatus = messages.getString("tray_menu_status_error");
+			}else{
+				if(syncNode.getLastModified() != null){
+					DateFormat df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.getDefault());
+					syncStatus = messages.getString("tray_menu_status_last") + df.format(syncNode.getLastModified());					
+				}else{
+					syncStatus = messages.getString("tray_menu_status_na");
+				}
+			}
+			
+			MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
+			jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
+			jobTrig.setData(syncNode);
+			
+			Menu jobMenu = new Menu(shell, SWT.DROP_DOWN);
+			jobTrig.setMenu(jobMenu);			
+
+			MenuItem m0 = new MenuItem(jobMenu, SWT.PUSH);			
+			m0.setText(syncStatus);
+			
+			new MenuItem(jobMenu, SWT.SEPARATOR);					
+			
+			MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
+			mI.setText(messages.getString("tray_menu_trigger"));
 			mI.setData(syncNode);
+			if(running) mI.setEnabled(false);
 			mI.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					try {
@@ -102,7 +145,36 @@ public class SysTray {
 					}
 				}
 			});
+
+			MenuItem mI2 = new MenuItem(jobMenu, SWT.PUSH);
+			mI2.setText(messages.getString("tray_menu_openlocal"));
+			mI2.setData(syncNode);
+			mI2.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					Manager.getInstance().openLocalTarget((Node)event.widget.getData());
+				}
+			});
+			
+			MenuItem mI3 = new MenuItem(jobMenu, SWT.PUSH);
+			mI3.setText(messages.getString("tray_menu_openremote"));
+			mI3.setData(syncNode);
+			mI3.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					Manager.getInstance().openRemoteTarget((Node)event.widget.getData());
+				}
+			});			
 		}		
+		
+		new MenuItem(menu, SWT.SEPARATOR);
+
+		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
+		mi2.setText (messages.getString("tray_menu_quit"));
+		mi2.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				int res = Manager.getInstance().close();
+				System.exit(res);
+			}
+		});					
 	}
 	
 	public SysTray(final Shell shell, ResourceBundle messages, Manager managerInstance){
@@ -139,57 +211,13 @@ public class SysTray {
 					openConfiguration(shell);
 				}
 			});
+			
+			
 			menu = new Menu (shell, SWT.POP_UP);			
-			MenuItem mi = new MenuItem (menu, SWT.PUSH);
-			mi.setText ( messages.getString("tray_menu_preferences") );
-			menu.setDefaultItem(mi);
-			mi.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					openConfiguration(shell);
-				}
-			});
-			
-			
-			
-			mTrig = new MenuItem (menu, SWT.CASCADE);
-			mTrig.setText ( messages.getString("tray_menu_trigger") );
-			
-			jobsMenu = new Menu(shell, SWT.DROP_DOWN);
-			mTrig.setMenu(jobsMenu);
-			//this.refreshJobsMenu(managerInstance);
-			
-			final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
-			showNotifMenu.setSelection(showNotifications);
-			showNotifMenu.setText (messages.getString("tray_menu_notif"));
-			showNotifMenu.addSelectionListener (new SelectionListener() {				
-				@Override
-				public void widgetSelected(SelectionEvent event) {
-					showNotifications = ((MenuItem)event.widget).getSelection();
-				}
-				
-				@Override
-				public void widgetDefaultSelected(SelectionEvent event) {}
-			});
-			
-			if(!managerInstance.isDaemon()){
-				new MenuItem(menu, SWT.SEPARATOR);
-
-				MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
-				mi2.setText (messages.getString("tray_menu_quit"));
-				mi2.addListener (SWT.Selection, new Listener () {
-					public void handleEvent (Event event) {
-						int res = Manager.getInstance().close();
-						System.exit(res);
-					}
-				});				
-			}
-			
 			item.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
-					//menu.setVisible (true);
 				}
 			});
-			
 			item.addListener (SWT.MenuDetect, new Listener () {
 				public void handleEvent (Event event) {
 					menu.setVisible (true);
@@ -197,7 +225,6 @@ public class SysTray {
 				}
 			});
 			item.setImage (image);
-			//tip.setVisible(true);
 		}
 		shell.setBounds(0, 0, 0, 0);
 		shell.open ();
@@ -216,11 +243,6 @@ public class SysTray {
 	}
 	
 	public void openConfiguration(Shell shell){
-		/*
-		if(!shellInitialized || cPanel.isDisposed()){
-			cPanel = new ConfigPanel(shell);
-			shellInitialized = true;
-		}*/
 		if(!shell.isVisible()){
 			cPanel = new ConfigPanel(shell, this);
 			shell.setVisible(true);

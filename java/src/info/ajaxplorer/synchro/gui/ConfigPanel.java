@@ -39,8 +39,6 @@ import org.quartz.SchedulerException;
 public class ConfigPanel extends Canvas {	
 
 	{
-		//Register as a resource user - SWTResourceManager will
-		//handle the obtaining and disposing of resources
 		SWTResourceManager.registerResourceUser(this);
 	}
 	
@@ -56,6 +54,7 @@ public class ConfigPanel extends Canvas {
 	private Node currentSynchroNode;
 	LogViewer logViewer;
 	private SysTray sTray;
+	private Listener moveListener;
 	
 	private JobEditor jobEditor;
 	
@@ -102,7 +101,7 @@ public class ConfigPanel extends Canvas {
         shell.setBounds(150, 150, p.x, p.y);
                 
 		// add ability to move shell around
-	    Listener l = new Listener() {
+	    moveListener = new Listener() {
 	      Point origin;
 
 	      public void handleEvent(Event e) {
@@ -122,9 +121,9 @@ public class ConfigPanel extends Canvas {
 	        }
 	      }
 	    };
-	    this.addListener(SWT.MouseDown, l);
-	    this.addListener(SWT.MouseUp, l);
-	    this.addListener(SWT.MouseMove, l);
+	    this.addListener(SWT.MouseDown, moveListener);
+	    this.addListener(SWT.MouseUp, moveListener);
+	    this.addListener(SWT.MouseMove, moveListener);
 	    
 	    
 	}		
@@ -154,6 +153,9 @@ public class ConfigPanel extends Canvas {
 				titleImage = new Label(this, SWT.NONE);
 				titleImage.setImage(SWTResourceManager.getImage("images/SynchroLayout_03.png"));
 				titleImage.setLayoutData(titleImageLData);
+				titleImage.addListener(SWT.MouseDown, moveListener);
+				titleImage.addListener(SWT.MouseUp, moveListener);
+				titleImage.addListener(SWT.MouseMove, moveListener);				
 			}
 			{
 				minimize = new Label(this, SWT.NONE);
@@ -168,24 +170,16 @@ public class ConfigPanel extends Canvas {
 				minimize.addMouseListener(new MouseListener() {
 					
 					@Override
-					public void mouseUp(MouseEvent arg0) {
-						// TODO Auto-generated method stub
-						
+					public void mouseUp(MouseEvent arg0) {						
 					}
 					
 					@Override
 					public void mouseDown(MouseEvent arg0) {
-						// TODO Auto-generated method stub
-						//getShell().setVisible(false);
-						//ConfigPanel.this.dispose();
-						//System.gc();
 						sTray.closeConfiguration();
 					}
 					
 					@Override
 					public void mouseDoubleClick(MouseEvent arg0) {
-						// TODO Auto-generated method stub
-						
 					}
 				});
 			}
@@ -297,10 +291,8 @@ public class ConfigPanel extends Canvas {
 			}			
 			loadJobComboValues();
 		} catch (SchedulerException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
