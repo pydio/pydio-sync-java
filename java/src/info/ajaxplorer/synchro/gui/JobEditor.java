@@ -10,6 +10,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
@@ -161,7 +162,7 @@ public class JobEditor extends Composite{
 		radioSyncInterval3.setSelection(false);
 		
 		if(this.form != null){
-			this.form.setText("Create a new synchronization... ");
+			this.form.setText(Manager.getMessage("cpanel_create_synchro"));
 			updateFormActions(true, false);
 		}
 
@@ -169,13 +170,13 @@ public class JobEditor extends Composite{
 	
 	private void loadRepositories(){
 		
-		System.out.println("Loading repositories");
+		Logger.getRootLogger().debug("Loading repositories");		
 		if(tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") ){
 			return;
 		}
-		System.out.println("Update comborepo");
+		Logger.getRootLogger().debug("Updating combo repo");		
 
-		buttonLoadRepositories.setText("Loading ...");
+		buttonLoadRepositories.setText(Manager.getMessage("jobeditor_loading"));
 		String host = tfHost.getText();
 		String login = tfLogin.getText();
 		String pass = tfPassword.getText();
@@ -186,7 +187,6 @@ public class JobEditor extends Composite{
 			RestStateHolder.getInstance().setServer(s);
 			AjxpAPI.getInstance().setServer(s);
 			RestRequest rest = new RestRequest();
-			System.out.println("Will send request");
 			Document doc = rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
 			
 			NodeList mainTag = doc.getElementsByTagName("repositories");
@@ -221,12 +221,11 @@ public class JobEditor extends Composite{
 					repoItems.put(label, repositoryId);
 				}
 			}
-			System.out.println("Parsed response!");
 			comboRepository.setText("");
 			comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
 			comboRepository.setListVisible(true);
 			
-			buttonLoadRepositories.setText("Load");
+			buttonLoadRepositories.setText(Manager.getMessage("jobeditor_load"));
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		} catch (Exception e) {
@@ -250,7 +249,7 @@ public class JobEditor extends Composite{
 		form.getBody().setLayout(layout);		
 
 
-		Section section = configureSection(toolkit, form, "Server Connection", "Set up the remote server connection. The URL will be the exact same adress as you would use to access AjaXplorer via a web browser.", 1);
+		Section section = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_connection"),Manager.getMessage("jobeditor_legend_connection"), 1);
 		Composite sectionClient = toolkit.createComposite(section);		
 		layout = new TableWrapLayout();
 		sectionClient.setLayout(layout);
@@ -261,21 +260,21 @@ public class JobEditor extends Composite{
 		section.setClient(sectionClient);	
 		
 		// HOST
-		toolkit.createLabel(sectionClient, "Host URL : ");
+		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_hostURL") + " : ");
 		tfHost = toolkit.createText(sectionClient, "");
 		tfHost.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
 		// LOGIN
-		toolkit.createLabel(sectionClient, "Login : ");
+		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_login") + " : ");
 		tfLogin = toolkit.createText(sectionClient, "");
 		tfLogin.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
 		// PASSWORD
-		toolkit.createLabel(sectionClient, "Password : ");
+		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_password") + " : ");
 		tfPassword = toolkit.createText(sectionClient, "", SWT.PASSWORD);
 		tfPassword.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
-		Section section2 = configureSection(toolkit, form, "Synchronization Targets", "Once the remote connection is set up, load the accessible repositories and choose one, and browse the local folder to synchronize with.", 1);
+		Section section2 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_targets"), Manager.getMessage("jobeditor_legend_targets"), 1);
 
 		
 		Composite sectionClient2 = toolkit.createComposite(section2);
@@ -285,13 +284,13 @@ public class JobEditor extends Composite{
 		section2.setClient(sectionClient2);	
 		
 		// REPOSITORY CHOOSER
-		Label l = toolkit.createLabel(sectionClient2, "Repository : ");
+		Label l = toolkit.createLabel(sectionClient2, Manager.getMessage("jobeditor_repository") + " : ");
 		l.setLayoutData(getTWDataFillMiddle());
 		comboRepository = new Combo(sectionClient2, SWT.BORDER);
 		comboRepository.setLayoutData(getTWDataFillMiddle());
 		toolkit.adapt(comboRepository, true, true);
 		
-		buttonLoadRepositories = toolkit.createButton(sectionClient2, "Load", SWT.PUSH);
+		buttonLoadRepositories = toolkit.createButton(sectionClient2, Manager.getMessage("jobeditor_load"), SWT.PUSH);
 		buttonLoadRepositories.addListener(SWT.Selection, new Listener() {
 			@Override
 			public void handleEvent(Event arg0) {
@@ -301,12 +300,12 @@ public class JobEditor extends Composite{
 		buttonLoadRepositories.setLayoutData(getTWDataFillMiddle());
 
 		// TARGET FOLDER CHOOSER
-		l = toolkit.createLabel(sectionClient2, "Local Folder : ");
+		l = toolkit.createLabel(sectionClient2, Manager.getMessage("jobeditor_localfolder") + " : ");
 		l.setLayoutData(getTWDataFillMiddle());
 		tfTarget = toolkit.createText(sectionClient2, "");
 		tfTarget.setLayoutData(getTWDataFillMiddle());
 		
-		buttonFileChooser = toolkit.createButton(sectionClient2, "Browse", SWT.PUSH);
+		buttonFileChooser = toolkit.createButton(sectionClient2, Manager.getMessage("jobeditor_browse"), SWT.PUSH);
 		buttonFileChooser.setLayoutData(getTWDataFillMiddle());
 		buttonFileChooser.addListener(SWT.Selection, new Listener() {
 			
@@ -320,39 +319,39 @@ public class JobEditor extends Composite{
 			}
 		});
 		
-		Section section3 = configureSection(toolkit, form, "Job Execution Parameters", "Set how this synchronization job must be executed and when. The direction will determine whether the files should be automatically copied only from your local folder to the remote server (upload), the other way round (download), or in both sides (bidirectionnal).", 2);		
+		Section section3 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 2);		
 		Composite sectionClient3 = toolkit.createComposite(section3);
 		layout = new TableWrapLayout();
 		sectionClient3.setLayout(layout);
 		layout.numColumns = 2;
 		section3.setClient(sectionClient3);			
 		
-		checkboxActive = toolkit.createButton(sectionClient3, "This job is active", SWT.CHECK | SWT.SELECTED);
+		checkboxActive = toolkit.createButton(sectionClient3, Manager.getMessage("jobeditor_jobactive"), SWT.CHECK | SWT.SELECTED);
 		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
 		td.colspan = 2;
 		checkboxActive.setLayoutData(td);
 		
-		Label lab = toolkit.createLabel(sectionClient3, "Synchronisation direction : ");
+		Label lab = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_direction") + " : ");
 		lab.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp = toolkit.createComposite(sectionClient3);
 		rComp.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		layout = new TableWrapLayout();
 		layout.numColumns = 3;
 		rComp.setLayout(layout);
-		radioDirection = toolkit.createButton(rComp, "Bidirectionnal", SWT.RADIO);
-		radioDirection2 = toolkit.createButton(rComp, "Download only", SWT.RADIO);
-		radioDirection3 = toolkit.createButton(rComp, "Upload only", SWT.RADIO);
+		radioDirection = toolkit.createButton(rComp, Manager.getMessage("jobeditor_bi"), SWT.RADIO);
+		radioDirection2 = toolkit.createButton(rComp, Manager.getMessage("jobeditor_down"), SWT.RADIO);
+		radioDirection3 = toolkit.createButton(rComp, Manager.getMessage("jobeditor_up"), SWT.RADIO);
 				
-		Label lab2 = toolkit.createLabel(sectionClient3, "Execute synchro every : ");
+		Label lab2 = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_frequency") + " : ");
 		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp2= toolkit.createComposite(sectionClient3);
 		rComp2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		layout = new TableWrapLayout();
 		layout.numColumns = 3;
 		rComp2.setLayout(layout);
-		radioSyncInterval1 = toolkit.createButton(rComp2, "Minutes", SWT.RADIO);
-		radioSyncInterval2 = toolkit.createButton(rComp2, "Hours", SWT.RADIO);
-		radioSyncInterval3 = toolkit.createButton(rComp2, "Days", SWT.RADIO);
+		radioSyncInterval1 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_min"), SWT.RADIO);
+		radioSyncInterval2 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_hours"), SWT.RADIO);
+		radioSyncInterval3 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_days"), SWT.RADIO);
 		
 		updateFormActions(true, true);
 		
@@ -397,8 +396,8 @@ public class JobEditor extends Composite{
 				public void run() {
 					super.run();
 					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
-					dialog.setText("Delete Synchronization Job");
-					dialog.setMessage("Are you sure you want to remove this job? This operation cannot be undone!");
+					dialog.setText(Manager.getMessage("jobeditor_diag_delete"));
+					dialog.setMessage(Manager.getMessage("jobeditor_diag_deletem"));
 					int returnCode = dialog.open();					
 					if(returnCode == SWT.OK) configPanel.deleteConfig();
 				}

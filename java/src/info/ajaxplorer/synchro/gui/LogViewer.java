@@ -129,8 +129,8 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				TableItem it = new TableItem(table2, SWT.NONE);
 				SyncChangeValue v = change.getChangeValue();
 				it.setText(0, change.getKey());
-				it.setText(1, "Status : "+v.getStatusString());
-				it.setText(2, "Task : "+v.getTaskString());
+				it.setText(1, Manager.getMessage("logviewer_status") + " : "+v.getStatusString());
+				it.setText(2, Manager.getMessage("logviewer_task") + " : "+v.getTaskString());
 				it.setData(change);
 				if(v.status == SyncJob.STATUS_CONFLICT) currentConflictsCount ++;
 			}
@@ -172,7 +172,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					composite1.setLayout(composite1Layout);
 					{
 						label1 = new Label(composite1, SWT.NONE);
-						label1.setText("Synchronisations Log");
+						label1.setText(Manager.getMessage("logviewer_synclogs"));
 						FormData label1FormData = new FormData();
 						label1FormData.left =  new FormAttachment(0, 1000, 5);
 						label1FormData.top =  new FormAttachment(0, 1000, 10);
@@ -232,19 +232,19 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						table1.setLayoutData(table1FormData);
 						{
 							table1ColumnDate = new TableColumn(table1, SWT.NONE);
-							table1ColumnDate.setText("Date");
+							table1ColumnDate.setText(Manager.getMessage("logviewer_column_date"));
 							table1ColumnDate.setData("date");
 							table1ColumnDate.addListener(SWT.Selection, sortListener);							
 						}
 						{
 							table1ColumnResult = new TableColumn(table1, SWT.NONE);
-							table1ColumnResult.setText("Result");
+							table1ColumnResult.setText(Manager.getMessage("logviewer_column_result"));
 							table1ColumnResult.setData("result");
 							table1ColumnResult.addListener(SWT.Selection, sortListener);
 						}
 						{
 							table1ColumnSummary = new TableColumn(table1, SWT.NONE);
-							table1ColumnSummary.setText("Summary");
+							table1ColumnSummary.setText(Manager.getMessage("logviewer_column_summary"));
 							table1ColumnSummary.setData("summary");
 							table1ColumnSummary.addListener(SWT.Selection, sortListener);
 						}					
@@ -256,7 +256,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					composite2.setLayout(composite1Layout);
 					{
 						label2 = new Label(composite2, SWT.NONE);
-						label2.setText("Interrupted tasks or unresolved conflicts (right-click on each if an action is necessary)");
+						label2.setText(Manager.getMessage("logviewer_interrupted_tasks"));
 						FormData label1FormData = new FormData();
 						label1FormData.left =  new FormAttachment(0, 1000, 5);
 						label1FormData.top =  new FormAttachment(0, 1000, 10);
@@ -277,15 +277,15 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						table2.setLayoutData(table1FormData);
 						{
 							table2ColumnFile = new TableColumn(table2, SWT.NONE);
-							table2ColumnFile.setText("File/Folder name");
+							table2ColumnFile.setText(Manager.getMessage("logviewer_column_file"));
 						}
 						{
 							table2ColumnStatus = new TableColumn(table2, SWT.NONE);
-							table2ColumnStatus.setText("Status");
+							table2ColumnStatus.setText(Manager.getMessage("logviewer_column_status"));
 						}
 						{
 							TableColumn table2ColumnTask = new TableColumn(table2, SWT.NONE);
-							table2ColumnTask.setText("Task");
+							table2ColumnTask.setText(Manager.getMessage("logviewer_column_task"));
 						}
 					}
 				}			
@@ -315,7 +315,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 solveMenu = new Menu(this.getShell(),
                      SWT.POP_UP);
 			 itemSolveKeepMine = new MenuItem(solveMenu, SWT.PUSH);
-			 itemSolveKeepMine.setText("Keep my version");
+			 itemSolveKeepMine.setText(Manager.getMessage("logviewer_conflict_keepmine"));
 			 itemSolveKeepMine.setData("mine");
 			 SelectionListener listener = new SelectionListener() {				 
 				 public void widgetSelected(SelectionEvent arg0) {
@@ -333,7 +333,6 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						 v.status = SyncJob.STATUS_CONFLICT_SOLVED;
 						 c.setChangeValue(v);
 						 try {
-							System.out.println("Updating " + c.getKey() + " with task " + v.getTaskString());
 							sCDao.update(c);
 							changes = true;
 						} catch (SQLException e) {
@@ -349,7 +348,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					 solveMenu.setVisible(false);
 					 if(currentConflictsCount == 0){
 						MessageBox messageBox = new MessageBox(LogViewer.this.getShell(), SWT.ICON_QUESTION|SWT.YES|SWT.NO);
-					    messageBox.setMessage("Conflicts are marked as solved, do you want to re-run the synchronization now?");
+					    messageBox.setMessage(Manager.getMessage("logviewer_conflict_solved"));
 					    if(messageBox.open() == SWT.YES){
 					    	try {
 								Manager.getInstance().triggerJobNow(currentSynchroNode, false);
@@ -363,11 +362,11 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 };			 
 			 itemSolveKeepMine.addSelectionListener(listener);
 			 itemSolveKeepTheir = new MenuItem(solveMenu, SWT.PUSH);
-			 itemSolveKeepTheir.setText("Keep remote version");
+			 itemSolveKeepTheir.setText(Manager.getMessage("logviewer_conflict_keeptheir"));
 			 itemSolveKeepTheir.setData("their");
 			 itemSolveKeepTheir.addSelectionListener(listener);
              itemSolveKeepBoth = new MenuItem(solveMenu, SWT.PUSH);
-             itemSolveKeepBoth.setText("Keep both versions");
+             itemSolveKeepBoth.setText(Manager.getMessage("logviewer_conflict_keepboth"));
              itemSolveKeepBoth.setData("both");
              itemSolveKeepBoth.addSelectionListener(listener);
 			this.layout();

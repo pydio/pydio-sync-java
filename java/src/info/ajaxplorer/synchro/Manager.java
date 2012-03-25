@@ -79,9 +79,8 @@ public class Manager {
             language = new String("en");
             country = new String("US");
         } 
-        Locale currentLocale = new Locale(language, country);
-		
-		Display.setAppName("AjaXplorer Synchronizer");
+        Locale currentLocale = new Locale(language, country);        
+		Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
 		Display.setAppVersion("1.0");
 		final Display display = new Display();
 		final Shell shell = new Shell(display, SWT.NONE | SWT.ALPHA);
@@ -189,7 +188,7 @@ public class Manager {
 	
 	public int close(){
 		try {
-			this.notifyUser("Shutting down", "Please wait, interrupting running jobs...");
+			this.notifyUser(getMessage("notif_shuttingdown_title"), getMessage("notif_shuttingdown"));
 			Set<JobKey> keys = scheduler.getJobKeys(GroupMatcher.jobGroupEquals("sync"));
 			Iterator<JobKey> it = keys.iterator();
 			while(it.hasNext()){
@@ -247,15 +246,7 @@ public class Manager {
 		if(!work.exists()) work.mkdir();
 		File dbFile = new File(work, "ajxpsync.db");
 		boolean dbAlreadyCreated = dbFile.exists();
-		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
-		
-		//ConnectionSource connectionSource = new JdbcConnectionSource(databaseUrl);
-
-		// instantiate the daos
-		//nodeDao = DaoManager.createDao(connectionSource, Node.class);				
-		//syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
-		//syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
-		//propertyDao = DaoManager.createDao(connectionSource, Property.class);
+		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();		
 
 		if(!dbAlreadyCreated){
 			ConnectionSource cs = this.getConnection();
@@ -413,7 +404,7 @@ public class Manager {
 	}
 	
 	public String makeJobLabel(Node node, boolean shortFormat){
-		String s = "REPO on HOST <> LOCAL";
+		String s = getMessage("joblabel_format");
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
 		if(uri != null){

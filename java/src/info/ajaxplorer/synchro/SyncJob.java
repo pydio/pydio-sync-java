@@ -42,6 +42,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.apache.http.HttpEntity;
+import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.InterruptableJob;
@@ -161,7 +162,7 @@ public class SyncJob implements InterruptableJob {
 		boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
 		Map<String, Object[]> again = null;
 		if(unsolvedConflicts){
-			Manager.getInstance().notifyUser("Unsolved conflicts", "Synchronization cannot be performed as long as there are conflicts!");
+			Manager.getInstance().notifyUser(Manager.getMessage("job_blocking_conflicts_title"), Manager.getMessage("job_blocking_conflicts"));
 			currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
@@ -181,7 +182,7 @@ public class SyncJob implements InterruptableJob {
 		Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 
 		if(previousChanges.size() > 0){
-			System.out.println("Getting sync from previous job");
+			Logger.getRootLogger().debug("Getting previous tasks");
 			again = applyChanges(previousChanges);
 			syncChangeDao.delete(previouslyRemaining);
 			// TODO NOT GOOD : THE NODES REFERENCES BY "again" ARE DELETED
@@ -190,12 +191,10 @@ public class SyncJob implements InterruptableJob {
 		}
 		
         Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
-        //System.out.println(changes);
         Map<String, Object[]> remainingChanges = applyChanges(changes);
         if(again != null && again.size() > 0){
         	remainingChanges.putAll(again);
         }
-        //System.out.println(remainingChanges);
         if(remainingChanges.size() > 0){
         	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
         	Node remainingRoot = loadRootAndSnapshot("remaining_nodes", null, null);
@@ -239,25 +238,25 @@ public class SyncJob implements InterruptableJob {
 		String summary = "";
 		if(countConflictsDetected > 0) {
 			status = SyncLog.LOG_STATUS_CONFLICTS;
-			summary = countConflictsDetected + " conflicts detected. Please fix them before next synchro!";
+			summary = Manager.getMessage("job_status_conflicts").replace("%d", countConflictsDetected+"");
 		}
 		else if(countResourcesErrors > 0) {
 			status = SyncLog.LOG_STATUS_ERRORS;
-			summary = countResourcesErrors + " errors detected";
+			summary = Manager.getMessage("job_status_errors").replace("%d", countResourcesErrors + "");
 		}else {
 			if(countResourcesInterrupted > 0) status = SyncLog.LOG_STATUS_INTERRUPT;
 			else status = SyncLog.LOG_STATUS_SUCCESS;
 			if(countFilesDownloaded > 0){
-				summary = countFilesDownloaded + " files downloaded, ";
+				summary = Manager.getMessage("job_status_downloads").replace("%d", countFilesDownloaded + "" );
 			}
 			if(countFilesUploaded > 0){
-				summary += countFilesUploaded + " files uploaded, ";
+				summary += Manager.getMessage("job_status_uploads").replace("%d", countFilesUploaded + "" );
 			}
 			if(countResourcesSynchronized > 0){
-				summary += countResourcesSynchronized + " resources synchronized";
+				summary += Manager.getMessage("job_status_resources").replace("%d", countResourcesSynchronized+ "" );
 			}
 			if(summary.equals("")){
-				summary = "No actions necessary";
+				summary = Manager.getMessage("job_status_nothing");
 			}
 		}
 		sl.jobDate = (new Date()).getTime();
@@ -317,7 +316,7 @@ public class SyncJob implements InterruptableJob {
 					Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					node.setPath(k);
 					File targetFile = new File(currentLocalFolder, k);
-					this.logChange("Downloading file from server", k);
+					this.logChange(Manager.getMessage("job_log_downloading"), k);
 					this.synchronousDL(node, targetFile);
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Error while downloading file from server");
@@ -328,7 +327,7 @@ public class SyncJob implements InterruptableJob {
 					
 					File f = new File(currentLocalFolder, k);
 					if(!f.exists()) {
-						this.logChange("Creating local folder", k);
+						this.logChange(Manager.getMessage("job_log_mkdir"), k);
 						boolean res = f.mkdirs();
 						if(!res){
 							throw new Exception("Error while creating local folder");
@@ -338,7 +337,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_LOCAL_REMOVE){
 					
-					this.logChange("Remove local resource", k);
+					this.logChange(Manager.getMessage("job_log_rmlocal"), k);
 					File f = new File(currentLocalFolder, k);
 					if(f.exists()){
 						boolean res = f.delete();
@@ -350,7 +349,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_REMOTE_MKDIR){
 					
-					this.logChange("Creating remote folder", k);
+					this.logChange(Manager.getMessage("job_log_mkdir_remote"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
@@ -364,7 +363,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_REMOTE_PUT_CONTENT){
 	
-					this.logChange("Uploading file to server", k);
+					this.logChange(Manager.getMessage("job_log_uploading"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
@@ -378,7 +377,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_REMOTE_REMOVE){
 					
-					this.logChange("Delete remote resource", k);
+					this.logChange(Manager.getMessage("job_log_rmremote"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
@@ -392,7 +391,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
 					
-					this.logChange("Conflict detected on this resource!", k);
+					this.logChange(Manager.getMessage("job_log_conflict"), k);
 					notApplied.put(k, value);
 					countConflictsDetected ++;
 					
@@ -408,7 +407,7 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	protected void logChange(String action, String path){
-		Manager.getInstance().notifyUser("AjaXplorer Synchro", action+ " : "+path);
+		Manager.getInstance().notifyUser(Manager.getMessage("job_log_balloontitle"), action+ " : "+path);
 	}
 	
 	protected boolean ignoreTreeConflict(Integer remoteChange, Integer localChange, Node remoteNode, Node localNode){
@@ -426,7 +425,7 @@ public class SyncJob implements InterruptableJob {
 			if(remoteNode.getPropertyValue("md5").equals(localMd5)){
 				return true;
 			}
-			System.out.println("MD5 differ " + remoteNode.getPropertyValue("md5") + " - " + localMd5);
+			Logger.getRootLogger().debug("MD5 differ " + remoteNode.getPropertyValue("md5") + " - " + localMd5);
 		}
 		return false;
 	}

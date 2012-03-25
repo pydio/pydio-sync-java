@@ -92,7 +92,7 @@ public class ConfigPanel extends Canvas {
 			}
 	    });		
 		
-        shell.setText("AjaXplorer Synchronizer");
+        shell.setText(Manager.getMessage("shell_title"));
         shell.setSize(450, 400);
         //shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-Bi.png")));
         
@@ -166,7 +166,7 @@ public class ConfigPanel extends Canvas {
 				minimizeLData.right =  new FormAttachment(1000, 1000, 0);
 				minimize.setLayoutData(minimizeLData);
 				minimize.setImage(SWTResourceManager.getImage("images/SynchroLayout_05.png"));
-				minimize.setToolTipText("Close this window");
+				minimize.setToolTipText(Manager.getMessage("cpanel_tooltip_close"));
 				minimize.addMouseListener(new MouseListener() {
 					
 					@Override
@@ -191,7 +191,7 @@ public class ConfigPanel extends Canvas {
 				cLabel1LData.width = 317;
 				cLabel1LData.height = 19;
 				cLabel1.setLayoutData(cLabel1LData);
-				cLabel1.setText("Select a synchronisation job to edit");
+				cLabel1.setText(Manager.getMessage("cpanel_selectjob"));
 				cLabel1.setForeground(SWTResourceManager.getColor(0, 0, 0));
 			}
 			{
@@ -218,7 +218,7 @@ public class ConfigPanel extends Canvas {
 				tabFolder1.setLayoutData(tabFolder1LData);
 				{
 					tabItem1 = new CTabItem(tabFolder1, SWT.NONE);
-					tabItem1.setText(" Job Data ");
+					tabItem1.setText(" " + Manager.getMessage("cpanel_tab_jobdata") + " ");
 					{				
 						jobEditor = new JobEditor(tabFolder1, this);				
 						tabItem1.setControl(jobEditor);
@@ -230,7 +230,7 @@ public class ConfigPanel extends Canvas {
 				}
 				{
 					tabItem2 = new CTabItem(tabFolder1, SWT.NONE);
-					tabItem2.setText(" Synchronization Logs ");
+					tabItem2.setText(" " + Manager.getMessage("cpanel_tab_logs") + " ");
 					{
 						logViewer = new LogViewer(tabFolder1, SWT.NONE);
 						tabItem2.setControl(logViewer);
@@ -313,7 +313,7 @@ public class ConfigPanel extends Canvas {
 			}
 			i++;
 		}
-		keys.add("Create a new synchronization job...");		
+		keys.add(Manager.getMessage("cpanel_create_synchro"));		
 		cCombo1.setItems(keys.toArray(new String[0]));
 		cCombo1.select(currentSel);
 	}
