@@ -7,6 +7,7 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 
+import java.awt.Color;
 import java.sql.SQLException;
 import java.text.Collator;
 import java.util.Collection;
@@ -149,6 +150,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 		try {
 			FormLayout thisLayout = new FormLayout();
 			this.setLayout(thisLayout);
+			this.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 			this.setSize(581, 310);
 
 			{

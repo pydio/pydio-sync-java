@@ -25,7 +25,6 @@ import org.quartz.SchedulerException;
 
 public class SysTray {
 
-	private boolean shellInitialized = false;
 	private ToolTip tip;
 	private Image image;
 	private Display display;
@@ -222,8 +221,10 @@ public class SysTray {
 			cPanel = new ConfigPanel(shell);
 			shellInitialized = true;
 		}*/
-		cPanel = new ConfigPanel(shell, this);
-		shell.setVisible(true);
+		if(!shell.isVisible()){
+			cPanel = new ConfigPanel(shell, this);
+			shell.setVisible(true);
+		}
 		shell.forceActive();
 	}
 	

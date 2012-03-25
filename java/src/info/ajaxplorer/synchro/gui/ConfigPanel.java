@@ -36,20 +36,6 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.SchedulerException;
 
-
-
-/**
-* This code was edited or generated using CloudGarden's Jigloo
-* SWT/Swing GUI Builder, which is free for non-commercial
-* use. If Jigloo is being used commercially (ie, by a corporation,
-* company or business for any purpose whatever) then you
-* should purchase a license for each developer using Jigloo.
-* Please visit www.cloudgarden.com for details.
-* Use of Jigloo implies acceptance of these licensing terms.
-* A COMMERCIAL LICENSE HAS NOT BEEN PURCHASED FOR
-* THIS MACHINE, SO JIGLOO OR THIS CODE CANNOT BE USED
-* LEGALLY FOR ANY CORPORATE OR COMMERCIAL PURPOSE.
-*/
 public class ConfigPanel extends Canvas {	
 
 	{
@@ -61,10 +47,10 @@ public class ConfigPanel extends Canvas {
 	
 	private Label minimize;
 	private CLabel cLabel1;
-	private Label Title;
 	private Combo cCombo1;
 	ArrayList<Object> jobComboItems;
 	private CTabItem tabItem2;
+	private Label titleImage;
 	private CTabItem tabItem1;
 	private CTabFolder tabFolder1;
 	private Node currentSynchroNode;
@@ -160,14 +146,24 @@ public class ConfigPanel extends Canvas {
 			this.applyGradientBG(this);
 			this.setBackgroundMode(1);
 			{
+				FormData titleImageLData = new FormData();
+				titleImageLData.left =  new FormAttachment(0, 1000, 0);
+				titleImageLData.top =  new FormAttachment(0, 1000, 1);
+				titleImageLData.width = 261;
+				titleImageLData.height = 29;
+				titleImage = new Label(this, SWT.NONE);
+				titleImage.setImage(SWTResourceManager.getImage("images/SynchroLayout_03.png"));
+				titleImage.setLayoutData(titleImageLData);
+			}
+			{
 				minimize = new Label(this, SWT.NONE);
 				FormData minimizeLData = new FormData();
-				minimizeLData.width = 16;
-				minimizeLData.height = 16;
-				minimizeLData.top =  new FormAttachment(0, 1000, 4);
-				minimizeLData.right =  new FormAttachment(1000, 1000, -4);
+				minimizeLData.width = 32;
+				minimizeLData.height = 29;
+				minimizeLData.top =  new FormAttachment(0, 1000, 1);
+				minimizeLData.right =  new FormAttachment(1000, 1000, 0);
 				minimize.setLayoutData(minimizeLData);
-				minimize.setImage(SWTResourceManager.getImage("images/minimize.png"));
+				minimize.setImage(SWTResourceManager.getImage("images/SynchroLayout_05.png"));
 				minimize.setToolTipText("Close this window");
 				minimize.addMouseListener(new MouseListener() {
 					
@@ -194,36 +190,23 @@ public class ConfigPanel extends Canvas {
 				});
 			}
 			{
-				Title = new Label(this, SWT.NONE);
-				FormData TitleLData = new FormData();
-				TitleLData.left =  new FormAttachment(0, 1000, 13);
-				TitleLData.top =  new FormAttachment(0, 1000, 10);
-				TitleLData.width = 463;
-				TitleLData.height = 26;
-				TitleLData.right =  new FormAttachment(1000, 1000, -124);
-				Title.setLayoutData(TitleLData);
-				Title.setText("AjaXplorer Synchronizer");
-				Title.setForeground(SWTResourceManager.getColor(255, 255, 255));
-				//Title.setForeground(SWTResourceManager.getColor(94, 124, 144));
-				Title.setFont(SWTResourceManager.getFont("Arial", 18, 0, false, false));
-			}
-			{
 				cLabel1 = new CLabel(this, SWT.NONE);
 				FormData cLabel1LData = new FormData();
-				cLabel1LData.left =  new FormAttachment(0, 1000, 12);
-				cLabel1LData.top =  new FormAttachment(0, 1000, 52);
+				cLabel1LData.left =  new FormAttachment(0, 1000, 11);
+				cLabel1LData.top =  new FormAttachment(0, 1000, 47);
 				cLabel1LData.width = 317;
 				cLabel1LData.height = 19;
 				cLabel1.setLayoutData(cLabel1LData);
 				cLabel1.setText("Select a synchronisation job to edit");
-				cLabel1.setForeground(SWTResourceManager.getColor(255, 255, 255));
+				cLabel1.setForeground(SWTResourceManager.getColor(0, 0, 0));
 			}
 			{
 				cCombo1 = new Combo(this, SWT.BORDER);
 				FormData cCombo1LData = new FormData();
 				cCombo1LData.left =  new FormAttachment(0, 1000, 12);
-				cCombo1LData.top =  new FormAttachment(0, 1000, 73);
+				cCombo1LData.top =  new FormAttachment(0, 1000, 67);
 				cCombo1LData.width = 289;
+				cCombo1LData.height = 21;
 				//cCombo1LData.height = 21;
 				cCombo1.setLayoutData(cCombo1LData);
 				loadJobComboValues();
@@ -384,9 +367,11 @@ public class ConfigPanel extends Canvas {
 		Image newImage = new Image(composite.getDisplay(), 1, Math.max(1,
 				rect.height));
 		GC gc = new GC(newImage);
-		gc.setBackground(composite.getDisplay().getSystemColor(SWT.COLOR_WHITE));
-		gc.setForeground(SWTResourceManager.getColor(94, 124, 144));
-		gc.fillGradientRectangle(0, 0, 1, 135, true);
+		gc.setForeground(composite.getDisplay().getSystemColor(SWT.COLOR_WHITE));
+		gc.setBackground(SWTResourceManager.getColor(213, 221, 227));
+		gc.fillGradientRectangle(0, 0, 1, 150, true);
+		gc.setBackground(SWTResourceManager.getColor(181, 196, 210));
+		gc.fillRectangle(0, 1, 1, 29);
 		gc.dispose();
 		composite.setBackgroundImage(newImage);
 
