@@ -42,6 +42,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.util.EncodingUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
@@ -185,8 +186,6 @@ public class SyncJob implements InterruptableJob {
 			Logger.getRootLogger().debug("Getting previous tasks");
 			again = applyChanges(previousChanges);
 			syncChangeDao.delete(previouslyRemaining);
-			// TODO NOT GOOD : THE NODES REFERENCES BY "again" ARE DELETED
-			// AND THE CONFLICTS ARE LOST!
 			this.clearSnapshot("remaining_nodes");
 		}
 		
@@ -202,7 +201,7 @@ public class SyncJob implements InterruptableJob {
         		SyncChangeValue cv = c.get(i).getChangeValue();
         		Node changeNode = cv.n;
         		changeNode.setParent(remainingRoot);
-        		if(changeNode.id == 0){ // Not yet created!
+        		if(changeNode.id == 0 || !nodeDao.idExists(changeNode.id+"")){ // Not yet created!
         			nodeDao.create(changeNode);
         			Map<String, String> pValues = new HashMap<String, String>();
         			for(Property p:changeNode.properties){

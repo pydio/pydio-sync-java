@@ -83,7 +83,7 @@ public class Manager {
 		Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
 		Display.setAppVersion("1.0");
 		final Display display = new Display();
-		final Shell shell = new Shell(display, SWT.NONE | SWT.ALPHA);
+		final Shell shell = new Shell(display, SWT.CLOSE|SWT.RESIZE);
 		shell.setActive();
 
 		Manager.instanciate(shell, currentLocale, daemon);

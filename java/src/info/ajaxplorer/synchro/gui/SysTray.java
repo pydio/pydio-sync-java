@@ -76,15 +76,6 @@ public class SysTray {
 			item.dispose();
 		}			
 		
-		MenuItem mi = new MenuItem (menu, SWT.PUSH);
-		mi.setText ( messages.getString("tray_menu_preferences") );
-		menu.setDefaultItem(mi);
-		mi.addListener (SWT.Selection, new Listener () {
-			public void handleEvent (Event event) {
-				openConfiguration(shell);
-			}
-		});
-		
 		final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
 		showNotifMenu.setSelection(showNotifications);
 		showNotifMenu.setText (messages.getString("tray_menu_notif"));
@@ -119,6 +110,7 @@ public class SysTray {
 					syncStatus = messages.getString("tray_menu_status_na");
 				}
 			}
+						
 			
 			MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
 			jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
@@ -127,6 +119,15 @@ public class SysTray {
 			Menu jobMenu = new Menu(shell, SWT.DROP_DOWN);
 			jobTrig.setMenu(jobMenu);			
 
+			MenuItem mi = new MenuItem (jobMenu, SWT.PUSH);
+			mi.setText ( messages.getString("tray_menu_preferences") );
+			final String nodeId = syncNode.id + "";
+			mi.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId);
+				}
+			});
+						
 			MenuItem m0 = new MenuItem(jobMenu, SWT.PUSH);			
 			m0.setText(syncStatus);
 			
@@ -198,17 +199,17 @@ public class SysTray {
 			//item.setToolTip(tip);
 			item.addListener (SWT.Show, new Listener () {
 				public void handleEvent (Event event) {
-					//System.out.println("show");
+					System.out.println("show");
 				}
 			});
 			item.addListener (SWT.Hide, new Listener () {
 				public void handleEvent (Event event) {
-					//System.out.println("hide");
+					System.out.println("hide");
 				}
 			});
 			item.addListener (SWT.DefaultSelection, new Listener () {
 				public void handleEvent (Event event) {
-					openConfiguration(shell);
+					openConfiguration(shell, null);
 				}
 			});
 			
@@ -216,6 +217,8 @@ public class SysTray {
 			menu = new Menu (shell, SWT.POP_UP);			
 			item.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
+					menu.setVisible (true);
+					refreshJobsMenu();
 				}
 			});
 			item.addListener (SWT.MenuDetect, new Listener () {
@@ -242,9 +245,9 @@ public class SysTray {
 		System.gc();
 	}
 	
-	public void openConfiguration(Shell shell){
+	public void openConfiguration(Shell shell, String nodeId){
 		if(!shell.isVisible()){
-			cPanel = new ConfigPanel(shell, this);
+			cPanel = new ConfigPanel(shell, this, nodeId);
 			shell.setVisible(true);
 		}
 		shell.forceActive();

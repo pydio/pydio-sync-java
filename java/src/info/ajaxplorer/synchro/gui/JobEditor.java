@@ -6,6 +6,7 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.Manager;
 
+import java.awt.Color;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,16 +19,17 @@ import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.DirectoryDialog;
-import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.forms.events.ExpansionAdapter;
 import org.eclipse.ui.forms.events.ExpansionEvent;
+import org.eclipse.ui.forms.events.IHyperlinkListener;
 import org.eclipse.ui.forms.widgets.Form;
 import org.eclipse.ui.forms.widgets.FormToolkit;
+import org.eclipse.ui.forms.widgets.Hyperlink;
 import org.eclipse.ui.forms.widgets.Section;
 import org.eclipse.ui.forms.widgets.TableWrapData;
 import org.eclipse.ui.forms.widgets.TableWrapLayout;
@@ -46,19 +48,22 @@ public class JobEditor extends Composite{
 	}
 	
 	private Text tfHost;
-	private Button buttonFileChooser;
+	private Hyperlink buttonFileChooser;
 	private Text tfTarget;
 	private Text tfPassword;
-	private Button radioDirection2;
-	private Button buttonLoadRepositories;
+	private Hyperlink linkLoadRepositories;
 	private Button radioSyncInterval2;
 	private Combo comboRepository;
 	private Button radioSyncInterval3;
 	private Button radioSyncInterval1;
-	private Button radioDirection3;
-	private Button radioDirection;
+	//private Button radioDirection3;
+	//private Button radioDirection2;
+	//private Button radioDirection;
+	private Combo comboDirection;
 	private Button checkboxActive;
 	private Text tfLogin;
+	
+	private boolean currentActiveState;
 	
 	private HashMap<String, String> repoItems;
 	private ConfigPanel configPanel;
@@ -94,8 +99,8 @@ public class JobEditor extends Composite{
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
 			this.loadFormData(values);		
 			if(this.form != null){
-				((FormHeading)this.form.getHead()).setText(Manager.getInstance().makeJobLabel(baseNode, true));				
-				updateFormActions(true, true);
+				//((FormHeading)this.form.getHead()).setText(Manager.getInstance().makeJobLabel(baseNode, true));				
+				updateFormActions(true, true, true);
 			}
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
@@ -112,10 +117,10 @@ public class JobEditor extends Composite{
 		values.put("REPOSITORY_LABEL", comboRepository.getText());
 		values.put("REPOSITORY_ID", repoItems.get(comboRepository.getText()));
 		values.put("TARGET", tfTarget.getText());
-		values.put("ACTIVE", (checkboxActive.getSelection()?"true":"false"));
+		values.put("ACTIVE", (currentActiveState?"true":"false"));
 		String dir = "bi";
-		if(radioDirection2.getSelection()) dir = "down";
-		else if(radioDirection3.getSelection()) dir = "up";
+		if(comboDirection.getSelectionIndex() == 1) dir = "up";
+		else if(comboDirection.getSelectionIndex() == 2) dir = "down";
 		values.put("DIRECTION", dir);
 		String freq = "minute";
 		if(radioSyncInterval2.getSelection()) freq = "hour";
@@ -132,11 +137,15 @@ public class JobEditor extends Composite{
 		repoItems = new HashMap<String, String>();
 		repoItems.put(values.get("REPOSITORY_LABEL"), values.get("REPOSITORY_ID"));
 		tfTarget.setText(values.get("TARGET"));
-		checkboxActive.setSelection(values.get("ACTIVE").equals("true"));
+		//checkboxActive.setSelection(values.get("ACTIVE").equals("true"));
+		currentActiveState = values.get("ACTIVE").equals("true");
 		
-		radioDirection.setSelection(values.get("DIRECTION").equals("bi"));
-		radioDirection2.setSelection(values.get("DIRECTION").equals("down"));
-		radioDirection3.setSelection(values.get("DIRECTION").equals("up"));
+		String dir = values.get("DIRECTION");
+		int selectionIndex = 0;
+		if(dir.equals("bi")) selectionIndex = 0;
+		else if(dir.equals("up")) selectionIndex = 1;
+		else if(dir.equals("down")) selectionIndex = 2;
+		comboDirection.select(selectionIndex);
 		
 		radioSyncInterval1.setSelection(values.get("INTERVAL").equals("minute"));
 		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
@@ -151,19 +160,17 @@ public class JobEditor extends Composite{
 		comboRepository.setItems(new String[0]);
 		repoItems = new HashMap<String, String>();
 		tfTarget.setText("");
-		checkboxActive.setSelection(true);
+		//checkboxActive.setSelection(true);
 		
-		radioDirection.setSelection(true);
-		radioDirection2.setSelection(false);
-		radioDirection3.setSelection(false);
+		comboDirection.select(0);
 		
 		radioSyncInterval1.setSelection(false);
 		radioSyncInterval2.setSelection(true);
 		radioSyncInterval3.setSelection(false);
 		
 		if(this.form != null){
-			this.form.setText(Manager.getMessage("cpanel_create_synchro"));
-			updateFormActions(true, false);
+			//this.form.setText(Manager.getMessage("cpanel_create_synchro"));
+			updateFormActions(true, false, true);
 		}
 
 	}	
@@ -176,7 +183,7 @@ public class JobEditor extends Composite{
 		}
 		Logger.getRootLogger().debug("Updating combo repo");		
 
-		buttonLoadRepositories.setText(Manager.getMessage("jobeditor_loading"));
+		linkLoadRepositories.setText(Manager.getMessage("jobeditor_loading"));
 		String host = tfHost.getText();
 		String login = tfLogin.getText();
 		String pass = tfPassword.getText();
@@ -225,7 +232,7 @@ public class JobEditor extends Composite{
 			comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
 			comboRepository.setListVisible(true);
 			
-			buttonLoadRepositories.setText(Manager.getMessage("jobeditor_load"));
+			linkLoadRepositories.setText(Manager.getMessage("jobeditor_load"));
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		} catch (Exception e) {
@@ -245,7 +252,7 @@ public class JobEditor extends Composite{
 		layout.verticalSpacing = 20;
 		layout.horizontalSpacing = 10;
 		layout.makeColumnsEqualWidth = true;
-		layout.numColumns = 2;
+		layout.numColumns = 1;
 		form.getBody().setLayout(layout);		
 
 
@@ -253,24 +260,26 @@ public class JobEditor extends Composite{
 		Composite sectionClient = toolkit.createComposite(section);		
 		layout = new TableWrapLayout();
 		sectionClient.setLayout(layout);
-		layout.numColumns = 2;
-		layout.horizontalSpacing = 8;
-		layout.verticalSpacing = 10;
+		layout.numColumns = 1;
+		layout.rightMargin = 5;
+		layout.leftMargin = 5;
+		layout.horizontalSpacing = 5;
+		layout.verticalSpacing = 5;
 		
 		section.setClient(sectionClient);	
 		
 		// HOST
-		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_hostURL") + " : ");
+		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_hostURL"));
 		tfHost = toolkit.createText(sectionClient, "");
 		tfHost.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
 		// LOGIN
-		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_login") + " : ");
+		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_login"));
 		tfLogin = toolkit.createText(sectionClient, "");
 		tfLogin.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
 		// PASSWORD
-		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_password") + " : ");
+		toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_password"));
 		tfPassword = toolkit.createText(sectionClient, "", SWT.PASSWORD);
 		tfPassword.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
@@ -280,37 +289,50 @@ public class JobEditor extends Composite{
 		Composite sectionClient2 = toolkit.createComposite(section2);
 		layout = new TableWrapLayout();
 		sectionClient2.setLayout(layout);
-		layout.numColumns = 3;		
+		layout.numColumns = 2;		
 		section2.setClient(sectionClient2);	
 		
 		// REPOSITORY CHOOSER
 		Label l = toolkit.createLabel(sectionClient2, Manager.getMessage("jobeditor_repository") + " : ");
-		l.setLayoutData(getTWDataFillMiddle());
-		comboRepository = new Combo(sectionClient2, SWT.BORDER);
-		comboRepository.setLayoutData(getTWDataFillMiddle());
+		l.setLayoutData(getTWDataFillMiddle(2));
+		comboRepository = new Combo(sectionClient2, SWT.BORDER|SWT.READ_ONLY);
+		comboRepository.setLayoutData(getTWDataFillMiddle(1));
 		toolkit.adapt(comboRepository, true, true);
 		
-		buttonLoadRepositories = toolkit.createButton(sectionClient2, Manager.getMessage("jobeditor_load"), SWT.PUSH);
-		buttonLoadRepositories.addListener(SWT.Selection, new Listener() {
+		linkLoadRepositories = toolkit.createHyperlink(sectionClient2, Manager.getMessage("jobeditor_load"), SWT.NULL);
+		linkLoadRepositories.setLayoutData(getTWDataFillMiddle(1, true));
+		linkLoadRepositories.setUnderlined(false);
+		linkLoadRepositories.addHyperlinkListener(new IHyperlinkListener() {			
 			@Override
-			public void handleEvent(Event arg0) {
+			public void linkExited(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {}
+			
+			@Override
+			public void linkEntered(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {}
+			
+			@Override
+			public void linkActivated(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {
 				loadRepositories();
 			}
 		});
-		buttonLoadRepositories.setLayoutData(getTWDataFillMiddle());
 
 		// TARGET FOLDER CHOOSER
 		l = toolkit.createLabel(sectionClient2, Manager.getMessage("jobeditor_localfolder") + " : ");
-		l.setLayoutData(getTWDataFillMiddle());
+		l.setLayoutData(getTWDataFillMiddle(2));
 		tfTarget = toolkit.createText(sectionClient2, "");
-		tfTarget.setLayoutData(getTWDataFillMiddle());
+		tfTarget.setLayoutData(getTWDataFillMiddle(1));
 		
-		buttonFileChooser = toolkit.createButton(sectionClient2, Manager.getMessage("jobeditor_browse"), SWT.PUSH);
-		buttonFileChooser.setLayoutData(getTWDataFillMiddle());
-		buttonFileChooser.addListener(SWT.Selection, new Listener() {
+		buttonFileChooser = toolkit.createHyperlink(sectionClient2, Manager.getMessage("jobeditor_browse"), SWT.PUSH);
+		buttonFileChooser.setLayoutData(getTWDataFillMiddle(1, true));
+		buttonFileChooser.setUnderlined(false);
+		buttonFileChooser.addHyperlinkListener(new IHyperlinkListener() {			
+			@Override
+			public void linkExited(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {}
 			
 			@Override
-			public void handleEvent(Event arg0) {									
+			public void linkEntered(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {}
+			
+			@Override
+			public void linkActivated(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {
 				DirectoryDialog dialog = new DirectoryDialog(JobEditor.this.getShell());
 				String res = dialog.open();
 				if(res != null){
@@ -319,28 +341,42 @@ public class JobEditor extends Composite{
 			}
 		});
 		
-		Section section3 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 2);		
+		Section section3 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 1);		
 		Composite sectionClient3 = toolkit.createComposite(section3);
 		layout = new TableWrapLayout();
 		sectionClient3.setLayout(layout);
-		layout.numColumns = 2;
+		layout.numColumns = 1;
 		section3.setClient(sectionClient3);			
 		
+		/*
 		checkboxActive = toolkit.createButton(sectionClient3, Manager.getMessage("jobeditor_jobactive"), SWT.CHECK | SWT.SELECTED);
 		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
-		td.colspan = 2;
+		td.colspan = 1;
 		checkboxActive.setLayoutData(td);
+		*/
 		
 		Label lab = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_direction") + " : ");
 		lab.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp = toolkit.createComposite(sectionClient3);
 		rComp.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		layout = new TableWrapLayout();
-		layout.numColumns = 3;
+		layout.numColumns = 1;
 		rComp.setLayout(layout);
+		/*
 		radioDirection = toolkit.createButton(rComp, Manager.getMessage("jobeditor_bi"), SWT.RADIO);
 		radioDirection2 = toolkit.createButton(rComp, Manager.getMessage("jobeditor_down"), SWT.RADIO);
 		radioDirection3 = toolkit.createButton(rComp, Manager.getMessage("jobeditor_up"), SWT.RADIO);
+			*/
+		comboDirection = new Combo(sectionClient3, SWT.READ_ONLY|SWT.BORDER);
+	    comboDirection.setItems(new String[] { 
+	    		Manager.getMessage("jobeditor_bi"), 
+	    		Manager.getMessage("jobeditor_up"), 
+	    		Manager.getMessage("jobeditor_down") 
+	    		});
+	    //toolkit.adapt(comboDirection);
+	    TableWrapData test = new TableWrapData(TableWrapData.FILL_GRAB);
+	    test.maxWidth = 180;
+	    comboDirection.setLayoutData(test);
 				
 		Label lab2 = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_frequency") + " : ");
 		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
@@ -352,23 +388,26 @@ public class JobEditor extends Composite{
 		radioSyncInterval1 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_min"), SWT.RADIO);
 		radioSyncInterval2 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_hours"), SWT.RADIO);
 		radioSyncInterval3 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_days"), SWT.RADIO);
-		
-		updateFormActions(true, true);
+		updateFormActions(true, true, true);
 		
 		toolkit.paintBordersFor(sectionClient);
 		toolkit.paintBordersFor(sectionClient2);
 		toolkit.paintBordersFor(sectionClient3);
 		
-		this.form.setText("looooooooooooooooooo  nnnnnnnnnnn gggStart text");		
+		this.form.setText("Connexion");		
 		this.layout();
 	}	
 	
-	protected TableWrapData getTWDataFillMiddle(){
-		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
+	protected TableWrapData getTWDataFillMiddle(int colspan){
+		return  getTWDataFillMiddle(colspan, false);
+	}
+	protected TableWrapData getTWDataFillMiddle(int colspan, boolean wrap){
+		TableWrapData td = new TableWrapData((wrap?TableWrapData.CENTER:TableWrapData.FILL_GRAB));
 		td.valign = TableWrapData.MIDDLE;
+		td.colspan = colspan;
 		return td;
 	}
-	protected void updateFormActions(boolean save, boolean delete){
+	protected void updateFormActions(boolean save, boolean delete, boolean activeState){
 		if(form == null) return;
 		form.getToolBarManager().removeAll();
 		if(save){
@@ -403,15 +442,30 @@ public class JobEditor extends Composite{
 				}
 			});
 		}
+		if(activeState){
+			
+			form.getToolBarManager().add(new Action("Toggle active", new ImageDescriptor() {
+				@Override
+				public ImageData getImageData() {
+					return new ImageData(this.getClass().getClassLoader().getResourceAsStream(currentActiveState?"images/media_playback_stop.png":"images/media_playback_start.png"));
+				}
+			}) {
+				@Override
+				public void run() {
+					super.run();
+					currentActiveState = !currentActiveState;
+					updateFormActions(true, true, true);
+				}
+			});
+		}
 		form.getToolBarManager().update(true);			
 		
 	}
 	
 	protected Section configureSection(FormToolkit toolkit, final Form form, String title, String description, int colspan){
-		Section section = toolkit.createSection(form.getBody(), 
-				Section.DESCRIPTION|Section.TITLE_BAR|Section.EXPANDED);
-		section.descriptionVerticalSpacing = 5;
-		section.clientVerticalSpacing = 10;
+		Section section = toolkit.createSection(form.getBody(),Section.EXPANDED|Section.DESCRIPTION);
+		section.descriptionVerticalSpacing = 0;
+		section.clientVerticalSpacing = 0;
 		
 		TableWrapData td = new TableWrapData(TableWrapData.FILL_GRAB);
 		td.colspan = colspan;
@@ -422,7 +476,9 @@ public class JobEditor extends Composite{
 			}
 		});
 		section.setText(title);
+		toolkit.createCompositeSeparator(section);
 		section.setDescription(description);
+		
 		return section;
 	}
 	
