@@ -16,13 +16,19 @@ import org.eclipse.jface.action.Action;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.ImageData;
+import org.eclipse.swt.layout.FormAttachment;
+import org.eclipse.swt.layout.FormData;
+import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Dialog;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.List;
 import org.eclipse.swt.widgets.MessageBox;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.forms.events.ExpansionAdapter;
 import org.eclipse.ui.forms.events.ExpansionEvent;
@@ -46,6 +52,10 @@ public class JobEditor extends Composite{
 		//handle the obtaining and disposing of resources
 		SWTResourceManager.registerResourceUser(this);
 	}
+	
+	private String currentRepoId;
+	private String currentRepoLabel;
+	private String currentLocalFolder;
 	
 	private Text tfHost;
 	private Hyperlink buttonFileChooser;
@@ -114,8 +124,8 @@ public class JobEditor extends Composite{
 		values.put("HOST", tfHost.getText());		
 		values.put("LOGIN", tfLogin.getText());		
 		values.put("PASSWORD", tfPassword.getText());		
-		values.put("REPOSITORY_LABEL", comboRepository.getText());
-		values.put("REPOSITORY_ID", repoItems.get(comboRepository.getText()));
+		//values.put("REPOSITORY_LABEL", comboRepository.getText());
+		//values.put("REPOSITORY_ID", repoItems.get(comboRepository.getText()));
 		values.put("TARGET", tfTarget.getText());
 		values.put("ACTIVE", (currentActiveState?"true":"false"));
 		String dir = "bi";
@@ -133,10 +143,13 @@ public class JobEditor extends Composite{
 		tfHost.setText(values.get("HOST"));
 		tfLogin.setText(values.get("LOGIN"));
 		tfPassword.setText(values.get("PASSWORD"));
-		comboRepository.setText(values.get("REPOSITORY_LABEL"));
+		//comboRepository.setText(values.get("REPOSITORY_LABEL"));
+		currentRepoLabel = values.get("REPOSITORY_LABEL");
+		currentRepoId = values.get("REPOSITORY_ID");
 		repoItems = new HashMap<String, String>();
 		repoItems.put(values.get("REPOSITORY_LABEL"), values.get("REPOSITORY_ID"));
-		tfTarget.setText(values.get("TARGET"));
+		//tfTarget.setText(values.get("TARGET"));
+		currentLocalFolder = values.get("TARGET");
 		//checkboxActive.setSelection(values.get("ACTIVE").equals("true"));
 		currentActiveState = values.get("ACTIVE").equals("true");
 		
@@ -150,6 +163,8 @@ public class JobEditor extends Composite{
 		radioSyncInterval1.setSelection(values.get("INTERVAL").equals("minute"));
 		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
 		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
+		
+		refreshHyperlinkChoosers();
 	}
 
 	public void clearFormData(){
@@ -256,11 +271,11 @@ public class JobEditor extends Composite{
 		form.getBody().setLayout(layout);		
 
 
-		Section section = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_connection"),Manager.getMessage("jobeditor_legend_connection"), 1);
+		Section section = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_connection"),Manager.getMessage("jobeditor_legend_connection"), 1, false);
 		Composite sectionClient = toolkit.createComposite(section);		
 		layout = new TableWrapLayout();
 		sectionClient.setLayout(layout);
-		layout.numColumns = 1;
+		layout.numColumns = 2;
 		layout.rightMargin = 5;
 		layout.leftMargin = 5;
 		layout.horizontalSpacing = 5;
@@ -283,24 +298,22 @@ public class JobEditor extends Composite{
 		tfPassword = toolkit.createText(sectionClient, "", SWT.PASSWORD);
 		tfPassword.setLayoutData(new TableWrapData(TableWrapData.FILL_GRAB));
 		
+		/*
 		Section section2 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_targets"), Manager.getMessage("jobeditor_legend_targets"), 1);
-
-		
 		Composite sectionClient2 = toolkit.createComposite(section2);
 		layout = new TableWrapLayout();
 		sectionClient2.setLayout(layout);
 		layout.numColumns = 2;		
 		section2.setClient(sectionClient2);	
-		
+		*/
 		// REPOSITORY CHOOSER
-		Label l = toolkit.createLabel(sectionClient2, Manager.getMessage("jobeditor_repository") + " : ");
-		l.setLayoutData(getTWDataFillMiddle(2));
-		comboRepository = new Combo(sectionClient2, SWT.BORDER|SWT.READ_ONLY);
-		comboRepository.setLayoutData(getTWDataFillMiddle(1));
-		toolkit.adapt(comboRepository, true, true);
-		
-		linkLoadRepositories = toolkit.createHyperlink(sectionClient2, Manager.getMessage("jobeditor_load"), SWT.NULL);
-		linkLoadRepositories.setLayoutData(getTWDataFillMiddle(1, true));
+		Label l = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_repository") + " : ");
+		l.setLayoutData(getTWDataFillMiddle(1));
+
+			
+		String t = (currentRepoLabel!=null?currentRepoLabel+ " (" + Manager.getMessage("jobeditor_load") + ")":"Choose remote repository");
+		linkLoadRepositories = toolkit.createHyperlink(sectionClient, t, SWT.NULL);
+		linkLoadRepositories.setLayoutData(getTWDataFillMiddle(1, false));
 		linkLoadRepositories.setUnderlined(false);
 		linkLoadRepositories.addHyperlinkListener(new IHyperlinkListener() {			
 			@Override
@@ -311,18 +324,25 @@ public class JobEditor extends Composite{
 			
 			@Override
 			public void linkActivated(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {
-				loadRepositories();
+				//loadRepositories();
+				openRepositoryChooser();
 			}
 		});
+		
+		/*
+		comboRepository = new Combo(sectionClient2, SWT.BORDER|SWT.READ_ONLY);
+		comboRepository.setLayoutData(getTWDataFillMiddle(2));
+		toolkit.adapt(comboRepository, true, true);
+		*/
 
 		// TARGET FOLDER CHOOSER
-		l = toolkit.createLabel(sectionClient2, Manager.getMessage("jobeditor_localfolder") + " : ");
-		l.setLayoutData(getTWDataFillMiddle(2));
-		tfTarget = toolkit.createText(sectionClient2, "");
-		tfTarget.setLayoutData(getTWDataFillMiddle(1));
+		l = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_localfolder") + " : ");
+		l.setLayoutData(getTWDataFillMiddle(1));
+		//tfTarget = toolkit.createText(sectionClient2, "");
+		//tfTarget.setLayoutData(getTWDataFillMiddle(1));
 		
-		buttonFileChooser = toolkit.createHyperlink(sectionClient2, Manager.getMessage("jobeditor_browse"), SWT.PUSH);
-		buttonFileChooser.setLayoutData(getTWDataFillMiddle(1, true));
+		buttonFileChooser = toolkit.createHyperlink(sectionClient, currentLocalFolder + " (" + Manager.getMessage("jobeditor_browse") + ")", SWT.PUSH);
+		buttonFileChooser.setLayoutData(getTWDataFillMiddle(1, false));
 		buttonFileChooser.setUnderlined(false);
 		buttonFileChooser.addHyperlinkListener(new IHyperlinkListener() {			
 			@Override
@@ -336,12 +356,12 @@ public class JobEditor extends Composite{
 				DirectoryDialog dialog = new DirectoryDialog(JobEditor.this.getShell());
 				String res = dialog.open();
 				if(res != null){
-					tfTarget.setText(res);
+					currentLocalFolder = res;
 				}
 			}
 		});
 		
-		Section section3 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 1);		
+		Section section3 = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 1, true);		
 		Composite sectionClient3 = toolkit.createComposite(section3);
 		layout = new TableWrapLayout();
 		sectionClient3.setLayout(layout);
@@ -391,20 +411,59 @@ public class JobEditor extends Composite{
 		updateFormActions(true, true, true);
 		
 		toolkit.paintBordersFor(sectionClient);
-		toolkit.paintBordersFor(sectionClient2);
+		//toolkit.paintBordersFor(sectionClient2);
 		toolkit.paintBordersFor(sectionClient3);
 		
 		this.form.setText("Connexion");		
 		this.layout();
 	}	
 	
+	protected void openRepositoryChooser(){
+		Shell dialog = new Shell (getShell(), SWT.DIALOG_TRIM|SWT.APPLICATION_MODAL);
+		//Label label = new Label (dialog, SWT.NONE);
+		List list = new List(dialog, SWT.BORDER | SWT.MULTI | SWT.V_SCROLL);
+		list.add("Repo 1");
+		list.add("Repo 2");
+		list.add("Repo 3");
+		Button okButton = new Button (dialog, SWT.PUSH);
+		okButton.setText ("&OK");
+		Button cancelButton = new Button (dialog, SWT.PUSH);
+		cancelButton.setText ("&Cancel");
+		/*
+		FormData listAtt = new FormData();
+		listAtt.left = new FormAttachment(0, 100);
+		listAtt.right = new FormAttachment(0, 100);
+		list.setLayoutData(listAtt);
+		*/
+		FormLayout form = new FormLayout ();
+		form.marginWidth = form.marginHeight = 8;
+		dialog.setLayout (form);
+		FormData okData = new FormData ();
+		okData.top = new FormAttachment (list, 8);
+		okButton.setLayoutData (okData);
+		FormData cancelData = new FormData ();
+		cancelData.left = new FormAttachment (okButton, 8);
+		cancelData.top = new FormAttachment (okButton, 0, SWT.TOP);
+		cancelButton.setLayoutData (cancelData);
+		
+		dialog.setDefaultButton (okButton);
+		dialog.pack ();
+		dialog.open ();	}
+	
+	protected void refreshHyperlinkChoosers(){
+		buttonFileChooser.setText(currentLocalFolder + " (" + Manager.getMessage("jobeditor_browse") + ")");
+		String t = (currentRepoLabel!=null?currentRepoLabel+ " (" + Manager.getMessage("jobeditor_load") + ")":"Choose remote repository");		
+		linkLoadRepositories.setText(t);
+	}
+	
 	protected TableWrapData getTWDataFillMiddle(int colspan){
 		return  getTWDataFillMiddle(colspan, false);
 	}
 	protected TableWrapData getTWDataFillMiddle(int colspan, boolean wrap){
-		TableWrapData td = new TableWrapData((wrap?TableWrapData.CENTER:TableWrapData.FILL_GRAB));
+		TableWrapData td = new TableWrapData((wrap?TableWrapData.LEFT:TableWrapData.FILL_GRAB));
 		td.valign = TableWrapData.MIDDLE;
 		td.colspan = colspan;
+		td.maxWidth = 200;
 		return td;
 	}
 	protected void updateFormActions(boolean save, boolean delete, boolean activeState){
@@ -462,8 +521,12 @@ public class JobEditor extends Composite{
 		
 	}
 	
-	protected Section configureSection(FormToolkit toolkit, final Form form, String title, String description, int colspan){
-		Section section = toolkit.createSection(form.getBody(),Section.EXPANDED|Section.DESCRIPTION);
+	protected Section configureSection(FormToolkit toolkit, final Form form, String title, String description, int colspan, boolean expandable){
+		int style = Section.EXPANDED|Section.DESCRIPTION;
+		if(expandable){
+			style = Section.TREE_NODE|Section.DESCRIPTION|Section.COMPACT;
+		}
+		Section section = toolkit.createSection(form.getBody(),style);
 		section.descriptionVerticalSpacing = 0;
 		section.clientVerticalSpacing = 0;
 		

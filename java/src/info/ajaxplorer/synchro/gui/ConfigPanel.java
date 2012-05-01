@@ -13,13 +13,6 @@ import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
 import org.eclipse.swt.custom.StackLayout;
-import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.MouseListener;
-import org.eclipse.swt.events.PaintEvent;
-import org.eclipse.swt.events.PaintListener;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
@@ -158,7 +151,7 @@ public class ConfigPanel extends Canvas {
 			if(System.getProperty("os.name").toLowerCase().indexOf("windows xp") >= 0){
 				this.setSize(240, 540);
 			}else{
-				this.setSize(280, 580);
+				this.setSize(320, 580);
 			}
 			{
 				final Composite contentPanel = new Composite (this, SWT.NULL);
