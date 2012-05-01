@@ -22,10 +22,12 @@ import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
@@ -76,6 +78,10 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 		//initGUI();
 	}
 
+	public Control getMouseHandler(){
+		return this;
+	}
+	
 	public void clearSynchroLog(){
 		table1.removeAll();
 		table2.removeAll();
@@ -150,24 +156,20 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	
 	public void initGUI() {
 		try {
-			FormLayout thisLayout = new FormLayout();
-			this.setLayout(thisLayout);
+			FillLayout compositeLayout = new FillLayout();
+			compositeLayout.type = SWT.HORIZONTAL|SWT.VERTICAL;
+			this.setLayout(compositeLayout);						
+			
 			this.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 			this.setSize(581, 310);
 
 			{
-				FormData sashForm1LData = new FormData();
-				sashForm1LData.left =  new FormAttachment(0, 1000, 5);
-				sashForm1LData.top =  new FormAttachment(0, 1000, 5);
-				sashForm1LData.width = 450;
-				sashForm1LData.height = 300;
-				sashForm1LData.right =  new FormAttachment(1000, 1000, -5);
-				sashForm1LData.bottom =  new FormAttachment(1000, 1000, -5);
 				sashForm1 = new SashForm(this, SWT.VERTICAL);
 				sashForm1.SASH_WIDTH = 5;
-				sashForm1.setLayoutData(sashForm1LData);
+				sashForm1.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 				{
 					composite1 = new Composite(sashForm1, SWT.NONE);
+					composite1.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 					FormLayout composite1Layout = new FormLayout();
 					composite1.setLayout(composite1Layout);
 					{
@@ -179,6 +181,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						label1FormData.right = new FormAttachment(1000, 1000, 0);
 						label1FormData.height = 20;
 						label1.setLayoutData(label1FormData);
+						label1.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 					}					
 					{
 						table1 = new Table(composite1, SWT.MULTI | SWT.BORDER | SWT.FULL_SELECTION);
@@ -252,6 +255,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				}
 				{
 					composite2 = new Composite(sashForm1, SWT.NONE);
+					composite2.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 					FormLayout composite1Layout = new FormLayout();
 					composite2.setLayout(composite1Layout);
 					{
@@ -263,6 +267,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						label1FormData.right = new FormAttachment(1000, 1000, 0);
 						label1FormData.height = 20;
 						label2.setLayoutData(label1FormData);
+						label2.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
 					}					
 					{
 						table2 = new Table(composite2, SWT.MULTI | SWT.BORDER | SWT.FULL_SELECTION);

@@ -83,7 +83,7 @@ public class Manager {
 		Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
 		Display.setAppVersion("1.0");
 		final Display display = new Display();
-		final Shell shell = new Shell(display, SWT.CLOSE|SWT.RESIZE);
+		final Shell shell = new Shell(display, SWT.ALPHA|SWT.NONE);
 		shell.setActive();
 
 		Manager.instanciate(shell, currentLocale, daemon);
@@ -322,13 +322,13 @@ public class Manager {
 			Collection<Property> toSave = new ArrayList<Property>();
 			for(Property p:props){
 				if(p.getName().equals("repository_id")
-						&& !p.getValue().equals(data.get("REPOSITORY_ID"))) {
+						&& (p.getValue() == null || !p.getValue().equals(data.get("REPOSITORY_ID")))) {
 					p.setValue(data.get("REPOSITORY_ID"));
 					serverChanges = true;
 					toSave.add(p);
 				}
 				else if(p.getName().equals("target_folder")
-						&& !p.getValue().equals(data.get("TARGET"))) {
+						&& (p.getValue() == null || !p.getValue().equals(data.get("TARGET")))) {
 					p.setValue(data.get("TARGET"));
 					serverChanges = true;
 					toSave.add(p);
@@ -403,6 +403,28 @@ public class Manager {
 		return true;
 	}
 	
+	public boolean changeSynchroState(Node synchroNode, boolean state){
+		Iterator<Property> it = synchroNode.properties.iterator();
+		while(it.hasNext()){
+			Property p = it.next();
+			if(p.getName().equals("synchro_active")){
+				p.setValue(state?"true":"false");
+				ConnectionSource cSource = this.getConnection();
+				Dao<Property, String> pDao;
+				try {
+					pDao = DaoManager.createDao(cSource, Property.class);
+					pDao.update(p);
+					this.releaseConnection();
+				} catch (SQLException e) {
+					e.printStackTrace();
+					this.releaseConnection();
+				}
+				break;
+			}
+		}
+		return true;
+	}
+		
 	public String makeJobLabel(Node node, boolean shortFormat){
 		String s = getMessage("joblabel_format");
 		s = s.replace("REPO", node.getLabel());

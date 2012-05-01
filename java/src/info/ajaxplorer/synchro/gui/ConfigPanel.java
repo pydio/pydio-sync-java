@@ -9,23 +9,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.CLabel;
-import org.eclipse.swt.custom.CTabFolder;
-import org.eclipse.swt.custom.CTabItem;
-import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
-import org.eclipse.swt.layout.FormAttachment;
-import org.eclipse.swt.layout.FormData;
-import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.widgets.Canvas;
-import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.SchedulerException;
@@ -37,16 +29,9 @@ public class ConfigPanel extends Canvas {
 	}
 	
 	
-	private Label minimize;
-	private CLabel cLabel1;
-	private Combo cCombo1;
 	ArrayList<Object> jobComboItems;
-	private CTabItem tabItem2;
-	private Label titleImage;
-	private CTabItem tabItem1;
-	private CTabFolder tabFolder1;
 	private Node currentSynchroNode;
-	LogViewer logViewer;
+	//LogViewer logViewer;
 	private SysTray sTray;
 	private Listener moveListener;
 	
@@ -66,14 +51,6 @@ public class ConfigPanel extends Canvas {
 					this.setCurrentNode(n);
 				}
 			}
-			/*
-			if(this.currentSynchroNode == null){
-				Collection<Node> nodes = Manager.getInstance().listSynchroNodes();
-				if(nodes.size()>0){
-					this.setCurrentNode(nodes.iterator().next());
-				}
-			}
-			*/
 		} catch (Exception e) {
 		}
 		
@@ -101,17 +78,15 @@ public class ConfigPanel extends Canvas {
         shell.setData("listeners_attached", "true");
 		
         shell.setText(Manager.getMessage("shell_title"));
-        shell.setSize(450, 400);
-        //shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-Bi.png")));
+        shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-Bi.png")));
         
         Point p = shell.getSize();
-
-        shell.setBounds(150, 150, p.x, p.y);                
-        this.moveShellWithMouse(shell);
+        shell.setBounds(500, 500, p.x, p.y);                
+        this.moveShellWithMouse(this, shell);
 	    
 	}		
 	
-	private void moveShellWithMouse(final Shell shell){
+	private void moveShellWithMouse(Control cont, final Shell shell){
 		
 		// add ability to move shell around
 	    moveListener = new Listener() {
@@ -134,56 +109,35 @@ public class ConfigPanel extends Canvas {
 	        }
 	      }
 	    };
-	    this.addListener(SWT.MouseDown, moveListener);
-	    this.addListener(SWT.MouseUp, moveListener);
-	    this.addListener(SWT.MouseMove, moveListener);
+	    cont.addListener(SWT.MouseDown, moveListener);
+	    cont.addListener(SWT.MouseUp, moveListener);
+	    cont.addListener(SWT.MouseMove, moveListener);
 		
 	}
 	
 	public void notifyJobStateChanged(String nodeId, boolean running){
-		this.logViewer.reload();
+		//this.logViewer.reload();
 	}
 	
 	private void initGUI() {
 		try {
-			FormLayout thisLayout = new FormLayout();
+			FillLayout thisLayout = new FillLayout();
 			this.setLayout(thisLayout);
-			if(System.getProperty("os.name").toLowerCase().indexOf("windows xp") >= 0){
-				this.setSize(240, 540);
-			}else{
-				this.setSize(320, 580);
-			}
-			{
-				final Composite contentPanel = new Composite (this, SWT.NULL);
-				FormData tabFolder1LData = new FormData();
-				tabFolder1LData.left =  new FormAttachment(0, 1000, 0);
-				tabFolder1LData.right =  new FormAttachment(1000, 1000, 0);
-				tabFolder1LData.top =  new FormAttachment(0, 1000, 0);
-				tabFolder1LData.bottom =  new FormAttachment(1000, 1000, 0);
-				contentPanel.setLayoutData(tabFolder1LData);
-				final StackLayout layout = new StackLayout ();
-				contentPanel.setLayout(layout);
-				{				
-					jobEditor = new JobEditor(contentPanel, this);				
-					FillLayout compositeLayout = new FillLayout();
-					compositeLayout.type = SWT.HORIZONTAL|SWT.VERTICAL;
-					jobEditor.setLayout(compositeLayout);
-					jobEditor.populateToolkit();
-				}
-				{
-					logViewer = new LogViewer(contentPanel, SWT.NONE);
-					FillLayout compositeLayout = new FillLayout();
-					compositeLayout.type = SWT.HORIZONTAL|SWT.VERTICAL;
-					logViewer.setLayout(compositeLayout);						
-					logViewer.initGUI();
-				}				
-				layout.topControl = jobEditor;
-			}
-			
+			this.setSize(280,230);
+			jobEditor = new JobEditor(this, this);				
+			FillLayout compositeLayout = new FillLayout();
+			compositeLayout.type = SWT.HORIZONTAL|SWT.VERTICAL;
+			jobEditor.setLayout(compositeLayout);
+			jobEditor.populateToolkit();
+			moveShellWithMouse(jobEditor.getMouseHandler(), getShell());
 			this.layout();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+		
+	protected void closeConfig(){
+		sTray.closeConfiguration();
 	}
 	
 	protected void saveConfig(){
@@ -222,11 +176,11 @@ public class ConfigPanel extends Canvas {
 		if(n == null){
 			currentSynchroNode = null;
 			jobEditor.clearFormData();
-			logViewer.clearSynchroLog();
+			//logViewer.clearSynchroLog();
 		}else{
 			currentSynchroNode = n;
 			jobEditor.loadFormFromNode(n);
-			logViewer.loadSynchroLog(n);
+			//logViewer.loadSynchroLog(n);
 			
 		}
 	}

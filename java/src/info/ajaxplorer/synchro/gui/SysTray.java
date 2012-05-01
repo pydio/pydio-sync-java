@@ -3,21 +3,26 @@ package info.ajaxplorer.synchro.gui;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
 
+import java.sql.SQLException;
 import java.text.DateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
+import org.eclipse.jface.action.Action;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
+import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.ToolTip;
 import org.eclipse.swt.widgets.Tray;
@@ -66,7 +71,9 @@ public class SysTray {
 			this.cPanel.notifyJobStateChanged(nodeId, state);
 		}
 	}
-	
+	protected Image getImage(String name){
+		return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));
+	}
 	public void refreshJobsMenu(){
 		refreshJobsMenu(Manager.getInstance());
 	}
@@ -76,17 +83,13 @@ public class SysTray {
 			item.dispose();
 		}			
 		
-		final MenuItem showNotifMenu = new MenuItem (menu, SWT.CHECK);
-		showNotifMenu.setSelection(showNotifications);
-		showNotifMenu.setText (messages.getString("tray_menu_notif"));
-		showNotifMenu.addSelectionListener (new SelectionListener() {				
-			@Override
-			public void widgetSelected(SelectionEvent event) {
-				showNotifications = ((MenuItem)event.widget).getSelection();
+		MenuItem createM = new MenuItem (menu, SWT.PUSH);
+		createM.setText ( messages.getString("cpanel_create_synchro") );
+		createM.setImage(getImage("add"));
+		createM.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				openConfiguration(shell, null);
 			}
-			
-			@Override
-			public void widgetDefaultSelected(SelectionEvent event) {}
 		});
 		
 		new MenuItem(menu, SWT.SEPARATOR);		
@@ -115,12 +118,14 @@ public class SysTray {
 			MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
 			jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
 			jobTrig.setData(syncNode);
+			jobTrig.setImage(getImage("switchuser"));
 			
 			Menu jobMenu = new Menu(shell, SWT.DROP_DOWN);
 			jobTrig.setMenu(jobMenu);			
 
 			MenuItem mi = new MenuItem (jobMenu, SWT.PUSH);
 			mi.setText ( messages.getString("tray_menu_preferences") );
+			mi.setImage(getImage("history"));
 			final String nodeId = syncNode.id + "";
 			mi.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
@@ -135,6 +140,7 @@ public class SysTray {
 			
 			MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
 			mI.setText(messages.getString("tray_menu_trigger"));
+			mI.setImage(getImage("media_playback_start"));
 			mI.setData(syncNode);
 			if(running) mI.setEnabled(false);
 			mI.addListener (SWT.Selection, new Listener () {
@@ -146,9 +152,46 @@ public class SysTray {
 					}
 				}
 			});
+			
+			final boolean currentActiveState = syncNode.getPropertyValue("synchro_active") == "true";
+			MenuItem mAct = new MenuItem(jobMenu, SWT.PUSH);			
+			mAct.setText(currentActiveState?"Set task inactive":"Set task active");
+			mAct.setImage(getImage("media_playback_pause"));
+			mAct.setData(syncNode);
+			if(running) mAct.setEnabled(false);
+			mAct.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					Manager.getInstance().changeSynchroState((Node)event.widget.getData(), !currentActiveState);
+				}
+			});
+			
+			MenuItem mDel = new MenuItem(jobMenu, SWT.PUSH);			
+			mDel.setText("Delete task");
+			mDel.setImage(getImage("editdelete"));
+			mDel.setData(syncNode);
+			if(running) mDel.setEnabled(false);
+			mDel.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					MessageBox dialog = new MessageBox(shell, SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
+					dialog.setText(Manager.getMessage("jobeditor_diag_delete"));
+					dialog.setMessage(Manager.getMessage("jobeditor_diag_deletem"));
+					int returnCode = dialog.open();					
+					if(returnCode == SWT.CANCEL) return;
+					try {
+						Manager.getInstance().deleteSynchroNode((Node)event.widget.getData());
+					} catch (SchedulerException e) {
+						e.printStackTrace();
+					} catch (SQLException e) {
+						e.printStackTrace();
+					}
+				}
+			});
+						
+			new MenuItem(jobMenu, SWT.SEPARATOR);
 
 			MenuItem mI2 = new MenuItem(jobMenu, SWT.PUSH);
 			mI2.setText(messages.getString("tray_menu_openlocal"));
+			mI2.setImage(getImage("folder_home"));
 			mI2.setData(syncNode);
 			mI2.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
@@ -158,6 +201,7 @@ public class SysTray {
 			
 			MenuItem mI3 = new MenuItem(jobMenu, SWT.PUSH);
 			mI3.setText(messages.getString("tray_menu_openremote"));
+			mI3.setImage(getImage("network_local"));
 			mI3.setData(syncNode);
 			mI3.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
@@ -168,8 +212,22 @@ public class SysTray {
 		
 		new MenuItem(menu, SWT.SEPARATOR);
 
+		final MenuItem showNotifMenu = new MenuItem (menu, SWT.PUSH);
+		//showNotifMenu.setSelection(showNotifications);
+		if(showNotifications){
+			showNotifMenu.setImage(getImage("apply"));
+		}
+		showNotifMenu.setText(messages.getString("tray_menu_notif"));
+		showNotifMenu.addListener (SWT.Selection, new Listener() {
+			public void handleEvent (Event event) {
+				showNotifications = !showNotifications;
+			}
+		});
+		
+		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
 		mi2.setText (messages.getString("tray_menu_quit"));
+		mi2.setImage(getImage("system_log_out"));
 		mi2.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				int res = Manager.getInstance().close();
