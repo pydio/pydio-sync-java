@@ -293,6 +293,7 @@ public class JobEditor extends Composite{
 					final NodeList repos = mainTag.item(0).getChildNodes();
 					repoItems = new HashMap<String, String>();
 					
+					
 					if (repos!=null && repos.getLength() > 0){
 						for (int i = 0; i < repos.getLength(); i++) {
 							org.w3c.dom.Node xmlNode = repos.item(i);
@@ -548,7 +549,7 @@ public class JobEditor extends Composite{
 	
 	protected void toggleRepositoryComponent(){
 		if(comboRepository == null){
-			comboRepository = new Combo(sectionClient, SWT.BORDER|SWT.READ_ONLY);
+			comboRepository = new Combo(sectionClient, SWT.BORDER|SWT.DROP_DOWN);
 			comboRepository.setLayoutData(getGridDataField(1));
 			comboRepository.setItems(new String[]{"Loading repositories..."});
 			comboRepository.select(0);

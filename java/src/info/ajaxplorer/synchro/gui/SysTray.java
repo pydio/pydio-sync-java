@@ -265,20 +265,23 @@ public class SysTray {
 					System.out.println("hide");
 				}
 			});
+			/*
 			item.addListener (SWT.DefaultSelection, new Listener () {
 				public void handleEvent (Event event) {
 					openConfiguration(shell, null);
 				}
 			});
+			*/
 			
-			
-			menu = new Menu (shell, SWT.POP_UP);			
+			menu = new Menu (shell, SWT.POP_UP);		
+			/*
 			item.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					menu.setVisible (true);
 					refreshJobsMenu();
 				}
 			});
+			*/
 			item.addListener (SWT.MenuDetect, new Listener () {
 				public void handleEvent (Event event) {
 					menu.setVisible (true);
