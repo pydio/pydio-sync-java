@@ -41,7 +41,7 @@ public class SysTray {
 	private Menu menu;
 	private boolean showNotifications = true;
 	ResourceBundle messages;
-	private ConfigPanel cPanel;
+	private JobEditor jobEditor;
 	
 	public void notifyUser(String title, String message){
 		if(!showNotifications || menu.isVisible()){
@@ -67,8 +67,8 @@ public class SysTray {
 		return display;
 	}
 	public void setMenuTriggerRunning(String nodeId, boolean state){
-		if(this.cPanel != null){
-			this.cPanel.notifyJobStateChanged(nodeId, state);
+		if(this.jobEditor != null){
+			this.jobEditor.notifyJobStateChanged(nodeId, state);
 		}
 	}
 	protected Image getImage(String name){
@@ -298,14 +298,23 @@ public class SysTray {
 	
 	public void closeConfiguration(){
 		shell.setVisible(false);
-		cPanel.dispose();
-		cPanel = null;
+		jobEditor.dispose();
+		jobEditor = null;
 		System.gc();
 	}
 	
 	public void openConfiguration(Shell shell, String nodeId){
 		if(!shell.isVisible()){
-			cPanel = new ConfigPanel(shell, this, nodeId);
+			jobEditor = new JobEditor(shell, this);
+			try {
+				if(nodeId != null){
+					Node n = Manager.getInstance().getSynchroNode(nodeId);
+					if(n != null){
+						jobEditor.setCurrentNode(n);
+					}
+				}
+			} catch (Exception e) {
+			}				
 			shell.setVisible(true);
 		}
 		shell.forceActive();

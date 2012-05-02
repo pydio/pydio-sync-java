@@ -7,6 +7,7 @@ import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.synchro.Manager;
 
 import java.net.URISyntaxException;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -14,15 +15,20 @@ import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 import org.eclipse.jface.action.Action;
-import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.nebula.animation.AnimationRunner;
+import org.eclipse.nebula.animation.effects.AlphaEffect;
+import org.eclipse.nebula.animation.effects.SetBoundsEffect;
+import org.eclipse.nebula.animation.movement.ExpoOut;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -30,11 +36,11 @@ import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.DirectoryDialog;
-import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.MessageBox;
+import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
-import org.eclipse.swt.widgets.Tray;
 import org.eclipse.ui.forms.events.ExpansionAdapter;
 import org.eclipse.ui.forms.events.ExpansionEvent;
 import org.eclipse.ui.forms.events.IHyperlinkListener;
@@ -44,6 +50,7 @@ import org.eclipse.ui.forms.widgets.ImageHyperlink;
 import org.eclipse.ui.forms.widgets.Section;
 import org.eclipse.ui.forms.widgets.TableWrapData;
 import org.eclipse.ui.forms.widgets.TableWrapLayout;
+import org.quartz.SchedulerException;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
@@ -79,18 +86,20 @@ public class JobEditor extends Composite{
 	private Section parametersSection;
 	private Section logsSection;
 	private LogViewer logs;
-	private boolean currentSectionParams = false;
 	
 	private boolean currentActiveState;
 	
 	private HashMap<String, String> repoItems;
-	private ConfigPanel configPanel;
+	//private ConfigPanel configPanel;
 	
 	private Form form;
 	
 	private Map<String, HashMap<String, Object>> stackData;
 	private String anchorH;
 	private String anchorW;
+	
+	SysTray sTray;
+	Node currentSynchroNode;
 
 	/**
 	* Overriding checkSubclass allows this class to extend org.eclipse.swt.widgets.Composite
@@ -98,9 +107,11 @@ public class JobEditor extends Composite{
 	protected void checkSubclass() {
 	}
 	
-	public JobEditor(Composite parent, ConfigPanel configPanel) {
-		super(parent, SWT.WRAP);
-		this.configPanel = configPanel;
+	public JobEditor(Shell shell, SysTray systemTray) {
+		
+		super(shell, SWT.WRAP);
+		this.initShell(shell);
+		this.sTray = systemTray;
 		this.anchorH = "bottom";
 		this.anchorW = "right";
 		//populateToolkit(parent);	
@@ -125,9 +136,28 @@ public class JobEditor extends Composite{
 		connData3.put("HEIGHT", 400);
 		connData3.put("ICON", "view_list_text");
 		stackData.put("logs", connData3);
+		
+		this.setLayout(new FillLayout(SWT.HORIZONTAL|SWT.VERTICAL));
+		populateToolkit();
+		moveShellWithMouse(getMouseHandler(), getShell());
+		
+		shell.pack();
+		
+		
+		toggleSection("connexion", false);
 
 		
 	}	
+	
+	public void initShell(final Shell shell){
+				
+        shell.setText(Manager.getMessage("shell_title"));
+        shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-Bi.png")));        
+        this.moveShellWithMouse(this, shell);
+		shell.setLayout(new FillLayout(SWT.HORIZONTAL|SWT.VERTICAL));		        
+        
+	}		
+	
 	
 	protected void loadFormFromNode(Node baseNode){
 		Server s;
@@ -439,7 +469,7 @@ public class JobEditor extends Composite{
 		updateFormActions();
 		
 		
-		logsSection = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 1, false);		
+		logsSection = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), null, 1, false);		
 		logs = new LogViewer(logsSection, SWT.NONE);
 		logs.initGUI();
 		logsSection.setClient(logs);				
@@ -448,11 +478,9 @@ public class JobEditor extends Composite{
 		toolkit.paintBordersFor(sectionClient);
 		toolkit.paintBordersFor(logs);
 		toolkit.paintBordersFor(sectionClient3);
-
-		toggleSection("connexion");
 	}	
 	
-	protected void toggleSection(String name){
+	protected void toggleSection(String name, boolean animateSize){
 		
 		if(stackData.get(name) == null) return;
 		
@@ -468,8 +496,6 @@ public class JobEditor extends Composite{
 			size[1] += 30;
 		}
 		
-		this.getShell().setSize(size[0], size[1]);
-		this.configPanel.setSize(size[0], size[1]);
 				
 		Rectangle screen = getShell().getDisplay().getPrimaryMonitor().getClientArea();
 		int top;
@@ -485,11 +511,31 @@ public class JobEditor extends Composite{
 		}else{
 			left = margin;
 		}
-		this.getShell().setLocation(left, top);		
+		
+		Rectangle orig = getShell().getBounds();
+		Rectangle r = new Rectangle(left, top, size[0], size[1]);
+		if(animateSize){
+			new AnimationRunner().runEffect(
+					new SetBoundsEffect(getShell(), orig, r, 1000, new ExpoOut(), null, null)
+			);
+		}else{
+			getShell().setAlpha(0);
+			getShell().setBounds(r);
+			new AnimationRunner().runEffect(
+					new AlphaEffect(
+							getShell(), 
+							0 /*initial value*/, 
+							255 /*final value*/, 
+							2000 /*duration*/, 
+							new ExpoOut() /*movement*/, 
+							null,
+							null /*run on cancel*/
+							));			
+		}
 		
 		updateFormActions();
 		this.form.setText((String)stackData.get(name).get("LABEL"));
-		this.layout();
+		this.layout();		
 	}
 	
 	
@@ -549,11 +595,8 @@ public class JobEditor extends Composite{
 			final String label = (String)e.getValue().get("LABEL");
 			final String icon = (String)e.getValue().get("ICON");
 			Section sec = (Section)e.getValue().get("SECTION");
-			if(((StackLayout)form.getBody().getLayout()).topControl == sec){
-				continue;
-			}
 
-			form.getMenuManager().add(new Action(label, new ImageDescriptor() {
+			Action a = new Action(label, new ImageDescriptor() {
 				@Override
 				public ImageData getImageData() {
 					return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+icon+".png"));
@@ -562,9 +605,13 @@ public class JobEditor extends Composite{
 				@Override
 				public void run() {
 					super.run();
-					toggleSection(key);
+					toggleSection(key, true);
 				}
-			});
+			};
+			if(((StackLayout)form.getBody().getLayout()).topControl == sec){
+				a.setEnabled(false);
+			}
+			form.getMenuManager().add(a);
 		}
 
 		form.getToolBarManager().add(new Action("Save", new ImageDescriptor() {
@@ -576,7 +623,7 @@ public class JobEditor extends Composite{
 			@Override
 			public void run() {
 				super.run();
-				configPanel.saveConfig();
+				saveConfig();
 			}
 		});
 		form.getToolBarManager().add(new Action("Close", new ImageDescriptor() {
@@ -588,7 +635,22 @@ public class JobEditor extends Composite{
 			@Override
 			public void run() {
 				super.run();
-				configPanel.closeConfig();
+				new AnimationRunner().runEffect(
+					new AlphaEffect(
+							getShell(), 
+							255 /*initial value*/, 
+							0 /*final value*/, 
+							1500 /*duration*/, 
+							new ExpoOut() /*movement*/, 
+							new Runnable() {
+								@Override
+								public void run() {								
+									closeConfig();
+								}
+							},
+							null /*run on cancel*/
+							)		
+				);
 			}
 		});
 
@@ -617,9 +679,83 @@ public class JobEditor extends Composite{
 		});
 		//section.setText(title);
 		//toolkit.createCompositeSeparator(section);
-		section.setDescription(description);
+		if(description != null) section.setDescription(description);
 		
 		return section;
 	}
+	
+	private void moveShellWithMouse(Control cont, final Shell shell){
+		
+		// add ability to move shell around
+	    Listener moveListener = new Listener() {
+	      Point origin;
+
+	      public void handleEvent(Event e) {
+	        switch (e.type) {
+	        case SWT.MouseDown:
+	          origin = new Point(e.x, e.y);
+	          break;
+	        case SWT.MouseUp:
+	          origin = null;
+	          break;
+	        case SWT.MouseMove:
+	          if (origin != null) {
+	            Point p = shell.getDisplay().map(shell, null, e.x, e.y);
+	            shell.setLocation(p.x - origin.x, p.y - origin.y);
+	          }
+	          break;
+	        }
+	      }
+	    };
+	    cont.addListener(SWT.MouseDown, moveListener);
+	    cont.addListener(SWT.MouseUp, moveListener);
+	    cont.addListener(SWT.MouseMove, moveListener);
+		
+	}
+	
+	protected void closeConfig(){
+		sTray.closeConfiguration();
+	}
+	
+	protected void saveConfig(){
+		try {
+			Node n = Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
+			this.setCurrentNode(n);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} catch (URISyntaxException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}		
+	}	
+	
+	protected void deleteConfig(){
+		try {
+			closeConfig();
+			Manager.getInstance().deleteSynchroNode(currentSynchroNode);
+		} catch (SchedulerException e) {
+			e.printStackTrace();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}	
+	protected void setCurrentNode(Node n){
+		if(n == null){
+			currentSynchroNode = null;
+			clearFormData();
+			logs.clearSynchroLog();
+		}else{
+			currentSynchroNode = n;
+			loadFormFromNode(n);
+			logs.loadSynchroLog(n);
+			
+		}
+	}	
+	
+	public void notifyJobStateChanged(String nodeId, boolean running){
+		logs.reload();
+	}
+	
 	
 }
