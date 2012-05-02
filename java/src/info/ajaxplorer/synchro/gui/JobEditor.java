@@ -237,7 +237,9 @@ public class JobEditor extends Composite{
 		tfHost.setText("");
 		tfLogin.setText("");
 		tfPassword.setText("");
-		comboRepository.setItems(new String[0]);
+		if(comboRepository!= null) {
+			comboRepository.setItems(new String[0]);
+		}
 		repoItems = new HashMap<String, String>();
 		tfTarget.setText("");
 		
@@ -323,8 +325,13 @@ public class JobEditor extends Composite{
 						public void modifyText(ModifyEvent arg0) {
 							currentRepoLabel = comboRepository.getText();
 							currentRepoId = repoItems.get(currentRepoLabel);
-							toggleRepositoryComponent();
-							tfRepo.setText(currentRepoLabel);
+							getDisplay().asyncExec(new Runnable() {
+								@Override
+								public void run() {
+									toggleRepositoryComponent();
+									tfRepo.setText(currentRepoLabel);							
+								}
+							});
 						}
 					});
 					
