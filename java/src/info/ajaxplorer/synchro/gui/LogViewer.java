@@ -7,7 +7,6 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 
-import java.awt.Color;
 import java.sql.SQLException;
 import java.text.Collator;
 import java.text.DateFormat;
@@ -64,6 +63,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 	MenuItem itemSolveKeepMine;
 	MenuItem itemSolveKeepTheir;
 	MenuItem itemSolveKeepBoth;
+	MenuItem itemSolveIgnore;
 	Node currentSynchroNode;
 	int currentConflictsCount;
 
@@ -334,6 +334,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						 SyncChangeValue v = c.getChangeValue();
 						 if(command.equals("mine")) v.task = SyncJob.TASK_SOLVE_KEEP_MINE;
 						 else if(command.equals("their")) v.task = SyncJob.TASK_SOLVE_KEEP_THEIR;
+						 else if(command.equals("ignore")) v.task = SyncJob.TASK_DO_NOTHING;
 						 else v.task = SyncJob.TASK_SOLVE_KEEP_BOTH;
 						 v.status = SyncJob.STATUS_CONFLICT_SOLVED;
 						 c.setChangeValue(v);
@@ -370,10 +371,14 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 itemSolveKeepTheir.setText(Manager.getMessage("logviewer_conflict_keeptheir"));
 			 itemSolveKeepTheir.setData("their");
 			 itemSolveKeepTheir.addSelectionListener(listener);
-             itemSolveKeepBoth = new MenuItem(solveMenu, SWT.PUSH);
-             itemSolveKeepBoth.setText(Manager.getMessage("logviewer_conflict_keepboth"));
-             itemSolveKeepBoth.setData("both");
-             itemSolveKeepBoth.addSelectionListener(listener);
+			 itemSolveKeepBoth = new MenuItem(solveMenu, SWT.PUSH);
+			 itemSolveKeepBoth.setText(Manager.getMessage("logviewer_conflict_keepboth"));
+			 itemSolveKeepBoth.setData("both");
+			 itemSolveKeepBoth.addSelectionListener(listener);
+             itemSolveIgnore = new MenuItem(solveMenu, SWT.PUSH);
+             itemSolveIgnore.setText(Manager.getMessage("logviewer_conflict_ignore"));
+             itemSolveIgnore.setData("ignore");
+             itemSolveIgnore.addSelectionListener(listener);
 			this.layout();
 		} catch (Exception e) {
 			e.printStackTrace();

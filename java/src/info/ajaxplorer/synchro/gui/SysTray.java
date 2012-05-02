@@ -6,15 +6,10 @@ import info.ajaxplorer.synchro.Manager;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
-import org.eclipse.jface.action.Action;
-import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.widgets.Display;
@@ -88,7 +83,7 @@ public class SysTray {
 		createM.setImage(getImage("add"));
 		createM.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
-				openConfiguration(shell, null);
+				openConfiguration(shell, null, "connexion");
 			}
 		});
 		
@@ -118,55 +113,80 @@ public class SysTray {
 			MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
 			jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
 			jobTrig.setData(syncNode);
-			jobTrig.setImage(getImage("switchuser"));
+			jobTrig.setImage(getImage("sync"));
 			
 			Menu jobMenu = new Menu(shell, SWT.DROP_DOWN);
 			jobTrig.setMenu(jobMenu);			
 
 			MenuItem mi = new MenuItem (jobMenu, SWT.PUSH);
-			mi.setText ( messages.getString("tray_menu_preferences") );
-			mi.setImage(getImage("history"));
+			mi.setText ( messages.getString("jobeditor_stack_server") );
+			mi.setImage(getImage("network_local"));
 			final String nodeId = syncNode.id + "";
 			mi.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
-					openConfiguration(shell, nodeId);
+					openConfiguration(shell, nodeId, "connexion");
+				}
+			});
+			MenuItem mij2 = new MenuItem (jobMenu, SWT.PUSH);
+			mij2.setText ( messages.getString("jobeditor_stack_params") );
+			mij2.setImage(getImage("history"));
+			mij2.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId, "parameters");
+				}
+			});
+			MenuItem mij1 = new MenuItem (jobMenu, SWT.PUSH);
+			mij1.setText ( messages.getString("jobeditor_stack_logs") );
+			mij1.setImage(getImage("view_list_text"));
+			mij1.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId, "logs");
 				}
 			});
 						
+			new MenuItem(jobMenu, SWT.SEPARATOR);					
+			final boolean currentActiveState = syncNode.getPropertyValue("synchro_active").equals("true");
+			
 			MenuItem m0 = new MenuItem(jobMenu, SWT.PUSH);			
 			m0.setText(syncStatus);
-			
-			new MenuItem(jobMenu, SWT.SEPARATOR);					
-			
-			MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
-			mI.setText(messages.getString("tray_menu_trigger"));
-			mI.setImage(getImage("media_playback_start"));
-			mI.setData(syncNode);
-			if(running) mI.setEnabled(false);
-			mI.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					try {
-						Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
-					} catch (SchedulerException e) {
-						e.printStackTrace();
+						
+			if(currentActiveState){
+				MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
+				mI.setText(messages.getString("tray_menu_trigger"));
+				mI.setImage(getImage("media_playback_start"));
+				mI.setData(syncNode);
+				if(running) mI.setEnabled(false);
+				mI.addListener (SWT.Selection, new Listener () {
+					public void handleEvent (Event event) {
+						try {
+							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
+						} catch (SchedulerException e) {
+							e.printStackTrace();
+						}
 					}
-				}
-			});
+				});
+			}
 			
-			final boolean currentActiveState = syncNode.getPropertyValue("synchro_active") == "true";
 			MenuItem mAct = new MenuItem(jobMenu, SWT.PUSH);			
-			mAct.setText(currentActiveState?"Set task inactive":"Set task active");
-			mAct.setImage(getImage("media_playback_pause"));
+			mAct.setText( Manager.getMessage(currentActiveState?"tray_menu_jobstatus_active":"tray_menu_jobstatus_inactive"));
+			mAct.setImage(getImage(currentActiveState?"media_playback_pause":"media_playback_start"));
 			mAct.setData(syncNode);
 			if(running) mAct.setEnabled(false);
 			mAct.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					Manager.getInstance().changeSynchroState((Node)event.widget.getData(), !currentActiveState);
+					if(!currentActiveState){
+						try {
+							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
+						} catch (SchedulerException e) {
+							e.printStackTrace();
+						}						
+					}
 				}
 			});
 			
 			MenuItem mDel = new MenuItem(jobMenu, SWT.PUSH);			
-			mDel.setText("Delete task");
+			mDel.setText(Manager.getMessage("tray_menu_jobdelete"));
 			mDel.setImage(getImage("editdelete"));
 			mDel.setData(syncNode);
 			if(running) mDel.setEnabled(false);
@@ -306,9 +326,9 @@ public class SysTray {
 		System.gc();
 	}
 	
-	public void openConfiguration(Shell shell, String nodeId){
+	public void openConfiguration(Shell shell, String nodeId, String stack){
 		if(!shell.isVisible()){
-			jobEditor = new JobEditor(shell, this);
+			jobEditor = new JobEditor(shell, this, stack);
 			try {
 				if(nodeId != null){
 					Node n = Manager.getInstance().getSynchroNode(nodeId);

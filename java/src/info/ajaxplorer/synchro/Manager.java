@@ -404,23 +404,17 @@ public class Manager {
 	}
 	
 	public boolean changeSynchroState(Node synchroNode, boolean state){
-		Iterator<Property> it = synchroNode.properties.iterator();
-		while(it.hasNext()){
-			Property p = it.next();
-			if(p.getName().equals("synchro_active")){
-				p.setValue(state?"true":"false");
-				ConnectionSource cSource = this.getConnection();
-				Dao<Property, String> pDao;
-				try {
-					pDao = DaoManager.createDao(cSource, Property.class);
-					pDao.update(p);
-					this.releaseConnection();
-				} catch (SQLException e) {
-					e.printStackTrace();
-					this.releaseConnection();
-				}
-				break;
-			}
+		
+		ConnectionSource cSource = this.getConnection();
+		Dao<Property, Integer> pDao;
+		try {
+			pDao = DaoManager.createDao(cSource, Property.class);
+			synchroNode.setProperty("synchro_active", (state?"true":"false"), pDao);
+			this.releaseConnection();
+		} catch (SQLException e) {
+			e.printStackTrace();
+			this.releaseConnection();
+			return false;
 		}
 		return true;
 	}

@@ -42,7 +42,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.apache.http.HttpEntity;
-import org.apache.http.util.EncodingUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
@@ -156,7 +155,7 @@ public class SyncJob implements InterruptableJob {
 		currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 		direction = currentRepository.getPropertyValue("synchro_direction");
 
-        //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + d.getPath() + " against " + s.getUrl());
+        //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + currentLocalFolder.getPath() + " against " + s.getUrl());
 
     	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
     	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
@@ -419,7 +418,7 @@ public class SyncJob implements InterruptableJob {
 			return true;
 		}else if(remoteNode.getPropertyValue("md5") != null){
 			// Get local node md5
-			File f = new File(currentLocalFolder, localNode.getPath());
+			File f = new File(currentLocalFolder, localNode.getPath(true));
 			String localMd5 = SyncJob.computeMD5(f);
 			if(remoteNode.getPropertyValue("md5").equals(localMd5)){
 				return true;

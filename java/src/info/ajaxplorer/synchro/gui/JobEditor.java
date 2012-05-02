@@ -10,6 +10,7 @@ import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -39,6 +40,7 @@ import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.forms.events.ExpansionAdapter;
@@ -87,7 +89,7 @@ public class JobEditor extends Composite{
 	private Section logsSection;
 	private LogViewer logs;
 	
-	private boolean currentActiveState;
+	private boolean currentActiveState = true;
 	
 	private HashMap<String, String> repoItems;
 	//private ConfigPanel configPanel;
@@ -107,7 +109,7 @@ public class JobEditor extends Composite{
 	protected void checkSubclass() {
 	}
 	
-	public JobEditor(Shell shell, SysTray systemTray) {
+	public JobEditor(Shell shell, SysTray systemTray, String stack) {
 		
 		super(shell, SWT.WRAP);
 		this.initShell(shell);
@@ -115,23 +117,23 @@ public class JobEditor extends Composite{
 		this.anchorH = "bottom";
 		this.anchorW = "right";
 		//populateToolkit(parent);	
-		stackData = new HashMap<String, HashMap<String, Object>>();
+		stackData = new LinkedHashMap<String, HashMap<String, Object>>();
 		HashMap<String, Object> connData = new HashMap<String, Object>();
-		connData.put("LABEL", "Connection");
+		connData.put("LABEL", Manager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 230);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
 		HashMap<String, Object> connData2 = new HashMap<String, Object>();
-		connData2.put("LABEL", "Execution parameters");
+		connData2.put("LABEL", Manager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 180);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
 		HashMap<String, Object> connData3 = new HashMap<String, Object>();
-		connData3.put("LABEL", "Logs and conflicts");
+		connData3.put("LABEL", Manager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 500);
 		connData3.put("HEIGHT", 400);
 		connData3.put("ICON", "view_list_text");
@@ -144,7 +146,7 @@ public class JobEditor extends Composite{
 		shell.pack();
 		
 		
-		toggleSection("connexion", false);
+		toggleSection(stack, false);
 
 		
 	}	
@@ -217,7 +219,6 @@ public class JobEditor extends Composite{
 		repoItems = new HashMap<String, String>();
 		repoItems.put(values.get("REPOSITORY_LABEL"), values.get("REPOSITORY_ID"));
 		tfTarget.setText(values.get("TARGET"));
-		//checkboxActive.setSelection(values.get("ACTIVE").equals("true"));
 		currentActiveState = values.get("ACTIVE").equals("true");
 		
 		String dir = values.get("DIRECTION");
@@ -262,12 +263,7 @@ public class JobEditor extends Composite{
 	
 	private void loadRepositories(){
 		
-		Logger.getRootLogger().debug("Loading repositories");		
-		if(tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") ){
-			return;
-		}
 		Logger.getRootLogger().debug("Updating combo repo");		
-		
 		
 		final String host = tfHost.getText();
 		final String login = tfLogin.getText();
@@ -391,7 +387,7 @@ public class JobEditor extends Composite{
 		label.setLayoutData(getGridDataLabel());
 		
 		
-		tfRepo = toolkit.createText(sectionClient, "test", SWT.READ_ONLY);
+		tfRepo = toolkit.createText(sectionClient, "click to load the repositories...", SWT.READ_ONLY);
 		tfRepo.setLayoutData(getGridDataField(1));
 		
 		linkLoadRepositories = toolkit.createImageHyperlink(sectionClient, SWT.NULL);
@@ -407,6 +403,13 @@ public class JobEditor extends Composite{
 			
 			@Override
 			public void linkActivated(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {
+				if( tfRepo != null && ( tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") )){
+					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_WARNING | SWT.OK );
+					dialog.setText(Manager.getMessage("jobeditor_diag_noserverdata"));
+					dialog.setMessage(Manager.getMessage("jobeditor_diag_noserverdata_msg"));
+					dialog.open();					
+					return;
+				}					
 				toggleRepositoryComponent();
 				loadRepositories();
 			}
@@ -463,6 +466,7 @@ public class JobEditor extends Composite{
 	    TableWrapData test = new TableWrapData(TableWrapData.FILL_GRAB);
 	    test.maxWidth = 180;
 	    comboDirection.setLayoutData(test);
+	    comboDirection.select(0);
 				
 		Label lab2 = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_frequency") + " : ");
 		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
@@ -474,6 +478,7 @@ public class JobEditor extends Composite{
 		radioSyncInterval1 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_min"), SWT.RADIO);
 		radioSyncInterval2 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_hours"), SWT.RADIO);
 		radioSyncInterval3 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_days"), SWT.RADIO);
+		radioSyncInterval2.setSelection(true);
 		updateFormActions();
 		
 		
@@ -559,7 +564,7 @@ public class JobEditor extends Composite{
 			sectionClient.layout(new Control[] {comboRepository});
 			tfRepo = null;			
 		}else if(tfRepo == null){
-			tfRepo = toolkit.createText(sectionClient, "test", SWT.READ_ONLY);
+			tfRepo = toolkit.createText(sectionClient, "", SWT.READ_ONLY);
 			tfRepo.setLayoutData(getGridDataField(1));
 			tfRepo.moveAbove(comboRepository);
 			comboRepository.dispose();
