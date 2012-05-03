@@ -1,5 +1,6 @@
 package info.ajaxplorer.synchro.gui;
 import info.ajaxplorer.client.http.AjxpAPI;
+import info.ajaxplorer.client.http.AjxpHttpClient;
 import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
@@ -121,21 +122,21 @@ public class JobEditor extends Composite{
 		HashMap<String, Object> connData = new HashMap<String, Object>();
 		connData.put("LABEL", Manager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
-		connData.put("HEIGHT", 230);
+		connData.put("HEIGHT", 240);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
 		HashMap<String, Object> connData2 = new HashMap<String, Object>();
 		connData2.put("LABEL", Manager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
-		connData2.put("HEIGHT", 180);
+		connData2.put("HEIGHT", 200);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
 		HashMap<String, Object> connData3 = new HashMap<String, Object>();
 		connData3.put("LABEL", Manager.getMessage("jobeditor_stack_logs"));
-		connData3.put("WIDTH", 500);
-		connData3.put("HEIGHT", 400);
+		connData3.put("WIDTH", 520);
+		connData3.put("HEIGHT", 420);
 		connData3.put("ICON", "view_list_text");
 		stackData.put("logs", connData3);
 		
@@ -278,8 +279,9 @@ public class JobEditor extends Composite{
 				try {
 					s = new Server("Test", host, login, pass, true, false);
 					RestStateHolder.getInstance().setServer(s);
-					AjxpAPI.getInstance().setServer(s);
+					AjxpAPI.getInstance().setServer(s);					
 					RestRequest rest = new RestRequest();
+					rest.getHttpClient().clearCookies();
 					Document doc = rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
 					
 					NodeList mainTag = doc.getElementsByTagName("repositories");
@@ -411,7 +413,9 @@ public class JobEditor extends Composite{
 					return;
 				}					
 				toggleRepositoryComponent();
-				loadRepositories();
+				if(comboRepository != null){
+					loadRepositories();
+				}
 			}
 		});
 
