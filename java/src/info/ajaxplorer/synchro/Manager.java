@@ -47,6 +47,8 @@ public class Manager {
 
 	
 	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "mysql", "imap", "jsapi"};
+	public String[] EXCLUDED_FILES_START = {"."};
+	public String[] EXCLUDED_FILES_END = {};
 
 	Scheduler scheduler;
 	static Manager instance;	

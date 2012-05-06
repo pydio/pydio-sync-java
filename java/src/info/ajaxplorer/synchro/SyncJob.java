@@ -384,7 +384,7 @@ public class SyncJob implements InterruptableJob {
 					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
 					if(object.has("mtime")){ // Still exists, should be empty!
 						throw new Exception("Could not remove the resource from the server");
-					}	
+					}
 					countResourcesSynchronized ++;
 					
 				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
@@ -585,7 +585,22 @@ public class SyncJob implements InterruptableJob {
 	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save) throws SQLException{
 		
 		File[] children = directory.listFiles();
+		String[] start = Manager.getInstance().EXCLUDED_FILES_START;
+		String[] end = Manager.getInstance().EXCLUDED_FILES_END;
 		for(int i=0;i<children.length;i++){
+			boolean ignore = false;
+			for(int j=0;j<start.length;j++){
+				if(children[i].getName().startsWith(start[j])){
+					ignore = true; break;
+				}					
+			}
+			if(ignore) continue;
+			for(int j=0;j<end.length;j++){
+				if(children[i].getName().endsWith(end[j])){
+					ignore = true; break;
+				}					
+			}
+			if(ignore) continue;
 			Node newNode = new Node(Node.NODE_TYPE_ENTRY, children[i].getName(), root);
 			if(save) nodeDao.create(newNode);
 			String p =children[i].getAbsolutePath().substring(root.getPath(true).length()).replace("\\", "/");
