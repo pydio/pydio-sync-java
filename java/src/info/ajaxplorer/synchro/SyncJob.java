@@ -108,17 +108,13 @@ public class SyncJob implements InterruptableJob {
 	
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
-		try {
-			currentJobNodeID = ctx.getMergedJobDataMap().getString("node-id");
-			if(ctx.getMergedJobDataMap().containsKey("clear-snapshots") && ctx.getMergedJobDataMap().getBooleanValue("clear-snapshots")){
-				clearSnapshots = true;
-			}else{
-				clearSnapshots = false;
-			}
-			this.run();
-		} catch (Exception e) {
-			e.printStackTrace();
+		currentJobNodeID = ctx.getMergedJobDataMap().getString("node-id");
+		if(ctx.getMergedJobDataMap().containsKey("clear-snapshots") && ctx.getMergedJobDataMap().getBooleanValue("clear-snapshots")){
+			clearSnapshots = true;
+		}else{
+			clearSnapshots = false;
 		}
+		this.run();
 	}
 	
 	public void interrupt(){
@@ -132,141 +128,181 @@ public class SyncJob implements InterruptableJob {
 		
 	}
 	
-	public void run()  throws URISyntaxException, Exception{
+	public void run() {
 		
 		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
 		
-		// instantiate the daos
-		ConnectionSource connectionSource = Manager.getInstance().getConnection();
-		nodeDao = DaoManager.createDao(connectionSource, Node.class);				
-		syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
-		syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
-		propertyDao = DaoManager.createDao(connectionSource, Property.class);
-		
-		
-		currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
-		currentRepository.setStatus(Node.NODE_STATUS_LOADING);
-		nodeDao.update(currentRepository);
-		Server s = new Server(currentRepository.getParent());
-		RestStateHolder.getInstance().setServer(s);		
-		RestStateHolder.getInstance().setRepository(currentRepository);
-		AjxpAPI.getInstance().setServer(s);		
-		
-		currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
-		direction = currentRepository.getPropertyValue("synchro_direction");
-
-        //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + currentLocalFolder.getPath() + " against " + s.getUrl());
-
-    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
-    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
-		boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
-		Map<String, Object[]> again = null;
-		if(unsolvedConflicts){
-			Manager.getInstance().notifyUser(Manager.getMessage("job_blocking_conflicts_title"), Manager.getMessage("job_blocking_conflicts"));
-			currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
+		try{
+			// instantiate the daos
+			ConnectionSource connectionSource = Manager.getInstance().getConnection();
+			nodeDao = DaoManager.createDao(connectionSource, Node.class);				
+			syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
+			syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
+			propertyDao = DaoManager.createDao(connectionSource, Property.class);
+			
+			
+			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
+			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
+			nodeDao.update(currentRepository);
+			Server s = new Server(currentRepository.getParent());
+			RestStateHolder.getInstance().setServer(s);		
+			RestStateHolder.getInstance().setRepository(currentRepository);
+			AjxpAPI.getInstance().setServer(s);		
+	
+			if(!testConnexion()){
+				currentRepository.setStatus(Node.NODE_STATUS_LOADED);
+				nodeDao.update(currentRepository);
+				Manager.getInstance().notifyUser("No Internet found", "No connexion found, skip sync for now!");
+		        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+		        Manager.getInstance().releaseConnection();			
+				return;
+			}
+			
+			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
+			direction = currentRepository.getPropertyValue("synchro_direction");
+	
+	        //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + currentLocalFolder.getPath() + " against " + s.getUrl());
+	
+	    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
+	    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
+			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
+			Map<String, Object[]> again = null;
+			if(unsolvedConflicts){
+				Manager.getInstance().notifyUser(Manager.getMessage("job_blocking_conflicts_title"), Manager.getMessage("job_blocking_conflicts"));
+				currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
+				nodeDao.update(currentRepository);
+		        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+		        Manager.getInstance().releaseConnection();
+				return;
+			}
+			
+			if(clearSnapshots) {
+				this.clearSnapshot("local_snapshot");
+				this.clearSnapshot("remote_snapshot");
+			}
+			List<Node> localSnapshot = new ArrayList<Node>();
+			List<Node> remoteSnapshot = new ArrayList<Node>();
+			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
+			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
+			
+			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
+			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
+	
+			if(previousChanges.size() > 0){
+				Logger.getRootLogger().debug("Getting previous tasks");
+				again = applyChanges(previousChanges);
+				syncChangeDao.delete(previouslyRemaining);
+				this.clearSnapshot("remaining_nodes");
+			}
+			
+	        Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
+	        Map<String, Object[]> remainingChanges = applyChanges(changes);
+	        if(again != null && again.size() > 0){
+	        	remainingChanges.putAll(again);
+	        }
+	        if(remainingChanges.size() > 0){
+	        	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
+	        	Node remainingRoot = loadRootAndSnapshot("remaining_nodes", null, null);
+	        	for(int i=0;i<c.size();i++){
+	        		SyncChangeValue cv = c.get(i).getChangeValue();
+	        		Node changeNode = cv.n;
+	        		changeNode.setParent(remainingRoot);
+	        		if(changeNode.id == 0 || !nodeDao.idExists(changeNode.id+"")){ // Not yet created!
+	        			nodeDao.create(changeNode);
+	        			Map<String, String> pValues = new HashMap<String, String>();
+	        			for(Property p:changeNode.properties){
+	        				pValues.put(p.getName(), p.getValue());
+	        			}
+	        			propertyDao.delete(changeNode.properties);
+	        			Iterator<Map.Entry<String, String>> it = pValues.entrySet().iterator();
+	        			while(it.hasNext()){
+	        				Map.Entry<String, String> ent = it.next();
+	        				changeNode.addProperty(ent.getKey(), ent.getValue());
+	        			}
+	        			c.get(i).setChangeValue(cv);
+	        		}else{
+	        			nodeDao.update(changeNode);
+	        		}
+	        		syncChangeDao.create(c.get(i));
+	        	}
+	        }
+	        
+	        // handle DL / UP failed! 
+	        takeLocalSnapshot(localRootNode, null, true);
+	        takeRemoteSnapshot(remoteRootNode, null, true);
+	        
+			cleanDB();
+	        
+	        // INDICATES THAT THE JOB WAS CORRECTLY SHUTDOWN
+			currentRepository.setStatus(Node.NODE_STATUS_LOADED);
+			currentRepository.setLastModified(new Date());
+			nodeDao.update(currentRepository);
+	        
+			SyncLog sl = new SyncLog();
+			String status;
+			String summary = "";
+			if(countConflictsDetected > 0) {
+				status = SyncLog.LOG_STATUS_CONFLICTS;
+				summary = Manager.getMessage("job_status_conflicts").replace("%d", countConflictsDetected+"");
+			}
+			else if(countResourcesErrors > 0) {
+				status = SyncLog.LOG_STATUS_ERRORS;
+				summary = Manager.getMessage("job_status_errors").replace("%d", countResourcesErrors + "");
+			}else {
+				if(countResourcesInterrupted > 0) status = SyncLog.LOG_STATUS_INTERRUPT;
+				else status = SyncLog.LOG_STATUS_SUCCESS;
+				if(countFilesDownloaded > 0){
+					summary = Manager.getMessage("job_status_downloads").replace("%d", countFilesDownloaded + "" );
+				}
+				if(countFilesUploaded > 0){
+					summary += Manager.getMessage("job_status_uploads").replace("%d", countFilesUploaded + "" );
+				}
+				if(countResourcesSynchronized > 0){
+					summary += Manager.getMessage("job_status_resources").replace("%d", countResourcesSynchronized+ "" );
+				}
+				if(summary.equals("")){
+					summary = Manager.getMessage("job_status_nothing");
+				}
+			}
+			sl.jobDate = (new Date()).getTime();
+			sl.jobStatus = status;
+			sl.jobSummary = summary;
+			sl.synchroNode = currentRepository;
+			syncLogDao.create(sl);
+			
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
-			return;
-		}
-		
-		if(clearSnapshots) {
-			this.clearSnapshot("local_snapshot");
-			this.clearSnapshot("remote_snapshot");
-		}
-		List<Node> localSnapshot = new ArrayList<Node>();
-		List<Node> remoteSnapshot = new ArrayList<Node>();
-		Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
-		Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
-		
-		Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
-		Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 
-		if(previousChanges.size() > 0){
-			Logger.getRootLogger().debug("Getting previous tasks");
-			again = applyChanges(previousChanges);
-			syncChangeDao.delete(previouslyRemaining);
-			this.clearSnapshot("remaining_nodes");
+		}catch(Exception e){
+			
+			String message = e.getMessage();
+			if(message == null && e.getCause() != null) message = e.getCause().getMessage();
+			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message);
+	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+	        Manager.getInstance().releaseConnection();
+
 		}
-		
-        Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
-        Map<String, Object[]> remainingChanges = applyChanges(changes);
-        if(again != null && again.size() > 0){
-        	remainingChanges.putAll(again);
-        }
-        if(remainingChanges.size() > 0){
-        	List<SyncChange> c = SyncChange.MapToSyncChanges(remainingChanges, currentJobNodeID);
-        	Node remainingRoot = loadRootAndSnapshot("remaining_nodes", null, null);
-        	for(int i=0;i<c.size();i++){
-        		SyncChangeValue cv = c.get(i).getChangeValue();
-        		Node changeNode = cv.n;
-        		changeNode.setParent(remainingRoot);
-        		if(changeNode.id == 0 || !nodeDao.idExists(changeNode.id+"")){ // Not yet created!
-        			nodeDao.create(changeNode);
-        			Map<String, String> pValues = new HashMap<String, String>();
-        			for(Property p:changeNode.properties){
-        				pValues.put(p.getName(), p.getValue());
-        			}
-        			propertyDao.delete(changeNode.properties);
-        			Iterator<Map.Entry<String, String>> it = pValues.entrySet().iterator();
-        			while(it.hasNext()){
-        				Map.Entry<String, String> ent = it.next();
-        				changeNode.addProperty(ent.getKey(), ent.getValue());
-        			}
-        			c.get(i).setChangeValue(cv);
-        		}else{
-        			nodeDao.update(changeNode);
-        		}
-        		syncChangeDao.create(c.get(i));
-        	}
-        }
-        
-        // handle DL / UP failed! 
-        takeLocalSnapshot(localRootNode, null, true);
-        takeRemoteSnapshot(remoteRootNode, null, true);
-        
-		cleanDB();
-        
-        // INDICATES THAT THE JOB WAS CORRECTLY SHUTDOWN
-		currentRepository.setStatus(Node.NODE_STATUS_LOADED);
-		currentRepository.setLastModified(new Date());
-		nodeDao.update(currentRepository);
-        
-		SyncLog sl = new SyncLog();
-		String status;
-		String summary = "";
-		if(countConflictsDetected > 0) {
-			status = SyncLog.LOG_STATUS_CONFLICTS;
-			summary = Manager.getMessage("job_status_conflicts").replace("%d", countConflictsDetected+"");
-		}
-		else if(countResourcesErrors > 0) {
-			status = SyncLog.LOG_STATUS_ERRORS;
-			summary = Manager.getMessage("job_status_errors").replace("%d", countResourcesErrors + "");
-		}else {
-			if(countResourcesInterrupted > 0) status = SyncLog.LOG_STATUS_INTERRUPT;
-			else status = SyncLog.LOG_STATUS_SUCCESS;
-			if(countFilesDownloaded > 0){
-				summary = Manager.getMessage("job_status_downloads").replace("%d", countFilesDownloaded + "" );
-			}
-			if(countFilesUploaded > 0){
-				summary += Manager.getMessage("job_status_uploads").replace("%d", countFilesUploaded + "" );
-			}
-			if(countResourcesSynchronized > 0){
-				summary += Manager.getMessage("job_status_resources").replace("%d", countResourcesSynchronized+ "" );
-			}
-			if(summary.equals("")){
-				summary = Manager.getMessage("job_status_nothing");
-			}
-		}
-		sl.jobDate = (new Date()).getTime();
-		sl.jobStatus = status;
-		sl.jobSummary = summary;
-		sl.synchroNode = currentRepository;
-		syncLogDao.create(sl);
-		
-        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
-        Manager.getInstance().releaseConnection();
-		
 	}
+	
+	protected boolean testConnexion(){
+		RestRequest rest = new RestRequest();
+		int originalTimeout = rest.getTimeout();
+		try {
+			rest.setTimeout(6000);
+			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
+		} catch (URISyntaxException e) {
+			e.printStackTrace();
+			rest.setTimeout(originalTimeout);
+			return false;
+		} catch (Exception e) {
+			e.printStackTrace();
+			rest.setTimeout(originalTimeout);
+			return false;
+		}
+		rest.setTimeout(originalTimeout);
+		return true;
+	}
+	
 	
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) throws Exception{
 		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet().iterator();
@@ -542,13 +578,9 @@ public class SyncJob implements InterruptableJob {
 		}
 	}
 	
-	protected void cleanDB(){
+	protected void cleanDB() throws SQLException{
 		// unlinked properties may have not been deleted
-		try {
-			propertyDao.executeRaw("DELETE FROM b WHERE node_id=0");
-		} catch (SQLException e) {			
-			e.printStackTrace();
-		}
+		propertyDao.executeRaw("DELETE FROM b WHERE node_id=0");
 	}
 	
 	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception{
