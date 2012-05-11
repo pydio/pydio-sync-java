@@ -37,6 +37,7 @@ public class SysTray {
 	private boolean showNotifications = true;
 	ResourceBundle messages;
 	private JobEditor jobEditor;
+	private boolean schedulerStateStarted = true;
 	
 	public void notifyUser(String title, String message){
 		if(!showNotifications || menu.isVisible()){
@@ -149,6 +150,14 @@ public class SysTray {
 			
 			MenuItem m0 = new MenuItem(jobMenu, SWT.PUSH);			
 			m0.setText(syncStatus);
+			if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
+				jobMenu.setDefaultItem(m0);
+				m0.addListener (SWT.Selection, new Listener () {
+					public void handleEvent (Event event) {
+						openConfiguration(shell, nodeId, "logs");
+					}
+				});
+			}
 						
 			if(currentActiveState){
 				MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
@@ -171,7 +180,7 @@ public class SysTray {
 			mAct.setText( Manager.getMessage(currentActiveState?"tray_menu_jobstatus_active":"tray_menu_jobstatus_inactive"));
 			mAct.setImage(getImage(currentActiveState?"media_playback_pause":"media_playback_start"));
 			mAct.setData(syncNode);
-			if(running) mAct.setEnabled(false);
+			//if(running) mAct.setEnabled(false);
 			mAct.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					Manager.getInstance().changeSynchroState((Node)event.widget.getData(), !currentActiveState);
@@ -189,7 +198,7 @@ public class SysTray {
 			mDel.setText(Manager.getMessage("tray_menu_jobdelete"));
 			mDel.setImage(getImage("editdelete"));
 			mDel.setData(syncNode);
-			if(running) mDel.setEnabled(false);
+			//if(running) mDel.setEnabled(false);
 			mDel.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					MessageBox dialog = new MessageBox(shell, SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
@@ -245,6 +254,24 @@ public class SysTray {
 		});
 		
 		
+		MenuItem mAct = new MenuItem(menu, SWT.PUSH);			
+		mAct.setText( Manager.getMessage(schedulerStateStarted?"tray_menu_scheduler_pauseall":"tray_menu_scheduler_startall"));
+		mAct.setImage(getImage(schedulerStateStarted?"media_playback_pause":"media_playback_start"));
+		mAct.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				boolean res;
+				if(schedulerStateStarted){
+					res = Manager.getInstance().pauseAll();
+				}else{
+					res = Manager.getInstance().restartAll();
+				}
+				if(res){
+					schedulerStateStarted = !schedulerStateStarted;
+				}
+			}
+		});
+		
+		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
 		mi2.setText (messages.getString("tray_menu_quit"));
 		mi2.setImage(getImage("system_log_out"));
@@ -293,15 +320,16 @@ public class SysTray {
 			});
 			*/
 			
-			menu = new Menu (shell, SWT.POP_UP);		
-			/*
-			item.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					menu.setVisible (true);
-					refreshJobsMenu();
-				}
-			});
-			*/
+			menu = new Menu (shell, SWT.POP_UP);
+			
+			if(!SWTResourceManager.isMac()){
+				item.addListener (SWT.Selection, new Listener () {
+					public void handleEvent (Event event) {
+						menu.setVisible (true);
+						refreshJobsMenu();
+					}
+				});
+			}
 			item.addListener (SWT.MenuDetect, new Listener () {
 				public void handleEvent (Event event) {
 					menu.setVisible (true);

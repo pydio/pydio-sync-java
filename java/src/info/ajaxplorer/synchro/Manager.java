@@ -34,6 +34,7 @@ import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.TriggerKey;
+import org.quartz.UnableToInterruptJobException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.GroupMatcher;
 
@@ -201,6 +202,26 @@ public class Manager {
 		} catch (SchedulerException e) {
 			Logger.getLogger("main").error("Closing scheduler", e);
 			return 1;
+		}
+	}
+	
+	public boolean pauseAll(){
+		try {
+			scheduler.standby();
+			return true;
+		} catch (SchedulerException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+	
+	public boolean restartAll(){
+		try {
+			scheduler.start();
+			return true;
+		} catch (SchedulerException e) {
+			e.printStackTrace();
+			return false;
 		}
 	}
 	
@@ -407,6 +428,14 @@ public class Manager {
 	
 	public boolean changeSynchroState(Node synchroNode, boolean state){
 		
+		if(!state){
+			// MAKE SURE TO INTERRUPT JOB
+			try {
+				scheduler.interrupt(new JobKey(String.valueOf(synchroNode.id), "sync"));
+			} catch (UnableToInterruptJobException e) {
+				e.printStackTrace();
+			}
+		}
 		ConnectionSource cSource = this.getConnection();
 		Dao<Property, Integer> pDao;
 		try {
@@ -545,9 +574,9 @@ public class Manager {
 	protected SimpleScheduleBuilder getSSBFromString(String s){
 		SimpleScheduleBuilder ssB = null;
 		if(s.equals("hour")){
-			ssB = simpleSchedule().withIntervalInHours(1).repeatForever();
+			ssB = simpleSchedule().withIntervalInHours(2).repeatForever();
 		}else if(s.equals("minute")){
-			ssB = simpleSchedule().withIntervalInMinutes(1).repeatForever();
+			ssB = simpleSchedule().withIntervalInMinutes(10).repeatForever();
 		}else if(s.equals("day")){
 			ssB = simpleSchedule().withIntervalInHours(24).repeatForever();
 		}
