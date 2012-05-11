@@ -339,6 +339,19 @@ public class SysTray {
 			} catch (Exception e) {
 			}				
 			shell.setVisible(true);
+		}else{
+			try {
+				if(nodeId != null){
+					Node n = Manager.getInstance().getSynchroNode(nodeId);
+					if(n != null){
+						jobEditor.setCurrentNode(n);
+					}
+				}else{
+					jobEditor.setCurrentNode(null);
+				}
+			} catch (Exception e) {
+			}
+			jobEditor.toggleSection(stack, true);
 		}
 		shell.forceActive();
 	}

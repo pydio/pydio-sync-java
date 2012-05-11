@@ -286,20 +286,20 @@ public class SyncJob implements InterruptableJob {
 	
 	protected boolean testConnexion(){
 		RestRequest rest = new RestRequest();
-		int originalTimeout = rest.getTimeout();
+		//int originalTimeout = rest.getTimeout();
 		try {
-			rest.setTimeout(6000);
+			//rest.setTimeout(30000);
 			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
-			rest.setTimeout(originalTimeout);
+			//rest.setTimeout(originalTimeout);
 			return false;
 		} catch (Exception e) {
 			e.printStackTrace();
-			rest.setTimeout(originalTimeout);
+			//rest.setTimeout(originalTimeout);
 			return false;
 		}
-		rest.setTimeout(originalTimeout);
+		//rest.setTimeout(originalTimeout);
 		return true;
 	}
 	

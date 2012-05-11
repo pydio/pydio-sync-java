@@ -26,6 +26,8 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.Point;
@@ -82,6 +84,9 @@ public class JobEditor extends Composite{
 	private Button radioSyncInterval1;
 	private Combo comboDirection;
 	private Text tfLogin;
+	
+	private Action saveAction;
+	private Action closeAction;
 	
 	private FormToolkit toolkit;
 	private Section connexionSection;
@@ -233,6 +238,8 @@ public class JobEditor extends Composite{
 		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
 		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
 		
+		saveAction.setEnabled(false);
+		
 	}
 
 	public void clearFormData(){
@@ -242,9 +249,11 @@ public class JobEditor extends Composite{
 		if(comboRepository!= null) {
 			comboRepository.setItems(new String[0]);
 		}
+		if(tfRepo != null) {
+			tfRepo.setText("");			
+		}
 		repoItems = new HashMap<String, String>();
 		tfTarget.setText("");
-		
 		comboDirection.select(0);
 		
 		radioSyncInterval1.setSelection(false);
@@ -253,7 +262,9 @@ public class JobEditor extends Composite{
 		
 		if(this.form != null){
 			updateFormActions();
+			saveAction.setEnabled(false);
 		}
+
 		if(this.logs != null) this.logs.clearSynchroLog();
 
 	}	
@@ -483,6 +494,81 @@ public class JobEditor extends Composite{
 		radioSyncInterval2 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_hours"), SWT.RADIO);
 		radioSyncInterval3 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_days"), SWT.RADIO);
 		radioSyncInterval2.setSelection(true);
+		
+		saveAction = new Action("Save", new ImageDescriptor() {
+			@Override
+			public ImageData getImageData() {
+				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/filesave.png"));
+			}
+		}) {
+			@Override
+			public void run() {
+				super.run();
+				if(saveConfig()){
+					saveAction.setEnabled(false);
+				}
+			}
+		};
+		ModifyListener tfMod = new ModifyListener() {
+			@Override
+			public void modifyText(ModifyEvent arg0) {
+				saveAction.setEnabled(true);				
+			}
+		};
+		SelectionListener rSel = new SelectionListener() {
+			
+			@Override
+			public void widgetSelected(SelectionEvent arg0) {
+				saveAction.setEnabled(true);
+			}
+			
+			@Override
+			public void widgetDefaultSelected(SelectionEvent arg0) {
+			}
+		};
+		tfHost.addModifyListener(tfMod);
+		tfLogin.addModifyListener(tfMod);
+		tfPassword.addModifyListener(tfMod);
+		tfTarget.addModifyListener(tfMod);
+		comboDirection.addModifyListener(tfMod);
+		radioSyncInterval1.addSelectionListener(rSel);
+		
+		closeAction = new Action("Close", new ImageDescriptor() {
+			@Override
+			public ImageData getImageData() {
+				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fileclose.png"));
+			}
+		}) {
+			@Override
+			public void run() {
+				super.run();
+				if(saveAction.isEnabled()){
+					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
+					dialog.setText(Manager.getMessage("jobeditor_diag_savenotchanges"));
+					dialog.setMessage(Manager.getMessage("jobeditor_diag_savenotchanges_msg"));
+					int returnCode = dialog.open();					
+					if(returnCode == SWT.CANCEL) return;
+				}
+				
+				new AnimationRunner().runEffect(
+					new AlphaEffect(
+							getShell(), 
+							255 /*initial value*/, 
+							0 /*final value*/, 
+							1500 /*duration*/, 
+							new ExpoOut() /*movement*/, 
+							new Runnable() {
+								@Override
+								public void run() {								
+									closeConfig();
+								}
+							},
+							null /*run on cancel*/
+							)		
+				);
+			}
+		};
+		
 		updateFormActions();
 		
 		
@@ -490,7 +576,8 @@ public class JobEditor extends Composite{
 		logs = new LogViewer(logsSection, SWT.NONE);
 		logs.initGUI();
 		logsSection.setClient(logs);				
-		stackData.get("logs").put("SECTION", logsSection);
+		stackData.get("logs").put("SECTION", logsSection);		
+		
 		
 		toolkit.paintBordersFor(sectionClient);
 		toolkit.paintBordersFor(logs);
@@ -574,6 +661,13 @@ public class JobEditor extends Composite{
 			comboRepository.dispose();
 			sectionClient.layout(new Control[] {tfRepo});
 			comboRepository = null;
+			tfRepo.addModifyListener(new ModifyListener() {
+				
+				@Override
+				public void modifyText(ModifyEvent arg0) {
+					saveAction.setEnabled(true);
+				}
+			});
 		}
 		sectionClient.redraw();
 	}
@@ -631,45 +725,8 @@ public class JobEditor extends Composite{
 			form.getMenuManager().add(a);
 		}
 
-		form.getToolBarManager().add(new Action("Save", new ImageDescriptor() {
-			@Override
-			public ImageData getImageData() {
-				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/filesave.png"));
-			}
-		}) {
-			@Override
-			public void run() {
-				super.run();
-				saveConfig();
-			}
-		});
-		form.getToolBarManager().add(new Action("Close", new ImageDescriptor() {
-			@Override
-			public ImageData getImageData() {
-				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fileclose.png"));
-			}
-		}) {
-			@Override
-			public void run() {
-				super.run();
-				new AnimationRunner().runEffect(
-					new AlphaEffect(
-							getShell(), 
-							255 /*initial value*/, 
-							0 /*final value*/, 
-							1500 /*duration*/, 
-							new ExpoOut() /*movement*/, 
-							new Runnable() {
-								@Override
-								public void run() {								
-									closeConfig();
-								}
-							},
-							null /*run on cancel*/
-							)		
-				);
-			}
-		});
+		form.getToolBarManager().add(saveAction);
+		form.getToolBarManager().add(closeAction);
 
 		form.getToolBarManager().update(true);			
 
@@ -734,10 +791,11 @@ public class JobEditor extends Composite{
 		sTray.closeConfiguration();
 	}
 	
-	protected void saveConfig(){
+	protected boolean saveConfig(){
 		try {
 			Node n = Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
 			this.setCurrentNode(n);
+			return true;
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} catch (URISyntaxException e) {
@@ -745,6 +803,7 @@ public class JobEditor extends Composite{
 		} catch (Exception e) {
 			e.printStackTrace();
 		}		
+		return false;
 	}	
 	
 	protected void deleteConfig(){
