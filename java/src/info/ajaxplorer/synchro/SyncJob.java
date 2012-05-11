@@ -1,6 +1,7 @@
 package info.ajaxplorer.synchro;
 
 import info.ajaxplorer.client.http.AjxpAPI;
+import info.ajaxplorer.client.http.CountingMultipartRequestEntity;
 import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
@@ -96,6 +97,7 @@ public class SyncJob implements InterruptableJob {
 	private boolean clearSnapshots = false;
 	private String direction;
 	private File currentLocalFolder;
+	private int maxUploadSize = 0;
 	
 	boolean interruptRequired = false;
 	
@@ -148,8 +150,8 @@ public class SyncJob implements InterruptableJob {
 			RestStateHolder.getInstance().setServer(s);		
 			RestStateHolder.getInstance().setRepository(currentRepository);
 			AjxpAPI.getInstance().setServer(s);		
-	
-			if(!testConnexion()){
+			RestRequest rest = new RestRequest();
+			if(!testConnexion(rest)){
 				currentRepository.setStatus(Node.NODE_STATUS_LOADED);
 				nodeDao.update(currentRepository);
 				Manager.getInstance().notifyUser("No Internet found", "No connexion found, skip sync for now!");
@@ -284,22 +286,16 @@ public class SyncJob implements InterruptableJob {
 		}
 	}
 	
-	protected boolean testConnexion(){
-		RestRequest rest = new RestRequest();
-		//int originalTimeout = rest.getTimeout();
+	protected boolean testConnexion(RestRequest rest){		
 		try {
-			//rest.setTimeout(30000);
 			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
-			//rest.setTimeout(originalTimeout);
 			return false;
 		} catch (Exception e) {
 			e.printStackTrace();
-			//rest.setTimeout(originalTimeout);
 			return false;
 		}
-		//rest.setTimeout(originalTimeout);
 		return true;
 	}
 	
@@ -430,6 +426,10 @@ public class SyncJob implements InterruptableJob {
 					countConflictsDetected ++;
 					
 				}			
+			}catch(FileNotFoundException ex){
+				ex.printStackTrace();
+				countResourcesErrors ++;
+				// Do not put in the notApplied again, otherwise it will indefinitely happen.
 			}catch(Exception e){
 				e.printStackTrace();
 				countResourcesErrors ++;
@@ -750,17 +750,29 @@ public class SyncJob implements InterruptableJob {
 		return val;
 	}
 	
-	protected void synchronousUP(Node folderNode, File sourceFile) throws Exception{
+	protected void synchronousUP(Node folderNode, final File sourceFile) throws Exception{
 
 		long totalSize = sourceFile.length();
 		if(!sourceFile.exists() || totalSize == 0){
-			throw new FileNotFoundException("Cannot find file !");
+			throw new FileNotFoundException("Cannot find file :" + sourceFile.getAbsolutePath());
 		}
 		
     	RestRequest rest = new RestRequest();
     	// Ping to make sure the user is logged
     	rest.getStatusCodeForRequest(AjxpAPI.getInstance().getAPIUri());
     	//final long filesize = totalSize; 
+    	rest.setUploadProgressListener(new CountingMultipartRequestEntity.ProgressListener() {
+			
+			@Override
+			public void transferred(long num) {
+				// TODO display progress?				
+			}
+			
+			@Override
+			public void partTransferred(int part, int total) {
+				logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " ["+(part+1)+"/"+total+"]");
+			}
+		});
     	String targetName = sourceFile.getName();
     	rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName);
 			          		
