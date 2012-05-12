@@ -37,6 +37,7 @@ public class SysTray {
 	private boolean showNotifications = true;
 	ResourceBundle messages;
 	private JobEditor jobEditor;
+	private AboutPanel aboutPanel;
 	private boolean schedulerStateStarted = true;
 	
 	public void notifyUser(String title, String message){
@@ -79,6 +80,17 @@ public class SysTray {
 			item.dispose();
 		}			
 		
+		MenuItem aboutM = new MenuItem (menu, SWT.PUSH);
+		aboutM.setText ( messages.getString("tray_menu_about") );
+		aboutM.setImage(getImage("infos"));
+		aboutM.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				openAboutPane();
+			}
+		});
+		
+		new MenuItem(menu, SWT.SEPARATOR);		
+		
 		MenuItem createM = new MenuItem (menu, SWT.PUSH);
 		createM.setText ( messages.getString("cpanel_create_synchro") );
 		createM.setImage(getImage("add"));
@@ -86,10 +98,7 @@ public class SysTray {
 			public void handleEvent (Event event) {
 				openConfiguration(shell, null, "connexion");
 			}
-		});
-		
-		new MenuItem(menu, SWT.SEPARATOR);		
-
+		});		
 		
 		Collection<Node> ns = managerInstance.listSynchroNodes();
 		for(Node syncNode:ns){
@@ -382,6 +391,19 @@ public class SysTray {
 			jobEditor.toggleSection(stack, true);
 		}
 		shell.forceActive();
+	}
+	
+	public void openAboutPane(){
+		Shell aShell = new Shell(shell.getDisplay(), SWT.NO_TRIM|SWT.ON_TOP);
+		aboutPanel = new AboutPanel(aShell, this);
+	}
+	
+	public void closeAboutPane(Shell theShell){
+		theShell.setVisible(false);
+		aboutPanel.dispose();
+		aboutPanel = null;
+		theShell.dispose();
+		System.gc();
 	}
 	
 }
