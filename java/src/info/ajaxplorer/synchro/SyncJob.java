@@ -97,7 +97,6 @@ public class SyncJob implements InterruptableJob {
 	private boolean clearSnapshots = false;
 	private String direction;
 	private File currentLocalFolder;
-	private int maxUploadSize = 0;
 	
 	boolean interruptRequired = false;
 	

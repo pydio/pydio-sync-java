@@ -1,6 +1,5 @@
 package info.ajaxplorer.synchro.gui;
 import info.ajaxplorer.client.http.AjxpAPI;
-import info.ajaxplorer.client.http.AjxpHttpClient;
 import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
