@@ -7,6 +7,7 @@ import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
+import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
@@ -28,12 +29,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import javax.xml.transform.OutputKeys;
@@ -43,6 +46,8 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.StatusLine;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
@@ -65,6 +70,7 @@ public class SyncJob implements InterruptableJob {
 	public static Integer NODE_CHANGE_STATUS_MODIFIED = 8;
 	public static Integer NODE_CHANGE_STATUS_DIR_CREATED = 16;
 	public static Integer NODE_CHANGE_STATUS_DIR_DELETED = 32;
+	public static Integer NODE_CHANGE_STATUS_FILE_MOVED = 64;
 	
 	public static Integer TASK_DO_NOTHING = 1;
 	public static Integer TASK_REMOTE_REMOVE = 2;
@@ -73,6 +79,8 @@ public class SyncJob implements InterruptableJob {
 	public static Integer TASK_LOCAL_REMOVE = 16;
 	public static Integer TASK_LOCAL_MKDIR = 32;
 	public static Integer TASK_LOCAL_GET_CONTENT = 64;
+	public static Integer TASK_REMOTE_MOVE_FILE = 128;	
+	public static Integer TASK_LOCAL_MOVE_FILE = 256;
 	
 	public static Integer TASK_SOLVE_KEEP_MINE = 128;
 	public static Integer TASK_SOLVE_KEEP_THEIR = 256;
@@ -302,6 +310,9 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) throws Exception{
 		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet().iterator();
 		Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
+		// Make sure to apply those one at the end
+		Map<String, Object[]> moves = new TreeMap<String, Object[]>();
+		Map<String, Object[]> deletes = new TreeMap<String, Object[]>();
 		RestRequest rest = new RestRequest();
 		while(it.hasNext()){
 			Map.Entry<String, Object[]> entry = it.next();
@@ -346,7 +357,7 @@ public class SyncJob implements InterruptableJob {
 					node.setPath(k);
 					File targetFile = new File(currentLocalFolder, k);
 					this.logChange(Manager.getMessage("job_log_downloading"), k);
-					this.synchronousDL(node, targetFile);
+					this.updateNode(node, targetFile, n);
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Error while downloading file from server");
 					}
@@ -366,16 +377,12 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_LOCAL_REMOVE){
 					
-					this.logChange(Manager.getMessage("job_log_rmlocal"), k);
-					File f = new File(currentLocalFolder, k);
-					if(f.exists()){
-						boolean res = f.delete();
-						if(!res){
-							throw new Exception("Error while removing local resource");
-						}
-						countResourcesSynchronized++;
-					}
+					deletes.put(k, value);
 					
+				}else if(v == TASK_REMOTE_REMOVE){
+					
+					deletes.put(k, value);
+									
 				}else if(v == TASK_REMOTE_MKDIR){
 					
 					this.logChange(Manager.getMessage("job_log_mkdir_remote"), k);
@@ -397,12 +404,118 @@ public class SyncJob implements InterruptableJob {
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
 					RestStateHolder.getInstance().setDirectory(currentDirectory);
-					this.synchronousUP(currentDirectory, new File(currentLocalFolder, k));
-					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
-					if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
-						throw new Exception("Could not upload file to the server");
+					File sourceFile = new File(currentLocalFolder, k);
+					if(!sourceFile.exists()) {
+						// Silently ignore, or it will continously try to reupload it.
+						continue;
+					}
+					boolean checked = this.synchronousUP(currentDirectory, sourceFile, n);
+					if(!checked){
+						JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
+						if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
+							throw new Exception("Could not upload file to the server");
+						}
 					}
 					countFilesUploaded ++;
+					
+				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
+					
+					this.logChange(Manager.getMessage("job_log_conflict"), k);
+					notApplied.put(k, value);
+					countConflictsDetected ++;
+					
+				}else if(v == TASK_LOCAL_MOVE_FILE || v == TASK_REMOTE_MOVE_FILE){
+					moves.put(k, value);
+				}
+			}catch(FileNotFoundException ex){
+				ex.printStackTrace();
+				countResourcesErrors ++;
+				// Do not put in the notApplied again, otherwise it will indefinitely happen.
+			}catch(Exception e){
+				e.printStackTrace();
+				countResourcesErrors ++;
+				value[2] = STATUS_ERROR;
+				notApplied.put(k, value);
+			}				
+		}
+
+		// APPLY MOVES
+		Iterator<Map.Entry<String, Object[]>> mIt = moves.entrySet().iterator();
+		while(mIt.hasNext()){
+			Map.Entry<String, Object[]> entry = mIt.next();
+			String k = entry.getKey();
+			Object[] value = entry.getValue().clone();
+			Integer v = (Integer)value[0];
+			Node n = (Node)value[1];
+			if(this.interruptRequired){
+				value[2] = STATUS_INTERRUPTED;
+				notApplied.put(k, value);
+				continue;
+			}
+			try{
+				if(v == TASK_LOCAL_MOVE_FILE && value.length == 4){
+					
+					this.logChange("Moving resource locally", k);
+					Node dest = (Node)value[3];
+					File origFile = new File(currentLocalFolder, n.getPath());
+					File destFile = new File(currentLocalFolder, dest.getPath());
+					origFile.renameTo(destFile);
+					if(!destFile.exists()){
+						throw new Exception("Error while creating " + dest.getPath());
+					}
+					countResourcesSynchronized++;					
+					
+				}else if(v == TASK_REMOTE_MOVE_FILE && value.length == 4){
+					
+					this.logChange("Moving resource remotely", k);
+					Node dest = (Node)value[3];
+					rest.getStatusCodeForRequest(AjxpAPI.getInstance().getRenameUri(n, dest));
+					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(dest.getPath()));
+					if(!object.has("size")){
+						throw new Exception("Could not move remote file to " + dest.getPath());
+					}
+					countResourcesSynchronized++;					
+				
+				}
+				
+			}catch(FileNotFoundException ex){
+				ex.printStackTrace();
+				countResourcesErrors ++;
+				// Do not put in the notApplied again, otherwise it will indefinitely happen.
+			}catch(Exception e){
+				e.printStackTrace();
+				countResourcesErrors ++;
+				value[2] = STATUS_ERROR;
+				notApplied.put(k, value);
+			}				
+		}		
+		
+		// APPLY DELETES
+		Iterator<Map.Entry<String, Object[]>> dIt = deletes.entrySet().iterator();
+		while(dIt.hasNext()){
+			Map.Entry<String, Object[]> entry = dIt.next();
+			String k = entry.getKey();
+			Object[] value = entry.getValue().clone();
+			Integer v = (Integer)value[0];
+			Node n = (Node)value[1];
+			if(this.interruptRequired){
+				value[2] = STATUS_INTERRUPTED;
+				notApplied.put(k, value);
+				continue;
+			}
+			try{
+
+				if(v == TASK_LOCAL_REMOVE){
+					
+					this.logChange(Manager.getMessage("job_log_rmlocal"), k);
+					File f = new File(currentLocalFolder, k);
+					if(f.exists()){
+						boolean res = f.delete();
+						if(!res){
+							throw new Exception("Error while removing local resource");
+						}
+						countResourcesSynchronized++;
+					}
 					
 				}else if(v == TASK_REMOTE_REMOVE){
 					
@@ -417,14 +530,8 @@ public class SyncJob implements InterruptableJob {
 						throw new Exception("Could not remove the resource from the server");
 					}
 					countResourcesSynchronized ++;
-					
-				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
-					
-					this.logChange(Manager.getMessage("job_log_conflict"), k);
-					notApplied.put(k, value);
-					countConflictsDetected ++;
-					
-				}			
+				}				
+				
 			}catch(FileNotFoundException ex){
 				ex.printStackTrace();
 				countResourcesErrors ++;
@@ -435,7 +542,8 @@ public class SyncJob implements InterruptableJob {
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
 			}				
-		}
+		}		
+				
 		return notApplied;
 	}
 	
@@ -505,6 +613,9 @@ public class SyncJob implements InterruptableJob {
 			}else if(v == NODE_CHANGE_STATUS_DIR_CREATED && !direction.equals("up")){
 				value[0] = TASK_LOCAL_MKDIR;
 				changes.put(k, value);
+			}else if(v == NODE_CHANGE_STATUS_FILE_MOVED && !direction.equals("up")){
+				value[0] = TASK_LOCAL_MOVE_FILE;
+				changes.put(k, value);
 			}
 		}
 		it = localDiff.entrySet().iterator();
@@ -536,7 +647,11 @@ public class SyncJob implements InterruptableJob {
 					value[0] = TASK_REMOTE_MKDIR;
 				}
 				changes.put(k, value);
-			}			
+			}else if(v == NODE_CHANGE_STATUS_FILE_MOVED && !direction.equals("down")){
+				value[0] = TASK_REMOTE_MOVE_FILE;
+				changes.put(k, value);
+			}
+			
 		}
 		return changes;
 	}		
@@ -607,7 +722,7 @@ public class SyncJob implements InterruptableJob {
 		final List<Node> list = new ArrayList<Node>();
 		takeLocalSnapshot(root, list, false);		
 		
-		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot);
+		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local");
 		//System.out.println(diff);
 		return diff;
 		
@@ -642,6 +757,8 @@ public class SyncJob implements InterruptableJob {
 				listDirRecursive(children[i], root, accumulator, save);
 			}else{				
 				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
+				// TODO  : Cache md5s in DB 				
+				newNode.addProperty("md5", computeMD5(children[i]));
 				newNode.setLeaf();
 			}
 			if(save) nodeDao.update(newNode);
@@ -684,7 +801,7 @@ public class SyncJob implements InterruptableJob {
 		final ArrayList<Node> list = new ArrayList<Node>();
 		takeRemoteSnapshot(root, list, false);
 		
-		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot);
+		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
 		//System.out.println(diff);
 		return diff;
 	}
@@ -707,10 +824,11 @@ public class SyncJob implements InterruptableJob {
 		
 	}
 	
-	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot){
+	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type){
 		List<Node> saved = new ArrayList<Node>(snapshot);
 		TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
 		Iterator<Node> cIt = current.iterator();
+		List<Node> created = new ArrayList<Node>(); 
 		while(cIt.hasNext()){
 			Node c = cIt.next();
 			Iterator<Node> sIt = saved.iterator();
@@ -727,15 +845,51 @@ public class SyncJob implements InterruptableJob {
 					saved.remove(s);
 				}
 			}
-			if(!found){				
-				diff.put(c.getPath(true), makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED), c));
+			if(!found){
+				created.add(c);
+				//diff.put(c.getPath(true), makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED), c));
 			}
 		}
 		if(saved.size()>0){
 			Iterator<Node> sIt = saved.iterator();
 			while(sIt.hasNext()){
 				Node s = sIt.next();
-				diff.put(s.getPath(true), makeTodoObject((s.isLeaf()?NODE_CHANGE_STATUS_FILE_DELETED:NODE_CHANGE_STATUS_DIR_DELETED), s));
+				if(s.isLeaf()){
+					Iterator<Node> creaIt = created.iterator();
+					boolean isMoved = false;
+					Node destinationNode = null;
+					while(creaIt.hasNext()){
+						Node createdNode = creaIt.next();
+						if(createdNode.isLeaf() && createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize"))){						
+							isMoved = ( createdNode.getPropertyValue("md5") != null 
+									&& s.getPropertyValue("md5") != null
+									&& createdNode.getPropertyValue("md5").equals(s.getPropertyValue("md5"))
+									);
+							if(isMoved) {
+								destinationNode = createdNode;
+								break;
+							}
+						}
+					}
+					if(isMoved){
+						// DETECTED, DO SOMETHING.
+						created.remove(destinationNode);
+						System.out.println("This item was moved, it's not necessary to reup/download it again!");
+						diff.put(s.getPath(true), makeTodoObjectWithData(NODE_CHANGE_STATUS_FILE_MOVED, s, destinationNode));
+					}else{
+						diff.put(s.getPath(true), makeTodoObject((s.isLeaf()?NODE_CHANGE_STATUS_FILE_DELETED:NODE_CHANGE_STATUS_DIR_DELETED), s));
+					}
+				}else{
+					diff.put(s.getPath(true), makeTodoObject((s.isLeaf()?NODE_CHANGE_STATUS_FILE_DELETED:NODE_CHANGE_STATUS_DIR_DELETED), s));
+				}
+			}
+		}
+		// NOW ADD CREATED ITEMS
+		if(created.size() > 0){
+			Iterator<Node> it = created.iterator();
+			while(it.hasNext()) {
+				Node c = it.next();
+				diff.put(c.getPath(true), makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED), c));
 			}
 		}
 		return diff;
@@ -749,13 +903,49 @@ public class SyncJob implements InterruptableJob {
 		return val;
 	}
 	
-	protected void synchronousUP(Node folderNode, final File sourceFile) throws Exception{
+	protected Object[] makeTodoObjectWithData(Integer nodeStatus, Node node, Object data){
+		Object[] val = new Object[4];
+		val[0] = nodeStatus;
+		val[1] = node;
+		val[2] = STATUS_TODO;
+		val[3] = data;
+		return val;
+	}
+	
+	protected boolean synchronousUP(Node folderNode, final File sourceFile, Node remoteNode) throws Exception{
 
+		// RDIFF ! 
+		File signatureFile = tmpFileName(sourceFile, "sig");
+		boolean remoteHasSignature = false;
+		try{
+			this.uriContentToFile(AjxpAPI.getInstance().getFilehashSignatureUri(remoteNode), signatureFile, null);
+			remoteHasSignature = true;
+		}catch(IllegalStateException e){				
+		}
+		if(remoteHasSignature && signatureFile.exists() && signatureFile.length() > 0){
+			// Compute delta
+			File deltaFile = tmpFileName(sourceFile, "delta");
+			RdiffProcessor proc = new RdiffProcessor();
+			proc.delta(signatureFile, sourceFile, deltaFile);
+			signatureFile.delete();
+			if(deltaFile.exists()){
+				// Send back to server
+				RestRequest rest = new RestRequest();
+				System.out.println("Uploading " + deltaFile.length() + " bytes");
+				String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
+				deltaFile.delete();
+				if(patchedFileMd5.trim().equals(SyncJob.computeMD5(sourceFile))){
+					// OK !
+					return true;
+				}
+			}
+		}
+		
 		long totalSize = sourceFile.length();
 		if(!sourceFile.exists() || totalSize == 0){
 			throw new FileNotFoundException("Cannot find file :" + sourceFile.getAbsolutePath());
 		}
-		
+		System.out.println("Uploading " + totalSize + " bytes");
     	RestRequest rest = new RestRequest();
     	// Ping to make sure the user is logged
     	rest.getStatusCodeForRequest(AjxpAPI.getInstance().getAPIUri());
@@ -774,20 +964,69 @@ public class SyncJob implements InterruptableJob {
 		});
     	String targetName = sourceFile.getName();
     	rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName);
+    	
+    	return false;
 			          		
 	}
 	
+	protected void updateNode(Node node, File targetFile, Node remoteNode) throws Exception{
+
+		if(targetFile.exists() && RdiffProcessor.rdiffEnabled()){
+			
+			// Compute signature
+			File sigFile = tmpFileName(targetFile, "sig");
+			File delta = tmpFileName(targetFile, "delta");
+			RdiffProcessor proc = new RdiffProcessor();
+			proc.signature(targetFile, sigFile);
+			// Post it to the server to retrieve delta,
+			URI uri = AjxpAPI.getInstance().getFilehashDeltaUri(node);
+			this.uriContentToFile(uri, delta, sigFile);
+			sigFile.delete();
+			// apply patch to a tmp version
+			File patched = new File(targetFile.getParent(), targetFile.getName()+".patched");
+			proc.patch(targetFile, delta, patched);
+			delta.delete();
+			// check md5
+			if(remoteNode != null && remoteNode.getPropertyValue("md5") != null && remoteNode.getPropertyValue("md5").equals(SyncJob.computeMD5(patched))){
+				targetFile.delete();
+				patched.renameTo(targetFile);
+			}else{
+				// There is a doubt, re-download whole file!
+				patched.delete();
+				this.synchronousDL(node, targetFile);
+				System.out.println(SyncJob.computeMD5(targetFile));
+			}
+			
+		}else{
+			
+			this.synchronousDL(node, targetFile);
+			
+		}
+		
+	}
+	
+	protected File tmpFileName(File source, String ext){
+		File dir = new File(System.getProperty("java.io.tmpdir"));
+		String name = String.format("ajxp_%s.%s", UUID.randomUUID(), ext);
+		return new File(dir, name);
+	}
+		
 	protected void synchronousDL(Node node, File targetFile) throws Exception{
-    	RestRequest rest = new RestRequest();
-    	//rest.getStatusCodeForRequest(DataProvider.dataHolder().urlHandler.getAPIUri());
     	
+		URI uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(true));
+		this.uriContentToFile(uri, targetFile, null);
+		
+	}
+	
+	protected void uriContentToFile(URI uri, File targetFile, File uploadFile) throws Exception{
+
+    	RestRequest rest = new RestRequest();
         int postedProgress = 0;
         int buffersize = 16384;
         int count = 0;
-        
-		URI uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(true));
-		HttpEntity entity = rest.getNotConsumedResponseEntity(uri, null);
+        HttpEntity entity = rest.getNotConsumedResponseEntity(uri, null, uploadFile);
 		long fullLength = entity.getContentLength();
+		System.out.println("Downloaded " + fullLength + " bytes");
 		
 		InputStream input = entity.getContent();
 		BufferedInputStream in = new BufferedInputStream(input,buffersize);
@@ -828,7 +1067,7 @@ public class SyncJob implements InterruptableJob {
         out.flush();
     	if(out != null) out.close();
         if(in != null) in.close();
-		
+        
 	}
 	
 	public static String computeMD5(File f){
