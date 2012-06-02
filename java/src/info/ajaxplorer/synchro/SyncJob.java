@@ -361,6 +361,9 @@ public class SyncJob implements InterruptableJob {
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Error while downloading file from server");
 					}
+					if(n!=null){
+						targetFile.setLastModified(n.getLastModified().getTime());
+					}
 					countFilesDownloaded++;
 					
 				}else if(v == TASK_LOCAL_MKDIR){
@@ -914,29 +917,31 @@ public class SyncJob implements InterruptableJob {
 	
 	protected boolean synchronousUP(Node folderNode, final File sourceFile, Node remoteNode) throws Exception{
 
-		// RDIFF ! 
-		File signatureFile = tmpFileName(sourceFile, "sig");
-		boolean remoteHasSignature = false;
-		try{
-			this.uriContentToFile(AjxpAPI.getInstance().getFilehashSignatureUri(remoteNode), signatureFile, null);
-			remoteHasSignature = true;
-		}catch(IllegalStateException e){				
-		}
-		if(remoteHasSignature && signatureFile.exists() && signatureFile.length() > 0){
-			// Compute delta
-			File deltaFile = tmpFileName(sourceFile, "delta");
-			RdiffProcessor proc = new RdiffProcessor();
-			proc.delta(signatureFile, sourceFile, deltaFile);
-			signatureFile.delete();
-			if(deltaFile.exists()){
-				// Send back to server
-				RestRequest rest = new RestRequest();
-				System.out.println("Uploading " + deltaFile.length() + " bytes");
-				String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
-				deltaFile.delete();
-				if(patchedFileMd5.trim().equals(SyncJob.computeMD5(sourceFile))){
-					// OK !
-					return true;
+		if(Manager.getInstance().getRdiffProc() != null && Manager.getInstance().getRdiffProc().rdiffEnabled()){
+			// RDIFF ! 
+			File signatureFile = tmpFileName(sourceFile, "sig");
+			boolean remoteHasSignature = false;
+			try{
+				this.uriContentToFile(AjxpAPI.getInstance().getFilehashSignatureUri(remoteNode), signatureFile, null);
+				remoteHasSignature = true;
+			}catch(IllegalStateException e){				
+			}
+			if(remoteHasSignature && signatureFile.exists() && signatureFile.length() > 0){
+				// Compute delta
+				File deltaFile = tmpFileName(sourceFile, "delta");
+				RdiffProcessor proc = Manager.getInstance().getRdiffProc();
+				proc.delta(signatureFile, sourceFile, deltaFile);
+				signatureFile.delete();
+				if(deltaFile.exists()){
+					// Send back to server
+					RestRequest rest = new RestRequest();
+					System.out.println("Uploading " + deltaFile.length() + " bytes");
+					String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
+					deltaFile.delete();
+					if(patchedFileMd5.trim().equals(SyncJob.computeMD5(sourceFile))){
+						// OK !
+						return true;
+					}
 				}
 			}
 		}
@@ -971,12 +976,12 @@ public class SyncJob implements InterruptableJob {
 	
 	protected void updateNode(Node node, File targetFile, Node remoteNode) throws Exception{
 
-		if(targetFile.exists() && RdiffProcessor.rdiffEnabled()){
+		if(targetFile.exists() && Manager.getInstance().getRdiffProc()!=null && Manager.getInstance().getRdiffProc().rdiffEnabled()){
 			
 			// Compute signature
 			File sigFile = tmpFileName(targetFile, "sig");
 			File delta = tmpFileName(targetFile, "delta");
-			RdiffProcessor proc = new RdiffProcessor();
+			RdiffProcessor proc = Manager.getInstance().getRdiffProc();
 			proc.signature(targetFile, sigFile);
 			// Post it to the server to retrieve delta,
 			URI uri = AjxpAPI.getInstance().getFilehashDeltaUri(node);

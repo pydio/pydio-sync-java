@@ -6,17 +6,27 @@ import static org.quartz.TriggerBuilder.newTrigger;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
+import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.gui.SysTray;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -28,6 +38,7 @@ import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.quartz.JobDetail;
+import org.quartz.JobExecutionContext;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -55,7 +66,17 @@ public class Manager {
 	static Manager instance;	
 	private SysTray sysTray;
 	private ResourceBundle messages;
+	private RdiffProcessor rdiffProc;
+	private HashMap<String, WatchDir> watchers;
 	
+	public RdiffProcessor getRdiffProc() {
+		return rdiffProc;
+	}
+
+	public void setRdiffProc(RdiffProcessor rdiffProc) {
+		this.rdiffProc = rdiffProc;
+	}
+
 	private boolean daemon;
 	
 	/**
@@ -66,22 +87,27 @@ public class Manager {
 		String language = null;
         String country = null;
         boolean daemon = false;
-        if(args.length > 0){        	
-        	if(args[0].equals("daemon")){
-        		daemon = true;
-        	}
-        	if(args.length == 3){
-                language = new String(args[1]);
-                country = new String(args[2]);        		
-        	}else if(args.length == 2){
-                language = new String(args[0]);
-                country = new String(args[1]);        		        		
-        	}
-        }
+        RdiffProcessor proc=null ;
+    	for(int i = 0; i < args.length ; i++){
+        	if(args[i].startsWith("rdiff=")){
+        		String path = args[i].substring(new String("rdiff=").length());
+        		proc = new RdiffProcessor(path);
+        	}else if(args[i].startsWith("daemon=")){
+        		daemon = args[i].substring(new String("daemon=").length()).equals("true");
+        	}else if(args[i].startsWith("lang=")){
+        		language = args[i].substring(new String("lang=").length());
+        	}else if(args[i].startsWith("country=")){
+        		country = args[i].substring(new String("country=").length());
+        	}            	
+    	}
+    	if(language != null && country == null) country = language.toUpperCase();
         if (language == null) {
             language = new String("en");
             country = new String("US");
         } 
+        if(proc == null){
+        	proc = new RdiffProcessor("rdiff");
+        }
         Locale currentLocale = new Locale(language, country);        
 		Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
 		Display.setAppVersion("1.0");
@@ -90,7 +116,7 @@ public class Manager {
 		shell.setActive();
 
 		Manager.instanciate(shell, currentLocale, daemon);
-		
+		Manager.getInstance().setRdiffProc(proc);
 		Manager.getInstance().initScheduler();
 		
 		while (!shell.isDisposed ()) {
@@ -135,6 +161,11 @@ public class Manager {
 	}
 	
 	public void updateSynchroState(final String nodeId, final boolean running){
+		if(running){
+			this.stopWatcher(nodeId);
+		}else{
+			this.startWatcher(nodeId);
+		}
 		if(this.sysTray == null) {
 			return;
 		}
@@ -558,12 +589,39 @@ public class Manager {
             		.withSchedule(getSSBFromString(n.getPropertyValue("synchro_interval")))
             		.build();
 
-            scheduler.scheduleJob(job, trigger);		   
+            scheduler.scheduleJob(job, trigger);	
+            
+            this.startWatcher(n);
         	
         }
 
 
 	}
+	
+	public void stopWatcher(String nodeId){
+		if(this.watchers != null && this.watchers.containsKey(nodeId)){
+			this.watchers.get(nodeId).stopProcessing();
+		}
+	}
+	
+	public void startWatcher(String nodeId){		
+		this.startWatcher(getSynchroNode(nodeId));
+	}
+		
+	public void startWatcher(Node n){
+		if(this.watchers == null){
+			this.watchers = new HashMap<String, WatchDir>();
+		}
+		try {
+			WatchDir w = new WatchDir(n, this); 
+			w.start();
+			this.watchers.put(String.valueOf(n.id), w);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+	
 	
 	public void unscheduleJob(Node n) throws SchedulerException{
 		
@@ -601,12 +659,19 @@ public class Manager {
 		JobKey jK = new JobKey(String.valueOf(n.id), "sync");
 		JobDetail job = scheduler.getJobDetail(jK);
 		if(job != null){
-	        Trigger trigger = newTrigger()
-	        		.withIdentity("onetime-"+String.valueOf(n.id), "ajxp")
-	        		.forJob(jK)
-	        		.usingJobData("clear-snapshots", renewSnapshots)
-	        		.startNow().build();
-	        scheduler.scheduleJob(trigger);
+			List<JobExecutionContext> jobs = scheduler.getCurrentlyExecutingJobs();
+			if(!jobs.contains(job)){
+		        Trigger trigger = newTrigger()
+		        		.withIdentity("onetime-"+String.valueOf(n.id), "ajxp")
+		        		.forJob(jK)
+		        		.usingJobData("clear-snapshots", renewSnapshots)
+		        		.startNow().build();
+		        scheduler.scheduleJob(trigger);
+			}else{
+				System.out.println("Trigger now : already running, ignore");
+			}
+		}else{
+			this.scheduleJob(n, true);
 		}
 		
 	}
