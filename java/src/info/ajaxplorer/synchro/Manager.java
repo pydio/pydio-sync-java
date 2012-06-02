@@ -33,6 +33,7 @@ import java.util.ResourceBundle;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jface.action.GroupMarker;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Display;
@@ -43,6 +44,7 @@ import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
+import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.TriggerKey;
 import org.quartz.UnableToInterruptJobException;
@@ -54,6 +56,7 @@ import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.jdbc.JdbcConnectionSource;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
+import com.sun.corba.se.impl.orbutil.graph.NodeData;
 
 public class Manager {
 
@@ -540,13 +543,23 @@ public class Manager {
 	protected void initScheduler(){
 		try {
 			Collection<Node> l = listSynchroNodes();
+			ConnectionSource cSource = this.getConnection();
+			Dao<Node, String> nDao = DaoManager.createDao(cSource, Node.class);
+
 			for(Node n:l){
-				boolean notCorrectlyShutdown = (n.getStatus() == Node.NODE_STATUS_LOADING);
+				boolean notCorrectlyShutdown = false;
+				if(n.getStatus() == Node.NODE_STATUS_LOADING){
+					notCorrectlyShutdown = true;	
+					n.setStatus(Node.NODE_STATUS_ERROR);
+					nDao.update(n);
+				}
 				scheduleJob(n, notCorrectlyShutdown);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-		}		
+		} finally {
+			this.releaseConnection();
+		}
 	}
 
 	public void scheduleJob(Node n) throws SchedulerException{				
@@ -659,8 +672,10 @@ public class Manager {
 		JobKey jK = new JobKey(String.valueOf(n.id), "sync");
 		JobDetail job = scheduler.getJobDetail(jK);
 		if(job != null){
+			Trigger existing = scheduler.getTrigger(new TriggerKey("onetime-"+String.valueOf(n.id), "ajxp"));
 			List<JobExecutionContext> jobs = scheduler.getCurrentlyExecutingJobs();
-			if(!jobs.contains(job)){
+			if(!jobs.contains(job) && existing == null){
+				System.out.println("Triggerring job now");
 		        Trigger trigger = newTrigger()
 		        		.withIdentity("onetime-"+String.valueOf(n.id), "ajxp")
 		        		.forJob(jK)
@@ -671,6 +686,7 @@ public class Manager {
 				System.out.println("Trigger now : already running, ignore");
 			}
 		}else{
+			System.out.println("Triggerring job now");
 			this.scheduleJob(n, true);
 		}
 		

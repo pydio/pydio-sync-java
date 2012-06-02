@@ -28,6 +28,7 @@ import java.net.URISyntaxException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -152,6 +153,9 @@ public class SyncJob implements InterruptableJob {
 			
 			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
+			if(currentRepository == null){
+				throw new Exception("The database returned an empty node.");
+			}
 			nodeDao.update(currentRepository);
 			Server s = new Server(currentRepository.getParent());
 			RestStateHolder.getInstance().setServer(s);		
@@ -320,6 +324,7 @@ public class SyncJob implements InterruptableJob {
 			Object[] value = entry.getValue().clone();
 			Integer v = (Integer)value[0];
 			Node n = (Node)value[1];
+			if(n == null) continue;
 			if(this.interruptRequired){
 				value[2] = STATUS_INTERRUPTED;
 				notApplied.put(k, value);
@@ -731,6 +736,14 @@ public class SyncJob implements InterruptableJob {
 		
 	}
 	
+	protected String normalizeUnicode(String str) {
+	    Normalizer.Form form = Normalizer.Form.NFD;
+	    if (!Normalizer.isNormalized(str, form)) {
+	        return Normalizer.normalize(str, form);
+	    }
+	    return str;
+	}	
+	
 	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save) throws SQLException{
 		
 		File[] children = directory.listFiles();
@@ -761,7 +774,7 @@ public class SyncJob implements InterruptableJob {
 			}else{				
 				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
 				// TODO  : Cache md5s in DB 				
-				newNode.addProperty("md5", computeMD5(children[i]));
+				newNode.addProperty("md5", computeMD5(new File(this.normalizeUnicode(children[i].getAbsolutePath()))));
 				newNode.setLeaf();
 			}
 			if(save) nodeDao.update(newNode);
@@ -946,7 +959,7 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 		
-		long totalSize = sourceFile.length();
+		final long totalSize = sourceFile.length();
 		if(!sourceFile.exists() || totalSize == 0){
 			throw new FileNotFoundException("Cannot find file :" + sourceFile.getAbsolutePath());
 		}
@@ -956,10 +969,14 @@ public class SyncJob implements InterruptableJob {
     	rest.getStatusCodeForRequest(AjxpAPI.getInstance().getAPIUri());
     	//final long filesize = totalSize; 
     	rest.setUploadProgressListener(new CountingMultipartRequestEntity.ProgressListener() {
-			
+			private int previousPercent = 0;
 			@Override
 			public void transferred(long num) {
-				// TODO display progress?				
+				int currentPercent =  (int) (num * 100 / totalSize); 
+				if(currentPercent > previousPercent){
+					logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " - "+currentPercent+"%");
+				}
+				previousPercent = currentPercent;
 			}
 			
 			@Override

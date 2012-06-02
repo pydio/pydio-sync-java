@@ -71,10 +71,10 @@ public class WatchDir extends Thread {
         if (trace) {
             Path prev = keys.get(key);
             if (prev == null) {
-                System.out.format("register: %s\n", dir);
+                //System.out.format("register: %s\n", dir);
             } else {
                 if (!dir.equals(prev)) {
-                    System.out.format("update: %s -> %s\n", prev, dir);
+                    //System.out.format("update: %s -> %s\n", prev, dir);
                 }
             }
         }
@@ -124,9 +124,8 @@ public class WatchDir extends Thread {
     	
     	try{
 	        if (recursive) {
-	            System.out.format("Scanning %s ...\n", dir);
+	            //System.out.format("Scanning %s ...\n", dir);
 	            registerAll(dir);
-	            System.out.println("Done.");
 	        } else {
 	            register(dir);
 	        }
@@ -182,9 +181,11 @@ public class WatchDir extends Thread {
                 Path child = dir.resolve(name);
 
                 // print out event
-                System.out.format("%s: %s\n", event.kind().name(), child);
-                this.notifyManager();
-
+                if(!child.endsWith(".DS_Store")){
+                    System.out.format("%s: %s\n", event.kind().name(), child);
+                	this.notifyManager();
+                }
+                
                 // if directory is created, and watching recursively, then
                 // register it and its sub-directories
                 if (recursive && (kind == ENTRY_CREATE)) {
@@ -211,28 +212,4 @@ public class WatchDir extends Thread {
         }
     }
 
-    /*
-    static void usage() {
-        System.err.println("usage: java WatchDir [-r] dir");
-        System.exit(-1);
-    }
-
-    public static void main(String[] args) throws IOException {
-        // parse arguments
-        if (args.length == 0 || args.length > 2)
-            usage();
-        boolean recursive = false;
-        int dirArg = 0;
-        if (args[0].equals("-r")) {
-            if (args.length < 2)
-                usage();
-            recursive = true;
-            dirArg++;
-        }
-
-        // register directory and process its events
-        Path dir = Paths.get(args[dirArg]);
-        new WatchDir(dir, recursive).processEvents();
-    }
-    */
 }

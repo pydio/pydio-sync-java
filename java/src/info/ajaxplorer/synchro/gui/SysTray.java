@@ -34,6 +34,7 @@ public class SysTray {
 	private Shell shell;
 	private final TrayItem item; 
 	private Menu menu;
+	private MenuItem currentStateItem;
 	private boolean showNotifications = true;
 	ResourceBundle messages;
 	private JobEditor jobEditor;
@@ -67,6 +68,9 @@ public class SysTray {
 		if(this.jobEditor != null){
 			this.jobEditor.notifyJobStateChanged(nodeId, state);
 		}
+		if(this.menu.isVisible() && this.currentStateItem != null){
+			this.currentStateItem.setText(this.computeSyncStatus(Manager.getInstance().getSynchroNode(nodeId)));
+		}
 	}
 	protected Image getImage(String name){
 		return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));
@@ -74,11 +78,32 @@ public class SysTray {
 	public void refreshJobsMenu(){
 		refreshJobsMenu(Manager.getInstance());
 	}
+	
+	protected String computeSyncStatus(Node syncNode){
+
+		String syncStatus = "";
+		if(syncNode.getStatus() == Node.NODE_STATUS_LOADING){
+			syncStatus = messages.getString("tray_menu_status_running");
+		}else if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
+			syncStatus = messages.getString("tray_menu_status_error");
+		}else{
+			if(syncNode.getLastModified() != null){
+				DateFormat df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.getDefault());
+				syncStatus = messages.getString("tray_menu_status_last") + df.format(syncNode.getLastModified());					
+			}else{
+				syncStatus = messages.getString("tray_menu_status_na");
+			}
+		}
+		return syncStatus;
+	}
+	
 	public void refreshJobsMenu(Manager managerInstance){
 		
 		for(MenuItem item:menu.getItems()){
 			item.dispose();
 		}			
+		Collection<Node> ns = managerInstance.listSynchroNodes();
+		boolean uniqMenu = (ns.size() < 2);
 		
 		MenuItem aboutM = new MenuItem (menu, SWT.PUSH);
 		aboutM.setText ( messages.getString("tray_menu_about") );
@@ -89,7 +114,7 @@ public class SysTray {
 			}
 		});
 		
-		new MenuItem(menu, SWT.SEPARATOR);		
+		if(!uniqMenu) new MenuItem(menu, SWT.SEPARATOR);		
 		
 		MenuItem createM = new MenuItem (menu, SWT.PUSH);
 		createM.setText ( messages.getString("cpanel_create_synchro") );
@@ -100,34 +125,26 @@ public class SysTray {
 			}
 		});		
 		
-		Collection<Node> ns = managerInstance.listSynchroNodes();
+		if(uniqMenu) new MenuItem(menu, SWT.SEPARATOR);		
+		
 		for(Node syncNode:ns){
 			
-			boolean running = false;
-			String syncStatus = "";
-			if(syncNode.getStatus() == Node.NODE_STATUS_LOADING){
-				syncStatus = messages.getString("tray_menu_status_running");
-				running = true;
-			}else if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
-				syncStatus = messages.getString("tray_menu_status_error");
-			}else{
-				if(syncNode.getLastModified() != null){
-					DateFormat df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM, Locale.getDefault());
-					syncStatus = messages.getString("tray_menu_status_last") + df.format(syncNode.getLastModified());					
-				}else{
-					syncStatus = messages.getString("tray_menu_status_na");
-				}
-			}
-						
-			
-			MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
-			jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
-			jobTrig.setData(syncNode);
-			jobTrig.setImage(getImage("sync"));
-			
-			Menu jobMenu = new Menu(shell, SWT.DROP_DOWN);
-			jobTrig.setMenu(jobMenu);			
+			boolean running = (syncNode.getStatus() == Node.NODE_STATUS_LOADING);
 
+
+			Menu jobMenu;
+			if(!uniqMenu){
+				MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
+				jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
+				jobTrig.setData(syncNode);
+				jobTrig.setImage(getImage("sync"));
+				
+				jobMenu = new Menu(shell, SWT.DROP_DOWN);
+				jobTrig.setMenu(jobMenu);			
+			}else{
+				jobMenu = menu;
+			}
+			
 			MenuItem mi = new MenuItem (jobMenu, SWT.PUSH);
 			mi.setText ( messages.getString("jobeditor_stack_server") );
 			mi.setImage(getImage("network_local"));
@@ -157,11 +174,11 @@ public class SysTray {
 			new MenuItem(jobMenu, SWT.SEPARATOR);					
 			final boolean currentActiveState = syncNode.getPropertyValue("synchro_active").equals("true");
 			
-			MenuItem m0 = new MenuItem(jobMenu, SWT.PUSH);			
-			m0.setText(syncStatus);
+			this.currentStateItem = new MenuItem(jobMenu, SWT.PUSH);			
+			this.currentStateItem.setText(this.computeSyncStatus(syncNode));
 			if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
-				jobMenu.setDefaultItem(m0);
-				m0.addListener (SWT.Selection, new Listener () {
+				jobMenu.setDefaultItem(this.currentStateItem);
+				this.currentStateItem.addListener (SWT.Selection, new Listener () {
 					public void handleEvent (Event event) {
 						openConfiguration(shell, nodeId, "logs");
 					}
@@ -282,7 +299,7 @@ public class SysTray {
 		
 		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
-		mi2.setText (messages.getString("tray_menu_quit"));
+		mi2.setText (Manager.getMessage("tray_menu_quit"));
 		mi2.setImage(getImage("system_log_out"));
 		mi2.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
@@ -306,7 +323,6 @@ public class SysTray {
 		} else {
 			boolean isMac = SWTResourceManager.isMac();
 			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
-		    //tip.setMessage("Here is a message for the user. When the message is too long it wraps. I should say something cool but nothing comes to my mind.");
 
 			item = new TrayItem (tray, SWT.NONE);
 			item.setToolTipText("AjaXplorer Synchronizer");

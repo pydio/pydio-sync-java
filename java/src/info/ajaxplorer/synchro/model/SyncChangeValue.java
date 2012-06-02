@@ -26,7 +26,7 @@ public class SyncChangeValue {
 	}
 	
 	public String getSerializedString(){
-		return this.task + sep + this.n.id + sep + this.status;
+		return this.task + sep + (this.n != null ?  this.n.id : this.nodeId) + sep + this.status;
 	}
 	
 	public String getStatusString(){
