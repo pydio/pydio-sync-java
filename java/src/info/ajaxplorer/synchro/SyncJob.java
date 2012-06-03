@@ -30,7 +30,6 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -47,8 +46,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.quartz.DisallowConcurrentExecution;
@@ -104,6 +101,7 @@ public class SyncJob implements InterruptableJob {
 	
 	private String currentJobNodeID;
 	private boolean clearSnapshots = false;
+	private boolean localWatchOnly = false;
 	private String direction;
 	private File currentLocalFolder;
 	
@@ -124,6 +122,11 @@ public class SyncJob implements InterruptableJob {
 		}else{
 			clearSnapshots = false;
 		}
+		if(ctx.getMergedJobDataMap().containsKey("local-monitoring") && ctx.getMergedJobDataMap().getBooleanValue("local-monitoring")){
+			localWatchOnly = true;
+		}else{
+			localWatchOnly = false;
+		}
 		this.run();
 	}
 	
@@ -138,10 +141,23 @@ public class SyncJob implements InterruptableJob {
 		
 	}
 	
+	private void exitWithStatusAndNotify(int status, String titleId, String messageId) throws SQLException{
+		Manager.getInstance().notifyUser(Manager.getMessage(titleId), Manager.getMessage(messageId));
+		exitWithStatus(status);
+	}
+	
+	private void exitWithStatus(int status) throws SQLException{
+		currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
+		nodeDao.update(currentRepository);
+        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+        Manager.getInstance().releaseConnection();
+		return;
+
+	}
+	
 	public void run() {
-		
+				
 		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
-		
 		try{
 			// instantiate the daos
 			ConnectionSource connectionSource = Manager.getInstance().getConnection();
@@ -163,29 +179,23 @@ public class SyncJob implements InterruptableJob {
 			AjxpAPI.getInstance().setServer(s);		
 			RestRequest rest = new RestRequest();
 			if(!testConnexion(rest)){
-				currentRepository.setStatus(Node.NODE_STATUS_LOADED);
-				nodeDao.update(currentRepository);
-				Manager.getInstance().notifyUser("No Internet found", "No connexion found, skip sync for now!");
-		        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
-		        Manager.getInstance().releaseConnection();			
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
 				return;
 			}
 			
 			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 			direction = currentRepository.getPropertyValue("synchro_direction");
 	
-	        //Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + currentLocalFolder.getPath() + " against " + s.getUrl());
+	        if(!localWatchOnly) {
+	        	Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
+	        }
 	
 	    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
 	    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
 			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
 			Map<String, Object[]> again = null;
-			if(unsolvedConflicts){
-				Manager.getInstance().notifyUser(Manager.getMessage("job_blocking_conflicts_title"), Manager.getMessage("job_blocking_conflicts"));
-				currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
-				nodeDao.update(currentRepository);
-		        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
-		        Manager.getInstance().releaseConnection();
+			if(!localWatchOnly && unsolvedConflicts){
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
 				return;
 			}
 			
@@ -195,10 +205,24 @@ public class SyncJob implements InterruptableJob {
 			}
 			List<Node> localSnapshot = new ArrayList<Node>();
 			List<Node> remoteSnapshot = new ArrayList<Node>();
-			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
-			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
-			
+			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);			
 			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
+			
+			if(localWatchOnly && localDiff.size() == 0){
+				this.exitWithStatus(Node.NODE_STATUS_LOADED);
+				//System.out.println(" >> Nothing changed locally, exiting");
+				return;				
+			}
+			if(localWatchOnly){
+				// If we are here, then we must have detected some changes
+	        	Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
+			}
+			if(unsolvedConflicts){
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
+				return;				
+			}
+			
+			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 	
 			if(previousChanges.size() > 0){
@@ -774,7 +798,7 @@ public class SyncJob implements InterruptableJob {
 			}else{				
 				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
 				// TODO  : Cache md5s in DB 				
-				newNode.addProperty("md5", computeMD5(new File(this.normalizeUnicode(children[i].getAbsolutePath()))));
+				newNode.addProperty("md5", computeMD5(children[i]));
 				newNode.setLeaf();
 			}
 			if(save) nodeDao.update(newNode);
@@ -890,7 +914,7 @@ public class SyncJob implements InterruptableJob {
 					if(isMoved){
 						// DETECTED, DO SOMETHING.
 						created.remove(destinationNode);
-						System.out.println("This item was moved, it's not necessary to reup/download it again!");
+						//System.out.println("This item was moved, it's not necessary to reup/download it again!");
 						diff.put(s.getPath(true), makeTodoObjectWithData(NODE_CHANGE_STATUS_FILE_MOVED, s, destinationNode));
 					}else{
 						diff.put(s.getPath(true), makeTodoObject((s.isLeaf()?NODE_CHANGE_STATUS_FILE_DELETED:NODE_CHANGE_STATUS_DIR_DELETED), s));
@@ -948,9 +972,10 @@ public class SyncJob implements InterruptableJob {
 				if(deltaFile.exists()){
 					// Send back to server
 					RestRequest rest = new RestRequest();
-					System.out.println("Uploading " + deltaFile.length() + " bytes");
+					logChange(Manager.getMessage("job_log_updelta"), sourceFile.getName());
 					String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
 					deltaFile.delete();
+					//String localMD5 = (folderNode)
 					if(patchedFileMd5.trim().equals(SyncJob.computeMD5(sourceFile))){
 						// OK !
 						return true;
@@ -1001,6 +1026,7 @@ public class SyncJob implements InterruptableJob {
 			RdiffProcessor proc = Manager.getInstance().getRdiffProc();
 			proc.signature(targetFile, sigFile);
 			// Post it to the server to retrieve delta,
+			logChange(Manager.getMessage("job_log_downdelta"), targetFile.getName());
 			URI uri = AjxpAPI.getInstance().getFilehashDeltaUri(node);
 			this.uriContentToFile(uri, delta, sigFile);
 			sigFile.delete();
@@ -1016,7 +1042,6 @@ public class SyncJob implements InterruptableJob {
 				// There is a doubt, re-download whole file!
 				patched.delete();
 				this.synchronousDL(node, targetFile);
-				System.out.println(SyncJob.computeMD5(targetFile));
 			}
 			
 		}else{

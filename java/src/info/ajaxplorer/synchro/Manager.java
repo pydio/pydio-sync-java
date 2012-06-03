@@ -12,19 +12,11 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +25,6 @@ import java.util.ResourceBundle;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jface.action.GroupMarker;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Display;
@@ -44,7 +35,6 @@ import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
-import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.TriggerKey;
 import org.quartz.UnableToInterruptJobException;
@@ -56,7 +46,6 @@ import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.jdbc.JdbcConnectionSource;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
-import com.sun.corba.se.impl.orbutil.graph.NodeData;
 
 public class Manager {
 
@@ -70,7 +59,7 @@ public class Manager {
 	private SysTray sysTray;
 	private ResourceBundle messages;
 	private RdiffProcessor rdiffProc;
-	private HashMap<String, WatchDir> watchers;
+	//private HashMap<String, WatchDir> watchers;
 	
 	public RdiffProcessor getRdiffProc() {
 		return rdiffProc;
@@ -109,7 +98,7 @@ public class Manager {
             country = new String("US");
         } 
         if(proc == null){
-        	proc = new RdiffProcessor("rdiff");
+        	proc = new RdiffProcessor("/usr/local/bin/rdiff");
         }
         Locale currentLocale = new Locale(language, country);        
 		Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
@@ -165,9 +154,9 @@ public class Manager {
 	
 	public void updateSynchroState(final String nodeId, final boolean running){
 		if(running){
-			this.stopWatcher(nodeId);
+			//this.stopWatcher(nodeId);
 		}else{
-			this.startWatcher(nodeId);
+			//this.startWatcher(nodeId);
 		}
 		if(this.sysTray == null) {
 			return;
@@ -574,7 +563,7 @@ public class Manager {
         		.withIdentity(String.valueOf(n.id), "sync")
         		.usingJobData("node-id", String.valueOf(n.id))
         		.build();
-        
+
         if(firstTriggerClear){
         	
             Trigger trigger1 = newTrigger()
@@ -590,9 +579,7 @@ public class Manager {
             		.build();
             
             scheduler.scheduleJob(job, trigger1);
-            scheduler.scheduleJob(trigger2);
-            
-        	
+            scheduler.scheduleJob(trigger2);  	
         	
         }else{
         	
@@ -604,13 +591,21 @@ public class Manager {
 
             scheduler.scheduleJob(job, trigger);	
             
-            this.startWatcher(n);
+            //this.startWatcher(n);
         	
         }
 
+        Trigger localTrigger = newTrigger()
+        		.withIdentity("local-periodic-"+String.valueOf(n.id), "ajxp")            		        	
+        		.withSchedule(getSSBFromString("local_monitor"))
+        		.forJob(job)
+        		.usingJobData("local-monitoring", true)
+        		.build();
+        
+        scheduler.scheduleJob(localTrigger);
 
 	}
-	
+	/*
 	public void stopWatcher(String nodeId){
 		if(this.watchers != null && this.watchers.containsKey(nodeId)){
 			this.watchers.get(nodeId).stopProcessing();
@@ -634,7 +629,7 @@ public class Manager {
 		}
 
 	}
-	
+	*/
 	
 	public void unscheduleJob(Node n) throws SchedulerException{
 		
@@ -648,6 +643,8 @@ public class Manager {
 			ssB = simpleSchedule().withIntervalInHours(2).repeatForever();
 		}else if(s.equals("minute")){
 			ssB = simpleSchedule().withIntervalInMinutes(10).repeatForever();
+		}else if(s.equals("local_monitor")){
+			ssB = simpleSchedule().withIntervalInSeconds(30).repeatForever();
 		}else if(s.equals("day")){
 			ssB = simpleSchedule().withIntervalInHours(24).repeatForever();
 		}
