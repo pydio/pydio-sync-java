@@ -188,7 +188,7 @@ public class JobEditor extends Composite{
 			if(this.logs != null) this.logs.loadSynchroLog(baseNode);
 
 		} catch (URISyntaxException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		}
 	}
 	
@@ -345,9 +345,9 @@ public class JobEditor extends Composite{
 					});
 					
 				} catch (URISyntaxException e) {
-					e.printStackTrace();
+					Logger.getRootLogger().error("Synchro", e);
 				} catch (Exception e) {
-					e.printStackTrace();
+					Logger.getRootLogger().error("Synchro", e);
 				}			
 			}
 		});
@@ -796,11 +796,11 @@ public class JobEditor extends Composite{
 			this.setCurrentNode(n);
 			return true;
 		} catch (SQLException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		} catch (URISyntaxException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		}		
 		return false;
 	}	
@@ -810,9 +810,9 @@ public class JobEditor extends Composite{
 			closeConfig();
 			Manager.getInstance().deleteSynchroNode(currentSynchroNode);
 		} catch (SchedulerException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		} catch (SQLException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		}
 	}	
 	protected void setCurrentNode(Node n){

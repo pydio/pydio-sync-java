@@ -127,7 +127,10 @@ public class SyncJob implements InterruptableJob {
 		}else{
 			localWatchOnly = false;
 		}
+		long start = System.nanoTime();    
 		this.run();
+		long elapsedTime = System.nanoTime() - start;
+		Logger.getRootLogger().info("This pass took " + elapsedTime / 1000000 + " milliSeconds (Local : " + this.localWatchOnly + ")");
 	}
 	
 	public void interrupt(){
@@ -147,7 +150,7 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	private void exitWithStatus(int status) throws SQLException{
-		currentRepository.setStatus(Node.NODE_STATUS_ERROR);	        
+		currentRepository.setStatus(status);	        
 		nodeDao.update(currentRepository);
         Manager.getInstance().updateSynchroState(currentJobNodeID, false);
         Manager.getInstance().releaseConnection();
@@ -186,9 +189,9 @@ public class SyncJob implements InterruptableJob {
 			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 			direction = currentRepository.getPropertyValue("synchro_direction");
 	
-	        if(!localWatchOnly) {
-	        	Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
-	        }
+	        //if(!localWatchOnly) {
+	        	//Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
+	        //}
 	
 	    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
 	    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
@@ -210,12 +213,12 @@ public class SyncJob implements InterruptableJob {
 			
 			if(localWatchOnly && localDiff.size() == 0){
 				this.exitWithStatus(Node.NODE_STATUS_LOADED);
-				//System.out.println(" >> Nothing changed locally, exiting");
+				//Logger.getRootLogger().info(" >> Nothing changed locally, exiting");
 				return;				
 			}
 			if(localWatchOnly){
 				// If we are here, then we must have detected some changes
-	        	Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
+	        	// Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
 			}
 			if(unsolvedConflicts){
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
@@ -325,10 +328,10 @@ public class SyncJob implements InterruptableJob {
 		try {
 			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
 		} catch (URISyntaxException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 			return false;
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 			return false;
 		}
 		return true;
@@ -386,7 +389,12 @@ public class SyncJob implements InterruptableJob {
 					node.setPath(k);
 					File targetFile = new File(currentLocalFolder, k);
 					this.logChange(Manager.getMessage("job_log_downloading"), k);
-					this.updateNode(node, targetFile, n);
+					try{
+						this.updateNode(node, targetFile, n);
+					}catch(IllegalStateException e){
+						if(this.statRemoteFile(node, "file", rest) == null) continue;
+						else throw e;
+					}
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
 						throw new Exception("Error while downloading file from server");
 					}
@@ -464,7 +472,7 @@ public class SyncJob implements InterruptableJob {
 				countResourcesErrors ++;
 				// Do not put in the notApplied again, otherwise it will indefinitely happen.
 			}catch(Exception e){
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 				countResourcesErrors ++;
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
@@ -490,6 +498,14 @@ public class SyncJob implements InterruptableJob {
 					this.logChange("Moving resource locally", k);
 					Node dest = (Node)value[3];
 					File origFile = new File(currentLocalFolder, n.getPath());
+					if(!origFile.exists()){
+						// Cannot move a non-existing file! Download instead!
+						value[0] = TASK_LOCAL_GET_CONTENT;
+						value[1] = dest;
+						value[2] = STATUS_TODO;						
+						notApplied.put(k, value);
+						continue;
+					}
 					File destFile = new File(currentLocalFolder, dest.getPath());
 					origFile.renameTo(destFile);
 					if(!destFile.exists()){
@@ -501,8 +517,16 @@ public class SyncJob implements InterruptableJob {
 					
 					this.logChange("Moving resource remotely", k);
 					Node dest = (Node)value[3];
+					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(n.getPath()));
+					if(!object.has("size")){
+						value[0] = TASK_REMOTE_PUT_CONTENT;
+						value[1] = dest;
+						value[2] = STATUS_TODO;
+						notApplied.put(k, value);
+						continue;
+					}
 					rest.getStatusCodeForRequest(AjxpAPI.getInstance().getRenameUri(n, dest));
-					JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(dest.getPath()));
+					object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(dest.getPath()));
 					if(!object.has("size")){
 						throw new Exception("Could not move remote file to " + dest.getPath());
 					}
@@ -515,7 +539,7 @@ public class SyncJob implements InterruptableJob {
 				countResourcesErrors ++;
 				// Do not put in the notApplied again, otherwise it will indefinitely happen.
 			}catch(Exception e){
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 				countResourcesErrors ++;
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
@@ -529,7 +553,7 @@ public class SyncJob implements InterruptableJob {
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
 			Integer v = (Integer)value[0];
-			Node n = (Node)value[1];
+			//Node n = (Node)value[1];
 			if(this.interruptRequired){
 				value[2] = STATUS_INTERRUPTED;
 				notApplied.put(k, value);
@@ -569,7 +593,7 @@ public class SyncJob implements InterruptableJob {
 				countResourcesErrors ++;
 				// Do not put in the notApplied again, otherwise it will indefinitely happen.
 			}catch(Exception e){
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 				countResourcesErrors ++;
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
@@ -577,6 +601,23 @@ public class SyncJob implements InterruptableJob {
 		}		
 				
 		return notApplied;
+	}
+	
+	protected JSONObject statRemoteFile(Node n, String type, RestRequest rest){
+		try {
+			JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(n.getPath()));
+			if(type == "file" && object.has("size")){
+				return object;
+			}
+			if(type == "dir" && object.has("mtime")){
+				return object;
+			}
+		} catch (URISyntaxException e) {
+			Logger.getRootLogger().error("Synchro", e);
+		} catch (Exception e) {
+			Logger.getRootLogger().error("Synchro", e);
+		}
+		return null;		
 	}
 	
 	protected void logChange(String action, String path){
@@ -755,7 +796,7 @@ public class SyncJob implements InterruptableJob {
 		takeLocalSnapshot(root, list, false);		
 		
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local");
-		//System.out.println(diff);
+		//Logger.getRootLogger().info(diff);
 		return diff;
 		
 	}
@@ -842,7 +883,7 @@ public class SyncJob implements InterruptableJob {
 		takeRemoteSnapshot(root, list, false);
 		
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
-		//System.out.println(diff);
+		//Logger.getRootLogger().info(diff);
 		return diff;
 	}
 	
@@ -914,7 +955,7 @@ public class SyncJob implements InterruptableJob {
 					if(isMoved){
 						// DETECTED, DO SOMETHING.
 						created.remove(destinationNode);
-						//System.out.println("This item was moved, it's not necessary to reup/download it again!");
+						//Logger.getRootLogger().info("This item was moved, it's not necessary to reup/download it again!");
 						diff.put(s.getPath(true), makeTodoObjectWithData(NODE_CHANGE_STATUS_FILE_MOVED, s, destinationNode));
 					}else{
 						diff.put(s.getPath(true), makeTodoObject((s.isLeaf()?NODE_CHANGE_STATUS_FILE_DELETED:NODE_CHANGE_STATUS_DIR_DELETED), s));
@@ -988,7 +1029,7 @@ public class SyncJob implements InterruptableJob {
 		if(!sourceFile.exists() || totalSize == 0){
 			throw new FileNotFoundException("Cannot find file :" + sourceFile.getAbsolutePath());
 		}
-		System.out.println("Uploading " + totalSize + " bytes");
+		Logger.getRootLogger().info("Uploading " + totalSize + " bytes");
     	RestRequest rest = new RestRequest();
     	// Ping to make sure the user is logged
     	rest.getStatusCodeForRequest(AjxpAPI.getInstance().getAPIUri());
@@ -1060,7 +1101,7 @@ public class SyncJob implements InterruptableJob {
 		
 	protected void synchronousDL(Node node, File targetFile) throws Exception{
     	
-		URI uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(true));
+		URI uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(false));
 		this.uriContentToFile(uri, targetFile, null);
 		
 	}
@@ -1073,7 +1114,7 @@ public class SyncJob implements InterruptableJob {
         int count = 0;
         HttpEntity entity = rest.getNotConsumedResponseEntity(uri, null, uploadFile);
 		long fullLength = entity.getContentLength();
-		System.out.println("Downloaded " + fullLength + " bytes");
+		Logger.getRootLogger().info("Downloaded " + fullLength + " bytes");
 		
 		InputStream input = entity.getContent();
 		BufferedInputStream in = new BufferedInputStream(input,buffersize);
@@ -1164,7 +1205,7 @@ public class SyncJob implements InterruptableJob {
 	
 	
 	protected void logMemory(){
-		System.out.println("Total memory (bytes): " + 
+		Logger.getRootLogger().info("Total memory (bytes): " + 
 		        Math.round(Runtime.getRuntime().totalMemory() / (1024 * 1024)) + "M");
 	}
 	
@@ -1177,7 +1218,7 @@ public class SyncJob implements InterruptableJob {
 			DOMSource source = new DOMSource(d);
 			transformer.transform(source, result);	
 			String xmlString = result.getWriter().toString();
-			System.out.println(xmlString);
+			Logger.getRootLogger().info(xmlString);
 		}catch(Exception e){
 		}		
 	}

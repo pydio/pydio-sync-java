@@ -137,7 +137,7 @@ public class Manager {
 	
 	public void notifyUser(final String title, final String message){
 		if(this.sysTray == null) {
-			System.out.println("No systray - message was " + message);
+			Logger.getRootLogger().info("No systray - message was " + message);
 			return;
 		}
 		this.sysTray.getDisplay().asyncExec(new Runnable() {
@@ -146,7 +146,7 @@ public class Manager {
 				if(!sysTray.isDisposed()){
 					sysTray.notifyUser(title, message);
 				}else{
-					System.out.println("No systray - message was " + message);
+					Logger.getRootLogger().info("No systray - message was " + message);
 				}
 			}
 		});
@@ -186,14 +186,14 @@ public class Manager {
 		try {
 			initializeDAO();
 		}catch(SQLException e){
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		}
 		sysTray = new SysTray(shell, messages, this);
 	    try {			
             scheduler = StdSchedulerFactory.getDefaultScheduler();
             scheduler.start();
         } catch (SchedulerException se) {
-            se.printStackTrace();
+            Logger.getRootLogger().error("Synchro", se);
         }
 	    /*
 	    if(!daemon){
@@ -233,7 +233,7 @@ public class Manager {
 			scheduler.standby();
 			return true;
 		} catch (SchedulerException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 			return false;
 		}
 	}
@@ -243,7 +243,7 @@ public class Manager {
 			scheduler.start();
 			return true;
 		} catch (SchedulerException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 			return false;
 		}
 	}
@@ -253,7 +253,7 @@ public class Manager {
 	private ConnectionSource connectionSource;
 	
 	public synchronized ConnectionSource getConnection(){
-		//System.out.println("Incrementing refs");
+		//Logger.getRootLogger().info("Incrementing refs");
 		if(connectionRefs > 0 && connectionSource != null){
 			connectionRefs ++;
 			return connectionSource;
@@ -262,7 +262,7 @@ public class Manager {
 				connectionSource = new JdbcConnectionSource(databaseUrl);
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 				return null;
 			}
 			connectionRefs ++;
@@ -271,18 +271,18 @@ public class Manager {
 	}
 	
 	public synchronized void releaseConnection(){
-		//System.out.println("Decrementing refs");
+		//Logger.getRootLogger().info("Decrementing refs");
 		connectionRefs --;
 		if(connectionRefs == 0){
 			try {
 				connectionSource.close();
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 			}
 			connectionSource = null;
 			System.gc();
-			//System.out.println("Releasing connection");
+			//Logger.getRootLogger().info("Releasing connection");
 		}
 	}
 	
@@ -338,7 +338,7 @@ public class Manager {
 			try {
 				this.scheduleJob(node);
 			} catch (SchedulerException e) {
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 			}
 		}else{
 			boolean serverChanges = false;
@@ -427,7 +427,7 @@ public class Manager {
 					
 				}
 			} catch (SchedulerException e) {
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
 			}
 		}
 		this.updateSysTrayJobsMenu();
@@ -455,8 +455,11 @@ public class Manager {
 			// MAKE SURE TO INTERRUPT JOB
 			try {
 				scheduler.interrupt(new JobKey(String.valueOf(synchroNode.id), "sync"));
+				this.unscheduleJob(synchroNode);
 			} catch (UnableToInterruptJobException e) {
-				e.printStackTrace();
+				Logger.getRootLogger().error("Synchro", e);
+			} catch (SchedulerException e) {
+				Logger.getRootLogger().error("Synchro", e);
 			}
 		}
 		ConnectionSource cSource = this.getConnection();
@@ -466,9 +469,16 @@ public class Manager {
 			synchroNode.setProperty("synchro_active", (state?"true":"false"), pDao);
 			this.releaseConnection();
 		} catch (SQLException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 			this.releaseConnection();
 			return false;
+		}
+		if(state){
+			try {
+				this.scheduleJob(synchroNode, true);
+			} catch (SchedulerException e) {
+				Logger.getRootLogger().error("Synchro", e);
+			}
 		}
 		return true;
 	}
@@ -502,7 +512,7 @@ public class Manager {
 			this.releaseConnection();
 			return n;
 		} catch (SQLException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 			this.releaseConnection();
 			return null;
 		}
@@ -522,7 +532,7 @@ public class Manager {
 				}
 			}
 		} catch (SQLException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		} finally {
 			this.releaseConnection();
 		}
@@ -545,7 +555,7 @@ public class Manager {
 				scheduleJob(n, notCorrectlyShutdown);
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		} finally {
 			this.releaseConnection();
 		}
@@ -625,7 +635,7 @@ public class Manager {
 			w.start();
 			this.watchers.put(String.valueOf(n.id), w);
 		} catch (IOException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		}
 
 	}
@@ -644,7 +654,7 @@ public class Manager {
 		}else if(s.equals("minute")){
 			ssB = simpleSchedule().withIntervalInMinutes(10).repeatForever();
 		}else if(s.equals("local_monitor")){
-			ssB = simpleSchedule().withIntervalInSeconds(30).repeatForever();
+			ssB = simpleSchedule().withIntervalInSeconds(55).repeatForever();
 		}else if(s.equals("day")){
 			ssB = simpleSchedule().withIntervalInHours(24).repeatForever();
 		}
@@ -672,7 +682,7 @@ public class Manager {
 			Trigger existing = scheduler.getTrigger(new TriggerKey("onetime-"+String.valueOf(n.id), "ajxp"));
 			List<JobExecutionContext> jobs = scheduler.getCurrentlyExecutingJobs();
 			if(!jobs.contains(job) && existing == null){
-				System.out.println("Triggerring job now");
+				Logger.getRootLogger().info("Triggerring job now");
 		        Trigger trigger = newTrigger()
 		        		.withIdentity("onetime-"+String.valueOf(n.id), "ajxp")
 		        		.forJob(jK)
@@ -680,10 +690,10 @@ public class Manager {
 		        		.startNow().build();
 		        scheduler.scheduleJob(trigger);
 			}else{
-				System.out.println("Trigger now : already running, ignore");
+				Logger.getRootLogger().info("Trigger now : already running, ignore");
 			}
 		}else{
-			System.out.println("Triggerring job now");
+			Logger.getRootLogger().info("Triggerring job now");
 			this.scheduleJob(n, true);
 		}
 		

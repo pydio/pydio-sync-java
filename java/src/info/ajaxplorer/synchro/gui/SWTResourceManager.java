@@ -18,11 +18,6 @@ import org.eclipse.swt.widgets.Widget;
 /**
  * Class to manage SWT resources (Font, Color, Image and Cursor)
  * There are no restrictions on the use of this code.
- *
- * You may change this code and your changes will not be overwritten,
- * but if you change the version number below then this class will be
- * completely overwritten by Jigloo.
- * #SWTResourceManager:version4.0.0#
  */
 public class SWTResourceManager {
 

@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
+import org.apache.log4j.Logger;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
@@ -196,7 +197,7 @@ public class SysTray {
 						try {
 							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
 						} catch (SchedulerException e) {
-							e.printStackTrace();
+							Logger.getRootLogger().error("Synchro", e);
 						}
 					}
 				});
@@ -210,13 +211,14 @@ public class SysTray {
 			mAct.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					Manager.getInstance().changeSynchroState((Node)event.widget.getData(), !currentActiveState);
+					/*
 					if(!currentActiveState){
 						try {
 							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
 						} catch (SchedulerException e) {
-							e.printStackTrace();
+							Logger.getRootLogger().error("Synchro", e);
 						}						
-					}
+					}*/
 				}
 			});
 			
@@ -235,9 +237,9 @@ public class SysTray {
 					try {
 						Manager.getInstance().deleteSynchroNode((Node)event.widget.getData());
 					} catch (SchedulerException e) {
-						e.printStackTrace();
+						Logger.getRootLogger().error("Synchro", e);
 					} catch (SQLException e) {
-						e.printStackTrace();
+						Logger.getRootLogger().error("Synchro", e);
 					}
 				}
 			});
@@ -318,7 +320,7 @@ public class SysTray {
 		final Tray tray = display.getSystemTray ();
 		//tip = new ToolTip(shell, SWT.BALLOON | SWT.ICON_INFORMATION);
 		if (tray == null) {
-			System.out.println ("The system tray is not available");
+			Logger.getRootLogger().error("The system tray is not available");
 			item = null;			
 		} else {
 			boolean isMac = SWTResourceManager.isMac();
@@ -329,12 +331,10 @@ public class SysTray {
 			//item.setToolTip(tip);
 			item.addListener (SWT.Show, new Listener () {
 				public void handleEvent (Event event) {
-					System.out.println("show");
 				}
 			});
 			item.addListener (SWT.Hide, new Listener () {
 				public void handleEvent (Event event) {
-					System.out.println("hide");
 				}
 			});
 			/*

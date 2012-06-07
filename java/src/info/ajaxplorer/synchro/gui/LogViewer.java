@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Locale;
 
+import org.apache.log4j.Logger;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.events.MouseEvent;
@@ -148,7 +149,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			table2.getColumn(2).setWidth(table2.getBounds().width - table2.getColumn(0).getWidth() - table2.getColumn(1).getWidth()-20);
 			
 		} catch (SQLException e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		} finally{
 			Manager.getInstance().releaseConnection();
 		}
@@ -342,11 +343,11 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 							sCDao.update(c);
 							changes = true;
 						} catch (SQLException e) {
-							e.printStackTrace();
+							Logger.getRootLogger().error("Synchro", e);
 						}						 
 					 }		
 					 }catch(SQLException e){
-						 e.printStackTrace();
+						 Logger.getRootLogger().error("Synchro", e);
 					 }finally{
 						 Manager.getInstance().releaseConnection();
 					 }
@@ -359,7 +360,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					    	try {
 								Manager.getInstance().triggerJobNow(currentSynchroNode, false);
 							} catch (SchedulerException e) {
-								e.printStackTrace();
+								Logger.getRootLogger().error("Synchro", e);
 							}
 					    }
 					 }
@@ -381,7 +382,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
              itemSolveIgnore.addSelectionListener(listener);
 			this.layout();
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.getRootLogger().error("Synchro", e);
 		}
 	}
 

@@ -9,6 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
 import com.j256.ormlite.field.DatabaseField;
@@ -89,7 +91,7 @@ public class SyncChange {
 				Dao<Node, String> nodeDao = DaoManager.createDao(cs, Node.class);
 				value.n = nodeDao.queryForId(value.nodeId);
 			}catch (Exception e) {
-				System.out.println("Could not load node for SyncChangeValue!");
+				Logger.getRootLogger().error("Could not load node for SyncChangeValue!");
 			} finally{
 				Manager.getInstance().releaseConnection();
 			}
