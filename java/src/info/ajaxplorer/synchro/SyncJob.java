@@ -149,12 +149,17 @@ public class SyncJob implements InterruptableJob {
 		exitWithStatus(status);
 	}
 	
-	private void exitWithStatus(int status) throws SQLException{
+	private boolean exitWithStatus(int status) throws SQLException{
 		currentRepository.setStatus(status);	        
 		nodeDao.update(currentRepository);
         Manager.getInstance().updateSynchroState(currentJobNodeID, false);
         Manager.getInstance().releaseConnection();
-		return;
+        DaoManager.clearCache();
+		nodeDao = null;
+		syncChangeDao = null;
+		syncLogDao = null;
+		propertyDao = null;
+		return true;
 
 	}
 	
@@ -169,12 +174,17 @@ public class SyncJob implements InterruptableJob {
 			syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
 			propertyDao = DaoManager.createDao(connectionSource, Property.class);
 			
-			
 			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
 			if(currentRepository == null){
 				throw new Exception("The database returned an empty node.");
 			}
+			/*
+			if(this.exitWithStatus(Node.NODE_STATUS_LOADED)){
+				return;
+			}
+			*/
+
 			nodeDao.update(currentRepository);
 			Server s = new Server(currentRepository.getParent());
 			RestStateHolder.getInstance().setServer(s);		
@@ -312,6 +322,7 @@ public class SyncJob implements InterruptableJob {
 			
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
+	        DaoManager.clearCache();
 
 		}catch(Exception e){
 			
@@ -320,7 +331,7 @@ public class SyncJob implements InterruptableJob {
 			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message);
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
-
+	        DaoManager.clearCache();
 		}
 	}
 	
@@ -1101,7 +1112,7 @@ public class SyncJob implements InterruptableJob {
 		
 	protected void synchronousDL(Node node, File targetFile) throws Exception{
     	
-		URI uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(false));
+		URI uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(true));
 		this.uriContentToFile(uri, targetFile, null);
 		
 	}
