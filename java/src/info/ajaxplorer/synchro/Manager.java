@@ -51,7 +51,7 @@ public class Manager {
 
 	
 	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "mysql", "imap", "jsapi"};
-	public String[] EXCLUDED_FILES_START = {"."};
+	public String[] EXCLUDED_FILES_START = {".", "Thumbs.db"};
 	public String[] EXCLUDED_FILES_END = {};
 
 	Scheduler scheduler;
@@ -83,6 +83,12 @@ public class Manager {
     	for(int i = 0; i < args.length ; i++){
         	if(args[i].startsWith("rdiff=")){
         		String path = args[i].substring(new String("rdiff=").length());
+        		if(i<args.length-1){
+	        		for(int j=i+1;j<args.length;j++){
+	        			if(args[j].contains("=")) break;
+	        			path += " " + args[j];
+	        		}
+        		}
         		proc = new RdiffProcessor(path);
         	}else if(args[i].startsWith("daemon=")){
         		daemon = args[i].substring(new String("daemon=").length()).equals("true");
@@ -107,6 +113,7 @@ public class Manager {
 		final Shell shell = new Shell(display, SWT.ALPHA|SWT.NONE);
 		shell.setActive();
 
+		Logger.getRootLogger().info("Rdiff Processor active? " + (proc.rdiffEnabled()?"Yes" :"No"));
 		Manager.instanciate(shell, currentLocale, daemon);
 		Manager.getInstance().setRdiffProc(proc);
 		Manager.getInstance().initScheduler();
