@@ -278,7 +278,7 @@ public class SyncJob implements InterruptableJob {
 	        }
 	        
 	        // handle DL / UP failed! 
-	        takeLocalSnapshot(localRootNode, null, true);
+	        takeLocalSnapshot(localRootNode, null, true, localSnapshot);
 	        takeRemoteSnapshot(remoteRootNode, null, true);
 	        
 			cleanDB();
@@ -645,8 +645,10 @@ public class SyncJob implements InterruptableJob {
 			return true;
 		}else if(remoteNode.getPropertyValue("md5") != null){
 			// Get local node md5
-			File f = new File(currentLocalFolder, localNode.getPath(true));
-			String localMd5 = SyncJob.computeMD5(f);
+			this.updateLocalMD5(localNode);
+			String localMd5 = localNode.getPropertyValue("md5");
+			//File f = new File(currentLocalFolder, localNode.getPath(true));
+			//String localMd5 = SyncJob.computeMD5(f);
 			if(remoteNode.getPropertyValue("md5").equals(localMd5)){
 				return true;
 			}
@@ -774,6 +776,7 @@ public class SyncJob implements InterruptableJob {
 			root = l.get(0);
 			nodeDao.delete(root);
 		}
+		cleanDB();
 	}
 	
 	protected void cleanDB() throws SQLException{
@@ -781,16 +784,15 @@ public class SyncJob implements InterruptableJob {
 		propertyDao.executeRaw("DELETE FROM b WHERE node_id=0");
 	}
 	
-	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception{
+	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save, final List<Node> previousSnapshot) throws Exception{
 			
-		if(save){
-			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
-			nodeDao.delete(rootNode.children);
-		}
-		//final List<Node> list = new ArrayList<Node>();
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception{
-				listDirRecursive(currentLocalFolder, rootNode, accumulator, save);
+				if(save){
+					nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+					nodeDao.delete(rootNode.children);
+				}
+				listDirRecursive(currentLocalFolder, rootNode, accumulator, save, previousSnapshot);
 				return null;
 			}
 		});
@@ -804,7 +806,7 @@ public class SyncJob implements InterruptableJob {
 		final Node root = new Node("local_tmp", "", null);
 		root.setPath(currentLocalFolder.getAbsolutePath());
 		final List<Node> list = new ArrayList<Node>();
-		takeLocalSnapshot(root, list, false);		
+		takeLocalSnapshot(root, list, false, snapshot);		
 		
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local");
 		//Logger.getRootLogger().info(diff);
@@ -820,7 +822,7 @@ public class SyncJob implements InterruptableJob {
 	    return str;
 	}	
 	
-	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save) throws SQLException{
+	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save, List<Node> previousSnapshot) throws SQLException{
 		
 		File[] children = directory.listFiles();
 		String[] start = Manager.getInstance().EXCLUDED_FILES_START;
@@ -846,11 +848,28 @@ public class SyncJob implements InterruptableJob {
 			newNode.properties = nodeDao.getEmptyForeignCollection("properties");			
 			newNode.setLastModified(new Date(children[i].lastModified()));
 			if(children[i].isDirectory()){
-				listDirRecursive(children[i], root, accumulator, save);
+				listDirRecursive(children[i], root, accumulator, save, previousSnapshot);
 			}else{				
 				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
-				// TODO  : Cache md5s in DB 				
-				newNode.addProperty("md5", computeMD5(children[i]));
+				String md5 = null;
+				if(previousSnapshot!=null){
+				Iterator<Node> it = previousSnapshot.iterator();
+					while(it.hasNext()){
+						Node previous = it.next();
+						if(previous.getPath().equals(p)){
+							if(previous.getLastModified().equals(newNode.getLastModified()) && previous.getPropertyValue("bytesize").equals(newNode.getPropertyValue("bytesize"))){
+								md5 = previous.getPropertyValue("md5");
+								//Logger.getRootLogger().info("Getting md5 from previous snapshot");
+							}
+							break;
+						}
+					}
+				}
+				if(md5 == null){
+					//Logger.getRootLogger().info("Computing new md5");
+					md5 = computeMD5(children[i]);
+				}
+				newNode.addProperty("md5", md5);
 				newNode.setLeaf();
 			}
 			if(save) nodeDao.update(newNode);
@@ -952,6 +971,7 @@ public class SyncJob implements InterruptableJob {
 					Node destinationNode = null;
 					while(creaIt.hasNext()){
 						Node createdNode = creaIt.next();
+						//if(type.equals("local")) this.updateLocalMD5(createdNode);
 						if(createdNode.isLeaf() && createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize"))){						
 							isMoved = ( createdNode.getPropertyValue("md5") != null 
 									&& s.getPropertyValue("md5") != null
@@ -985,6 +1005,13 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 		return diff;
+	}
+	
+	protected void updateLocalMD5(Node node){
+		if(node.getPropertyValue("md5")!=null) return;
+		Logger.getRootLogger().info("Computing md5 for node "+node.getPath());
+		String md5 = SyncJob.computeMD5(new File(currentLocalFolder, node.getPath()));
+		node.addProperty("md5", md5);
 	}
 	
 	protected Object[] makeTodoObject(Integer nodeStatus, Node node){

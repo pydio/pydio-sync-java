@@ -261,7 +261,6 @@ public class Manager {
 			try {
 				connectionSource = new JdbcConnectionSource(databaseUrl);
 			} catch (SQLException e) {
-				// TODO Auto-generated catch block
 				Logger.getRootLogger().error("Synchro", e);
 				return null;
 			}
@@ -277,7 +276,6 @@ public class Manager {
 			try {
 				connectionSource.close();
 			} catch (SQLException e) {
-				// TODO Auto-generated catch block
 				Logger.getRootLogger().error("Synchro", e);
 			}
 			connectionSource = null;
@@ -313,7 +311,10 @@ public class Manager {
 	public void deleteSynchroNode(Node node) throws SchedulerException, SQLException{
 		this.unscheduleJob(node);		
 		ConnectionSource cSource = this.getConnection();
-		DaoManager.createDao(cSource, Node.class).delete(node);
+		Dao<Node, String>nodeDao = DaoManager.createDao(cSource, Node.class);
+		nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+		nodeDao.delete(node);
+		nodeDao.executeRaw("DELETE FROM b WHERE node_id=0");
 		this.releaseConnection();
 	}
 	
