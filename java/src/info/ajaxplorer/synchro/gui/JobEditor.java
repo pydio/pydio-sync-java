@@ -819,6 +819,9 @@ public class JobEditor extends Composite{
 		if(n == null){
 			currentSynchroNode = null;
 			clearFormData();
+			if(Manager.defaultHome != null){
+				tfTarget.setText(Manager.defaultHome);
+			}
 			logs.clearSynchroLog();
 		}else{
 			currentSynchroNode = n;

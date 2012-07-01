@@ -1075,7 +1075,10 @@ public class SyncJob implements InterruptableJob {
     	rest.setUploadProgressListener(new CountingMultipartRequestEntity.ProgressListener() {
 			private int previousPercent = 0;
 			@Override
-			public void transferred(long num) {
+			public void transferred(long num) throws IOException {
+				if(SyncJob.this.interruptRequired){
+					throw new IOException("Upload interrupted on demand");
+				}
 				int currentPercent =  (int) (num * 100 / totalSize); 
 				if(currentPercent > previousPercent){
 					logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " - "+currentPercent+"%");
@@ -1084,7 +1087,10 @@ public class SyncJob implements InterruptableJob {
 			}
 			
 			@Override
-			public void partTransferred(int part, int total) {
+			public void partTransferred(int part, int total) throws IOException {
+				if(SyncJob.this.interruptRequired){
+					throw new IOException("Upload interrupted on demand");
+				}
 				logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " ["+(part+1)+"/"+total+"]");
 			}
 		});
@@ -1185,10 +1191,16 @@ public class SyncJob implements InterruptableJob {
                 	@SuppressWarnings("unused")
 					double ETC = bytesleft/(speed*10);
             	}
+            	if(tmpProgress != postedProgress){
+            		logChange(Manager.getMessage("job_log_downloading"), targetFile.getName() + " - "+tmpProgress+"%");
+            	}
             	postedProgress=tmpProgress;
             }
             out.write(data, 0, count);
             total = tmpTotal;
+        	if(this.interruptRequired){
+        		break;
+        	}
         }	        
         out.flush();
     	if(out != null) out.close();

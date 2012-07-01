@@ -12,6 +12,8 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
@@ -21,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.Set;
 
@@ -60,6 +63,8 @@ public class Manager {
 	private ResourceBundle messages;
 	private RdiffProcessor rdiffProc;
 	//private HashMap<String, WatchDir> watchers;
+	public static String defaultHome;
+	public boolean firstRun = false;
 	
 	public RdiffProcessor getRdiffProc() {
 		return rdiffProc;
@@ -90,13 +95,39 @@ public class Manager {
 	        		}
         		}
         		proc = new RdiffProcessor(path);
+        	}else if(args[i].startsWith("default_home=")){
+        		String defHome = args[i].substring(new String("default_home=").length());
+        		if(i<args.length-1){
+	        		for(int j=i+1;j<args.length;j++){
+	        			if(args[j].contains("=")) break;
+	        			defHome += " " + args[j];
+	        		}
+        		}
+        		Manager.defaultHome = defHome;
         	}else if(args[i].startsWith("daemon=")){
         		daemon = args[i].substring(new String("daemon=").length()).equals("true");
         	}else if(args[i].startsWith("lang=")){
         		language = args[i].substring(new String("lang=").length());
         	}else if(args[i].startsWith("country=")){
         		country = args[i].substring(new String("country=").length());
-        	}            	
+        	}else if(args[i].startsWith("winLangID=")){
+        		String lId = args[i].substring(new String("winLangID=").length());
+        		try{
+        			ResourceBundle b = ResourceBundle.getBundle("WindowsLanguages");
+        			String found = b.getString(lId);
+        			if(found!=null){
+        				if(found.contains("-")) {
+        					String[] parts = found.split("-");
+        					language = parts[0];
+        					country = parts[1].toUpperCase();
+        				}else{
+        					language = found;
+        					country = found.toUpperCase();
+        				}
+        			}
+        		}catch(Exception e){        			
+        		}
+        	}
     	}
     	if(language != null && country == null) country = language.toUpperCase();
         if (language == null) {
@@ -117,6 +148,12 @@ public class Manager {
 		Manager.instanciate(shell, currentLocale, daemon);
 		Manager.getInstance().setRdiffProc(proc);
 		Manager.getInstance().initScheduler();
+
+		if(Manager.instance.firstRun){
+			Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
+		}
+    	//Manager.defaultHome = null;
+		
 		
 		while (!shell.isDisposed ()) {
 			if (!display.readAndDispatch ()) display.sleep ();
@@ -190,8 +227,9 @@ public class Manager {
 	public Manager(final Shell shell, Locale locale, boolean daemon){
 		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
 		this.daemon = daemon;
+		boolean alreadyExists = false;
 		try {
-			initializeDAO();
+			alreadyExists = initializeDAO();
 		}catch(SQLException e){
 			Logger.getRootLogger().error("Synchro", e);
 		}
@@ -202,6 +240,7 @@ public class Manager {
         } catch (SchedulerException se) {
             Logger.getRootLogger().error("Synchro", se);
         }
+	    if(!alreadyExists) this.firstRun = true;
 	    /*
 	    if(!daemon){
 		    shell.getDisplay().asyncExec(new Runnable() {
@@ -291,7 +330,7 @@ public class Manager {
 		}
 	}
 	
-	private void initializeDAO() throws SQLException{
+	private boolean initializeDAO() throws SQLException{
 
 		File work = new File(System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer");
 		if(!work.exists()) work.mkdir();
@@ -312,7 +351,7 @@ public class Manager {
 					"END;");
 			this.releaseConnection();
 		}        		
-		
+		return dbAlreadyCreated;
 	}
 	
 	public void deleteSynchroNode(Node node) throws SchedulerException, SQLException{
@@ -453,7 +492,9 @@ public class Manager {
 	}
 	
 	public boolean openRemoteTarget(Node synchroNode){
-		Program.launch(synchroNode.getParent().getLabel() + "?repository_id=" + synchroNode.getPropertyValue("repository_id") + "&folder=%2F");
+		String server = synchroNode.getParent().getLabel();
+		if(!server.endsWith("/")) server += "/";
+		Program.launch(server + "?repository_id=" + synchroNode.getPropertyValue("repository_id") + "&folder=%2F");
 		return true;
 	}
 	

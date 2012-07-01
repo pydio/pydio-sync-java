@@ -388,6 +388,8 @@ public class SysTray {
 					if(n != null){
 						jobEditor.setCurrentNode(n);
 					}
+				}else{
+					jobEditor.setCurrentNode(null);
 				}
 			} catch (Exception e) {
 			}				
