@@ -1,5 +1,7 @@
 package info.ajaxplorer.synchro.gui;
 
+import java.util.ResourceBundle;
+
 import org.eclipse.nebula.animation.AnimationRunner;
 import org.eclipse.nebula.animation.effects.AlphaEffect;
 import org.eclipse.nebula.animation.movement.ExpoOut;
@@ -90,11 +92,14 @@ public class AboutPanel extends Composite {
 		this.setSize(300, 250);
 		this.setBackgroundImage(new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/AboutPane.png"))));
 		
+		ResourceBundle b = ResourceBundle.getBundle("application");
+		String version = b.getString("version");
+		
 		Label label = new Label(this, SWT.NULL);
-		label.setBounds(1, 219, 298, 30);
+		label.setBounds(1, 200, 298, 45);
 		label.setAlignment(SWT.CENTER|SWT.BOTTOM);
-		label.setBackground(SWTResourceManager.getColor(255, 255, 255));
-		label.setText("AjaXplorer Synchronization Tool - v1.0");
+		label.setBackground(SWTResourceManager.getColor(255, 255, 255));		
+		label.setText("AjaXplorer Synchronization Tool - v"+version+"\nFree / Non supported edition\nVisit http://ajaxplorer.info/");
 		
 	}
 

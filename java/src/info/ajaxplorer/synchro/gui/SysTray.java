@@ -2,10 +2,13 @@ package info.ajaxplorer.synchro.gui;
 
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.SyncJob;
 
 import java.sql.SQLException;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
@@ -35,7 +38,9 @@ public class SysTray {
 	private Shell shell;
 	private final TrayItem item; 
 	private Menu menu;
-	private MenuItem currentStateItem;
+	//private MenuItem currentStateItem;
+	private HashMap<String, MenuItem> currentStateItems;
+	private HashMap<String, MenuItem> currentStartItems;
 	private boolean showNotifications = true;
 	ResourceBundle messages;
 	private JobEditor jobEditor;
@@ -69,8 +74,11 @@ public class SysTray {
 		if(this.jobEditor != null){
 			this.jobEditor.notifyJobStateChanged(nodeId, state);
 		}
-		if(this.menu.isVisible() && this.currentStateItem != null){
-			this.currentStateItem.setText(this.computeSyncStatus(Manager.getInstance().getSynchroNode(nodeId)));
+		if(this.menu.isVisible() && this.currentStateItems != null && this.currentStateItems.containsKey(nodeId)){
+			this.currentStateItems.get(nodeId).setText(this.computeSyncStatus(Manager.getInstance().getSynchroNode(nodeId)));
+		}
+		if(this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)){
+			this.currentStartItems.get(nodeId).setEnabled(!state);
 		}
 	}
 	protected Image getImage(String name){
@@ -85,6 +93,22 @@ public class SysTray {
 		String syncStatus = "";
 		if(syncNode.getStatus() == Node.NODE_STATUS_LOADING){
 			syncStatus = messages.getString("tray_menu_status_running");
+			if(syncNode.getPropertyValue("sync_running_status") != null){
+				int runningStatus = new Integer(syncNode.getPropertyValue("sync_running_status"));
+				String key = null;
+				if(runningStatus == SyncJob.RUNNING_STATUS_INITIALIZING) key = "sync_running_init";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_PREVIOUS_CHANGES) key = "sync_running_previous";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_APPLY_CHANGES) key = "sync_running_apply";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_CLEANING) key = "sync_running_clean";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_COMPARING_CHANGES) key = "sync_running_compare";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_INTERRUPTING) key = "sync_running_interrupt";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_LOCAL_CHANGES) key = "sync_running_local";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_REMOTE_CHANGES) key = "sync_running_remote";
+				else if(runningStatus == SyncJob.RUNNING_STATUS_TESTING_CONNEXION) key = "sync_running_connexion";
+				if(key != null){
+					syncStatus = messages.getString(key);
+				}
+			}
 		}else if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
 			syncStatus = messages.getString("tray_menu_status_error");
 		}else{
@@ -126,7 +150,9 @@ public class SysTray {
 			}
 		});		
 		
-		if(uniqMenu) new MenuItem(menu, SWT.SEPARATOR);		
+		if(uniqMenu) new MenuItem(menu, SWT.SEPARATOR);
+		this.currentStateItems = new HashMap<String, MenuItem>();
+		this.currentStartItems = new HashMap<String, MenuItem>();
 		
 		for(Node syncNode:ns){
 			
@@ -175,16 +201,17 @@ public class SysTray {
 			new MenuItem(jobMenu, SWT.SEPARATOR);					
 			final boolean currentActiveState = syncNode.getPropertyValue("synchro_active").equals("true");
 			
-			this.currentStateItem = new MenuItem(jobMenu, SWT.PUSH);			
-			this.currentStateItem.setText(this.computeSyncStatus(syncNode));
+			MenuItem currentStateItem = new MenuItem(jobMenu, SWT.PUSH);			
+			currentStateItem.setText(this.computeSyncStatus(syncNode));
 			if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
-				jobMenu.setDefaultItem(this.currentStateItem);
-				this.currentStateItem.addListener (SWT.Selection, new Listener () {
+				jobMenu.setDefaultItem(currentStateItem);
+				currentStateItem.addListener (SWT.Selection, new Listener () {
 					public void handleEvent (Event event) {
 						openConfiguration(shell, nodeId, "logs");
 					}
 				});
 			}
+			this.currentStateItems.put(nodeId, currentStateItem);
 						
 			if(currentActiveState){
 				MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
@@ -201,6 +228,7 @@ public class SysTray {
 						}
 					}
 				});
+				this.currentStartItems.put(nodeId, mI);
 			}
 			
 			MenuItem mAct = new MenuItem(jobMenu, SWT.PUSH);			

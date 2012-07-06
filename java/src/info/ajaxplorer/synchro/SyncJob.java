@@ -92,11 +92,21 @@ public class SyncJob implements InterruptableJob {
 	public static Integer STATUS_PROGRESS = 32;
 	public static Integer STATUS_INTERRUPTED = 64;
 	
+	public static Integer RUNNING_STATUS_INITIALIZING = 64;
+	public static Integer RUNNING_STATUS_TESTING_CONNEXION = 128;
+	public static Integer RUNNING_STATUS_PREVIOUS_CHANGES = 512;
+	public static Integer RUNNING_STATUS_LOCAL_CHANGES = 2;
+	public static Integer RUNNING_STATUS_REMOTE_CHANGES = 4;
+	public static Integer RUNNING_STATUS_COMPARING_CHANGES = 8;
+	public static Integer RUNNING_STATUS_APPLY_CHANGES = 16;
+	public static Integer RUNNING_STATUS_CLEANING = 32;
+	public static Integer RUNNING_STATUS_INTERRUPTING = 256;
+	
 	Node currentRepository ;
 	Dao<Node, String> nodeDao;
 	Dao<SyncChange, String> syncChangeDao;
 	Dao<SyncLog, String> syncLogDao;
-	Dao<Property, String> propertyDao;
+	Dao<Property, Integer> propertyDao;
 	
 	
 	private String currentJobNodeID;
@@ -163,6 +173,13 @@ public class SyncJob implements InterruptableJob {
 
 	}
 	
+	protected void updateRunningStatus(Integer status){
+		if(currentRepository != null && propertyDao != null){
+			currentRepository.setProperty("sync_running_status", status.toString(), propertyDao);
+			Manager.getInstance().updateSynchroState(currentJobNodeID, true);
+		}
+	}
+	
 	public void run() {
 				
 		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
@@ -176,14 +193,10 @@ public class SyncJob implements InterruptableJob {
 			
 			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
+			updateRunningStatus(RUNNING_STATUS_INITIALIZING);
 			if(currentRepository == null){
 				throw new Exception("The database returned an empty node.");
 			}
-			/*
-			if(this.exitWithStatus(Node.NODE_STATUS_LOADED)){
-				return;
-			}
-			*/
 
 			nodeDao.update(currentRepository);
 			Server s = new Server(currentRepository.getParent());
@@ -191,6 +204,7 @@ public class SyncJob implements InterruptableJob {
 			RestStateHolder.getInstance().setRepository(currentRepository);
 			AjxpAPI.getInstance().setServer(s);		
 			RestRequest rest = new RestRequest();
+			updateRunningStatus(RUNNING_STATUS_TESTING_CONNEXION);
 			if(!testConnexion(rest)){
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
 				return;
@@ -202,7 +216,7 @@ public class SyncJob implements InterruptableJob {
 	        //if(!localWatchOnly) {
 	        	//Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
 	        //}
-	
+			updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
 	    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
 	    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
 			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
@@ -212,10 +226,11 @@ public class SyncJob implements InterruptableJob {
 				return;
 			}
 			
+			updateRunningStatus(RUNNING_STATUS_LOCAL_CHANGES);
 			if(clearSnapshots) {
 				this.clearSnapshot("local_snapshot");
 				this.clearSnapshot("remote_snapshot");
-			}
+			}			
 			List<Node> localSnapshot = new ArrayList<Node>();
 			List<Node> remoteSnapshot = new ArrayList<Node>();
 			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);			
@@ -234,18 +249,20 @@ public class SyncJob implements InterruptableJob {
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
 				return;				
 			}
-			
+			updateRunningStatus(RUNNING_STATUS_REMOTE_CHANGES);
 			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 	
 			if(previousChanges.size() > 0){
+				updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
 				Logger.getRootLogger().debug("Getting previous tasks");
 				again = applyChanges(previousChanges);
 				syncChangeDao.delete(previouslyRemaining);
 				this.clearSnapshot("remaining_nodes");
 			}
-			
+			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
 	        Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
+	        updateRunningStatus(RUNNING_STATUS_APPLY_CHANGES);
 	        Map<String, Object[]> remainingChanges = applyChanges(changes);
 	        if(again != null && again.size() > 0){
 	        	remainingChanges.putAll(again);
@@ -276,8 +293,7 @@ public class SyncJob implements InterruptableJob {
 	        		syncChangeDao.create(c.get(i));
 	        	}
 	        }
-	        
-	        // handle DL / UP failed! 
+	        updateRunningStatus(RUNNING_STATUS_CLEANING);
 	        takeLocalSnapshot(localRootNode, null, true, localSnapshot);
 	        takeRemoteSnapshot(remoteRootNode, null, true);
 	        
@@ -324,6 +340,13 @@ public class SyncJob implements InterruptableJob {
 	        Manager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
 
+		}catch(InterruptedException ie){
+			
+	        Manager.getInstance().notifyUser("Stopping", "Last synchro was interrupted on user demand");
+	        try {
+				this.exitWithStatus(Node.NODE_STATUS_FRESH);
+			} catch (SQLException e) {}
+	        
 		}catch(Exception e){
 			
 			String message = e.getMessage();
@@ -822,8 +845,11 @@ public class SyncJob implements InterruptableJob {
 	    return str;
 	}	
 	
-	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save, List<Node> previousSnapshot) throws SQLException{
+	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save, List<Node> previousSnapshot) throws InterruptedException, SQLException{
 		
+		if(this.interruptRequired){
+			throw new InterruptedException("Interrupt required");
+		}
 		File[] children = directory.listFiles();
 		String[] start = Manager.getInstance().EXCLUDED_FILES_START;
 		String[] end = Manager.getInstance().EXCLUDED_FILES_END;
@@ -852,21 +878,23 @@ public class SyncJob implements InterruptableJob {
 			}else{				
 				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
 				String md5 = null;
+
 				if(previousSnapshot!=null){
-				Iterator<Node> it = previousSnapshot.iterator();
+					//Logger.getRootLogger().info("Searching node in previous snapshot for " + p);
+					Iterator<Node> it = previousSnapshot.iterator();					
 					while(it.hasNext()){
 						Node previous = it.next();
-						if(previous.getPath().equals(p)){
+						if(previous.getPath(true).equals(p)){
 							if(previous.getLastModified().equals(newNode.getLastModified()) && previous.getPropertyValue("bytesize").equals(newNode.getPropertyValue("bytesize"))){
 								md5 = previous.getPropertyValue("md5");
-								//Logger.getRootLogger().info("Getting md5 from previous snapshot");
+								//Logger.getRootLogger().info("-- Getting md5 from previous snapshot");
 							}
 							break;
 						}
 					}
 				}
 				if(md5 == null){
-					//Logger.getRootLogger().info("Computing new md5");
+					//Logger.getRootLogger().info("-- Computing new md5");
 					md5 = computeMD5(children[i]);
 				}
 				newNode.addProperty("md5", md5);
@@ -1074,13 +1102,20 @@ public class SyncJob implements InterruptableJob {
     	//final long filesize = totalSize; 
     	rest.setUploadProgressListener(new CountingMultipartRequestEntity.ProgressListener() {
 			private int previousPercent = 0;
+			private int currentPart = 0;
+			private int currentTotal = 1;
 			@Override
 			public void transferred(long num) throws IOException {
 				if(SyncJob.this.interruptRequired){
 					throw new IOException("Upload interrupted on demand");
 				}
-				int currentPercent =  (int) (num * 100 / totalSize); 
-				if(currentPercent > previousPercent){
+				int currentPercent =  (int) (num * 100 / totalSize);
+				if(this.currentTotal > 1){
+					long partsSize = totalSize / this.currentTotal;
+					currentPercent =  (int) ( ((partsSize*this.currentPart) + num) * 100 / totalSize );
+				}
+				currentPercent = Math.min(Math.max(currentPercent,0), 100);
+				if(currentPercent > previousPercent){					
 					logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " - "+currentPercent+"%");
 				}
 				previousPercent = currentPercent;
@@ -1088,14 +1123,21 @@ public class SyncJob implements InterruptableJob {
 			
 			@Override
 			public void partTransferred(int part, int total) throws IOException {
+				this.currentPart = part;
+				this.currentTotal = total;
 				if(SyncJob.this.interruptRequired){
 					throw new IOException("Upload interrupted on demand");
 				}
+				Logger.getRootLogger().info("PARTS " + " ["+(part+1)+"/"+total+"]");
 				logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " ["+(part+1)+"/"+total+"]");
 			}
 		});
     	String targetName = sourceFile.getName();
-    	rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName);
+    	try{
+    		rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName);
+    	}catch (IOException ex){
+    		if(this.interruptRequired) throw new InterruptedException();
+    	}
     	
     	return false;
 			          		
@@ -1205,6 +1247,9 @@ public class SyncJob implements InterruptableJob {
         out.flush();
     	if(out != null) out.close();
         if(in != null) in.close();
+        if(this.interruptRequired){
+        	throw new InterruptedException();
+        }
         
 	}
 	
