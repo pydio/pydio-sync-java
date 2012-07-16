@@ -203,9 +203,8 @@ public class SyncJob implements InterruptableJob {
 			RestStateHolder.getInstance().setServer(s);		
 			RestStateHolder.getInstance().setRepository(currentRepository);
 			AjxpAPI.getInstance().setServer(s);		
-			RestRequest rest = new RestRequest();
 			updateRunningStatus(RUNNING_STATUS_TESTING_CONNEXION);
-			if(!testConnexion(rest)){
+			if(!testConnexion()){
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
 				return;
 			}
@@ -358,16 +357,20 @@ public class SyncJob implements InterruptableJob {
 		}
 	}
 	
-	protected boolean testConnexion(RestRequest rest){		
+	protected boolean testConnexion(){
+		RestRequest rest = new RestRequest();
 		try {
 			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
 		} catch (URISyntaxException e) {
 			Logger.getRootLogger().error("Synchro", e);
+			rest.release();
 			return false;
 		} catch (Exception e) {
 			Logger.getRootLogger().error("Synchro", e);
+			rest.release();
 			return false;
 		}
+		rest.release();
 		return true;
 	}
 	
@@ -483,9 +486,14 @@ public class SyncJob implements InterruptableJob {
 						// Silently ignore, or it will continously try to reupload it.
 						continue;
 					}
-					boolean checked = this.synchronousUP(currentDirectory, sourceFile, n);
+					boolean checked = false;
+					if(sourceFile.length() == 0){
+						rest.getStringContent(AjxpAPI.getInstance().getMkfileUri(sourceFile.getName()));
+					}else{
+						checked = this.synchronousUP(currentDirectory, sourceFile, n);
+					}
 					if(!checked){
-						JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(k));
+						JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(n.getPath(true)));
 						if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
 							throw new Exception("Could not upload file to the server");
 						}
@@ -537,7 +545,7 @@ public class SyncJob implements InterruptableJob {
 						value[0] = TASK_LOCAL_GET_CONTENT;
 						value[1] = dest;
 						value[2] = STATUS_TODO;						
-						notApplied.put(k, value);
+						notApplied.put(dest.getPath(true), value);
 						continue;
 					}
 					File destFile = new File(currentLocalFolder, dest.getPath());
@@ -556,7 +564,7 @@ public class SyncJob implements InterruptableJob {
 						value[0] = TASK_REMOTE_PUT_CONTENT;
 						value[1] = dest;
 						value[2] = STATUS_TODO;
-						notApplied.put(k, value);
+						notApplied.put(dest.getPath(true), value);
 						continue;
 					}
 					rest.getStatusCodeForRequest(AjxpAPI.getInstance().getRenameUri(n, dest));
@@ -633,7 +641,7 @@ public class SyncJob implements InterruptableJob {
 				notApplied.put(k, value);
 			}				
 		}		
-				
+		rest.release();
 		return notApplied;
 	}
 	
@@ -850,6 +858,7 @@ public class SyncJob implements InterruptableJob {
 		if(this.interruptRequired){
 			throw new InterruptedException("Interrupt required");
 		}
+		//Logger.getRootLogger().info("Searching "+directory.getAbsolutePath());
 		File[] children = directory.listFiles();
 		String[] start = Manager.getInstance().EXCLUDED_FILES_START;
 		String[] end = Manager.getInstance().EXCLUDED_FILES_END;
@@ -904,6 +913,13 @@ public class SyncJob implements InterruptableJob {
 			if(accumulator != null){
 				accumulator.add(newNode);
 			}
+			long totalMemory = Runtime.getRuntime().totalMemory();
+			long currentMemory = Runtime.getRuntime().freeMemory();
+			long percent = (currentMemory * 100 / totalMemory);
+			//Logger.getRootLogger().info( percent + "%");
+			if(percent <= 5) {
+				//System.gc();
+			}
 		}
 		
 	}
@@ -918,6 +934,7 @@ public class SyncJob implements InterruptableJob {
 		URI uri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode);
 		Document d = r.getDocumentContent(uri);
 		//this.logDocument(d);
+		r.release();
 		
 		final NodeList entries = d.getDocumentElement().getChildNodes();
 		if(entries != null && entries.getLength() > 0){
@@ -1081,6 +1098,7 @@ public class SyncJob implements InterruptableJob {
 					RestRequest rest = new RestRequest();
 					logChange(Manager.getMessage("job_log_updelta"), sourceFile.getName());
 					String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
+					rest.release();
 					deltaFile.delete();
 					//String localMD5 = (folderNode)
 					if(patchedFileMd5.trim().equals(SyncJob.computeMD5(sourceFile))){
@@ -1136,9 +1154,12 @@ public class SyncJob implements InterruptableJob {
     	try{
     		rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName);
     	}catch (IOException ex){
-    		if(this.interruptRequired) throw new InterruptedException();
+    		if(this.interruptRequired) {
+    			rest.release();
+    			throw new InterruptedException();
+    		}
     	}
-    	
+    	rest.release();
     	return false;
 			          		
 	}
@@ -1248,9 +1269,10 @@ public class SyncJob implements InterruptableJob {
     	if(out != null) out.close();
         if(in != null) in.close();
         if(this.interruptRequired){
+        	rest.release();
         	throw new InterruptedException();
         }
-        
+        rest.release();        
 	}
 	
 	public static String computeMD5(File f){

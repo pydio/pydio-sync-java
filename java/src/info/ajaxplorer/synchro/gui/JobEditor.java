@@ -293,7 +293,7 @@ public class JobEditor extends Composite{
 					RestRequest rest = new RestRequest();
 					rest.getHttpClient().clearCookies();
 					Document doc = rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
-					
+					rest.release();
 					NodeList mainTag = doc.getElementsByTagName("repositories");
 					if(mainTag.getLength() == 0){
 						throw new Exception("No repositories found");
