@@ -6,7 +6,6 @@ import info.ajaxplorer.synchro.SyncJob;
 
 import java.sql.SQLException;
 import java.text.DateFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Locale;
