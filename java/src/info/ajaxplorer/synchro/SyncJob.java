@@ -813,6 +813,7 @@ public class SyncJob implements InterruptableJob {
 	protected void cleanDB() throws SQLException{
 		// unlinked properties may have not been deleted
 		propertyDao.executeRaw("DELETE FROM b WHERE node_id=0");
+		propertyDao.executeRaw("VACUUM");
 	}
 	
 	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save, final List<Node> previousSnapshot) throws Exception{
