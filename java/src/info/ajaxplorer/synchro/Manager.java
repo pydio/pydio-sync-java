@@ -23,6 +23,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.apache.log4j.Logger;
 import org.eclipse.swt.SWT;
@@ -82,6 +84,7 @@ public class Manager {
         String country = null;
         boolean daemon = false;
         RdiffProcessor proc=null ;
+        int deferInit = -1;
     	for(int i = 0; i < args.length ; i++){
         	if(args[i].startsWith("rdiff=")){
         		String path = args[i].substring(new String("rdiff=").length());
@@ -103,6 +106,8 @@ public class Manager {
         		Manager.defaultHome = defHome;
         	}else if(args[i].startsWith("daemon=")){
         		daemon = args[i].substring(new String("daemon=").length()).equals("true");
+        	}else if(args[i].startsWith("defer_init=")){
+        		deferInit = Integer.valueOf(args[i].substring(new String("defer_init=").length()));
         	}else if(args[i].startsWith("lang=")){
         		language = args[i].substring(new String("lang=").length());
         	}else if(args[i].startsWith("country=")){
@@ -144,7 +149,18 @@ public class Manager {
 		Logger.getRootLogger().info("Rdiff Processor active? " + (proc.rdiffEnabled()?"Yes" :"No"));
 		Manager.instanciate(shell, currentLocale, daemon);
 		Manager.getInstance().setRdiffProc(proc);
-		Manager.getInstance().initScheduler();
+		if(deferInit > 0 ){
+			Timer t = new Timer();
+			t.schedule(new TimerTask() {
+				
+				@Override
+				public void run() {
+					Manager.getInstance().initScheduler();
+				}
+			}, 1000*deferInit);
+		}else{
+			Manager.getInstance().initScheduler();			
+		}
 
 		if(Manager.instance.firstRun){
 			Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
@@ -155,8 +171,7 @@ public class Manager {
 		while (!shell.isDisposed ()) {
 			if (!display.readAndDispatch ()) display.sleep ();
 		}
-		display.dispose ();
-		
+		display.dispose ();		
 		
 	}
 	
