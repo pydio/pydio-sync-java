@@ -45,6 +45,7 @@ public class SysTray {
 	private JobEditor jobEditor;
 	private AboutPanel aboutPanel;
 	private boolean schedulerStateStarted = true;
+	private AnimationThread at;
 	
 	public void notifyUser(String title, String message){
 		if(!showNotifications || menu.isVisible()){
@@ -79,6 +80,7 @@ public class SysTray {
 		if(this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)){
 			this.currentStartItems.get(nodeId).setEnabled(!state);
 		}
+		this.setIconState(state?"running":"idle");
 	}
 	protected Image getImage(String name){
 		return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));
@@ -346,11 +348,11 @@ public class SysTray {
 		
 		final Tray tray = display.getSystemTray ();
 		//tip = new ToolTip(shell, SWT.BALLOON | SWT.ICON_INFORMATION);
+		boolean isMac = SWTResourceManager.isMac();
 		if (tray == null) {
 			Logger.getRootLogger().error("The system tray is not available");
 			item = null;			
 		} else {
-			boolean isMac = SWTResourceManager.isMac();
 			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
 
 			item = new TrayItem (tray, SWT.NONE);
@@ -394,6 +396,84 @@ public class SysTray {
 		shell.open ();
 		shell.setVisible(false);
 	}
+		
+	public void setIconState(String state){
+		boolean isMac = SWTResourceManager.isMac();
+		if(state.equals("running")){
+			if(at!=null && at.isAlive()){
+				return;
+			}
+			at = new AnimationThread();
+			at.delayedAnimation(item, 100, "AjxpLogo16-"+(isMac?"BW":"Bi")+"-Bouncing", 9);
+			at.start();					
+		}else if(state.equals("idle")){
+			Image restore = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
+			if(at!=null && at.isAlive()){
+				at.requireInterrupt = true;
+				at.restoreImage = restore;
+			}
+			item.setImage(restore);
+		}
+	}
+	
+	class AnimationThread extends Thread {
+		TrayItem item;
+		int delay;
+		String img;
+		int number;
+		int currentIndex = 0;
+		public boolean requireInterrupt = false;
+		public Image restoreImage;
+
+		public void delayedAnimation(TrayItem i, int delay, String imgRadical, int number) {
+			this.item = i;
+			this.delay = delay;
+			this.img = imgRadical;
+			this.number = number;
+		}
+
+		public Image getImage(){
+			if(currentIndex < number - 1){
+				currentIndex ++;
+			}else{
+				currentIndex = 0;
+			}
+			Image image = new Image(display, SysTray.this.getClass().getClassLoader().getResourceAsStream("images/"+this.img+"-"+currentIndex+".png"));
+			return image;
+		}
+		
+		public void run() {
+			while (true) {
+				try {
+					if(requireInterrupt){
+						interrupt();
+						if(restoreImage != null){
+							display.asyncExec(new Runnable() {						
+								public void run() {
+									if(!SysTray.this.isDisposed()){
+										item.setImage(restoreImage);
+									}
+								}
+							});							
+						}
+						return;
+					}
+					sleep(delay);
+					final Image im = getImage();
+					display.asyncExec(new Runnable() {						
+						public void run() {
+							if(!SysTray.this.isDisposed()){
+								item.setImage(im);
+							}
+						}
+					});
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}	
 	
 	public void disposeMe(){
 		image.dispose();
