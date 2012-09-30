@@ -40,7 +40,7 @@ public class SysTray {
 	//private MenuItem currentStateItem;
 	private HashMap<String, MenuItem> currentStateItems;
 	private HashMap<String, MenuItem> currentStartItems;
-	private boolean showNotifications = true;
+	private boolean showNotifications = false;
 	ResourceBundle messages;
 	private JobEditor jobEditor;
 	private AboutPanel aboutPanel;
@@ -131,27 +131,6 @@ public class SysTray {
 		Collection<Node> ns = managerInstance.listSynchroNodes();
 		boolean uniqMenu = (ns.size() < 2);
 		
-		MenuItem aboutM = new MenuItem (menu, SWT.PUSH);
-		aboutM.setText ( messages.getString("tray_menu_about") );
-		aboutM.setImage(getImage("infos"));
-		aboutM.addListener (SWT.Selection, new Listener () {
-			public void handleEvent (Event event) {
-				openAboutPane();
-			}
-		});
-		
-		if(!uniqMenu) new MenuItem(menu, SWT.SEPARATOR);		
-		
-		MenuItem createM = new MenuItem (menu, SWT.PUSH);
-		createM.setText ( messages.getString("cpanel_create_synchro") );
-		createM.setImage(getImage("add"));
-		createM.addListener (SWT.Selection, new Listener () {
-			public void handleEvent (Event event) {
-				openConfiguration(shell, null, "connexion");
-			}
-		});		
-		
-		if(uniqMenu) new MenuItem(menu, SWT.SEPARATOR);
 		this.currentStateItems = new HashMap<String, MenuItem>();
 		this.currentStartItems = new HashMap<String, MenuItem>();
 		
@@ -173,37 +152,13 @@ public class SysTray {
 				jobMenu = menu;
 			}
 			
-			MenuItem mi = new MenuItem (jobMenu, SWT.PUSH);
-			mi.setText ( messages.getString("jobeditor_stack_server") );
-			mi.setImage(getImage("network_local"));
-			final String nodeId = syncNode.id + "";
-			mi.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					openConfiguration(shell, nodeId, "connexion");
-				}
-			});
-			MenuItem mij2 = new MenuItem (jobMenu, SWT.PUSH);
-			mij2.setText ( messages.getString("jobeditor_stack_params") );
-			mij2.setImage(getImage("history"));
-			mij2.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					openConfiguration(shell, nodeId, "parameters");
-				}
-			});
-			MenuItem mij1 = new MenuItem (jobMenu, SWT.PUSH);
-			mij1.setText ( messages.getString("jobeditor_stack_logs") );
-			mij1.setImage(getImage("view_list_text"));
-			mij1.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					openConfiguration(shell, nodeId, "logs");
-				}
-			});
-						
-			new MenuItem(jobMenu, SWT.SEPARATOR);					
+			final String nodeId = syncNode.id + "";			
 			final boolean currentActiveState = syncNode.getPropertyValue("synchro_active").equals("true");
 			
 			MenuItem currentStateItem = new MenuItem(jobMenu, SWT.PUSH);			
 			currentStateItem.setText(this.computeSyncStatus(syncNode));
+			currentStateItem.setImage(getImage("transp"));
+			currentStateItem.setEnabled(false);
 			if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
 				jobMenu.setDefaultItem(currentStateItem);
 				currentStateItem.addListener (SWT.Selection, new Listener () {
@@ -251,7 +206,70 @@ public class SysTray {
 				}
 			});
 			
-			MenuItem mDel = new MenuItem(jobMenu, SWT.PUSH);			
+						
+			new MenuItem(jobMenu, SWT.SEPARATOR);
+
+			
+			MenuItem qaTrig = new MenuItem (jobMenu, SWT.CASCADE);
+			qaTrig.setText ("Quick access ...");
+			qaTrig.setImage(getImage("folder_home"));
+			
+			Menu qaMenu = new Menu(shell, SWT.DROP_DOWN);
+			qaTrig.setMenu(qaMenu);			
+			
+			MenuItem mI2 = new MenuItem(qaMenu, SWT.PUSH);
+			mI2.setText(messages.getString("tray_menu_openlocal"));
+			mI2.setImage(getImage("folder_home"));
+			mI2.setData(syncNode);
+			mI2.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					Manager.getInstance().openLocalTarget((Node)event.widget.getData());
+				}
+			});
+			
+			MenuItem mI3 = new MenuItem(qaMenu, SWT.PUSH);
+			mI3.setText(messages.getString("tray_menu_openremote"));
+			mI3.setImage(getImage("network_local"));
+			mI3.setData(syncNode);
+			mI3.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					Manager.getInstance().openRemoteTarget((Node)event.widget.getData());
+				}
+			});		
+			
+			MenuItem configTrig = new MenuItem (jobMenu, SWT.CASCADE);
+			configTrig.setText ("Task parameters ...");
+			configTrig.setImage(getImage("folder_home"));
+			
+			Menu configMenu = new Menu(shell, SWT.DROP_DOWN);
+			configTrig.setMenu(configMenu);	
+			
+			MenuItem mi = new MenuItem (configMenu, SWT.PUSH);
+			mi.setText ( messages.getString("jobeditor_stack_server") );
+			mi.setImage(getImage("network_local"));
+			mi.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId, "connexion");
+				}
+			});
+			MenuItem mij2 = new MenuItem (configMenu, SWT.PUSH);
+			mij2.setText ( messages.getString("jobeditor_stack_params") );
+			mij2.setImage(getImage("history"));
+			mij2.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId, "parameters");
+				}
+			});
+			MenuItem mij1 = new MenuItem (configMenu, SWT.PUSH);
+			mij1.setText ( messages.getString("jobeditor_stack_logs") );
+			mij1.setImage(getImage("view_list_text"));
+			mij1.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId, "logs");
+				}
+			});
+			
+			MenuItem mDel = new MenuItem(configMenu, SWT.PUSH);			
 			mDel.setText(Manager.getMessage("tray_menu_jobdelete"));
 			mDel.setImage(getImage("editdelete"));
 			mDel.setData(syncNode);
@@ -272,36 +290,27 @@ public class SysTray {
 					}
 				}
 			});
-						
-			new MenuItem(jobMenu, SWT.SEPARATOR);
-
-			MenuItem mI2 = new MenuItem(jobMenu, SWT.PUSH);
-			mI2.setText(messages.getString("tray_menu_openlocal"));
-			mI2.setImage(getImage("folder_home"));
-			mI2.setData(syncNode);
-			mI2.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					Manager.getInstance().openLocalTarget((Node)event.widget.getData());
-				}
-			});
 			
-			MenuItem mI3 = new MenuItem(jobMenu, SWT.PUSH);
-			mI3.setText(messages.getString("tray_menu_openremote"));
-			mI3.setImage(getImage("network_local"));
-			mI3.setData(syncNode);
-			mI3.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					Manager.getInstance().openRemoteTarget((Node)event.widget.getData());
-				}
-			});			
+						
+			
+			
 		}		
 		
 		new MenuItem(menu, SWT.SEPARATOR);
 
-		final MenuItem showNotifMenu = new MenuItem (menu, SWT.PUSH);
+		MenuItem generalTrig = new MenuItem (menu, SWT.CASCADE);
+		generalTrig.setText ("Configurations ...");
+		generalTrig.setImage(getImage("folder_home"));
+		
+		Menu generalMenu = new Menu(shell, SWT.DROP_DOWN);
+		generalTrig.setMenu(generalMenu);			
+		
+		final MenuItem showNotifMenu = new MenuItem (generalMenu, SWT.PUSH);
 		//showNotifMenu.setSelection(showNotifications);
 		if(showNotifications){
 			showNotifMenu.setImage(getImage("apply"));
+		}else{
+			showNotifMenu.setImage(getImage("apply-not"));
 		}
 		showNotifMenu.setText(messages.getString("tray_menu_notif"));
 		showNotifMenu.addListener (SWT.Selection, new Listener() {
@@ -310,8 +319,17 @@ public class SysTray {
 			}
 		});
 		
+		MenuItem createM = new MenuItem (generalMenu, SWT.PUSH);
+		createM.setText ( messages.getString("cpanel_create_synchro") );
+		createM.setImage(getImage("add"));
+		createM.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				openConfiguration(shell, null, "connexion");
+			}
+		});		
 		
-		MenuItem mAct = new MenuItem(menu, SWT.PUSH);			
+		
+		MenuItem mAct = new MenuItem(generalMenu, SWT.PUSH);			
 		mAct.setText( Manager.getMessage(schedulerStateStarted?"tray_menu_scheduler_pauseall":"tray_menu_scheduler_startall"));
 		mAct.setImage(getImage(schedulerStateStarted?"media_playback_pause":"media_playback_start"));
 		mAct.addListener (SWT.Selection, new Listener () {
@@ -328,6 +346,14 @@ public class SysTray {
 			}
 		});
 		
+		MenuItem aboutM = new MenuItem (generalMenu, SWT.PUSH);
+		aboutM.setText ( messages.getString("tray_menu_about") );
+		aboutM.setImage(getImage("infos"));
+		aboutM.addListener (SWT.Selection, new Listener () {
+			public void handleEvent (Event event) {
+				openAboutPane();
+			}
+		});
 		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
 		mi2.setText (Manager.getMessage("tray_menu_quit"));
