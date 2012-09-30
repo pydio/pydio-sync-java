@@ -155,7 +155,7 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	private void exitWithStatusAndNotify(int status, String titleId, String messageId) throws SQLException{
-		Manager.getInstance().notifyUser(Manager.getMessage(titleId), Manager.getMessage(messageId));
+		Manager.getInstance().notifyUser(Manager.getMessage(titleId), Manager.getMessage(messageId), this.currentJobNodeID);
 		exitWithStatus(status);
 	}
 	
@@ -341,7 +341,7 @@ public class SyncJob implements InterruptableJob {
 
 		}catch(InterruptedException ie){
 			
-	        Manager.getInstance().notifyUser("Stopping", "Last synchro was interrupted on user demand");
+	        Manager.getInstance().notifyUser("Stopping", "Last synchro was interrupted on user demand", this.currentJobNodeID);
 	        try {
 				this.exitWithStatus(Node.NODE_STATUS_FRESH);
 			} catch (SQLException e) {}
@@ -350,7 +350,7 @@ public class SyncJob implements InterruptableJob {
 			
 			String message = e.getMessage();
 			if(message == null && e.getCause() != null) message = e.getCause().getMessage();
-			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message);
+			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message, this.currentJobNodeID);
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
@@ -663,7 +663,7 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	protected void logChange(String action, String path){
-		Manager.getInstance().notifyUser(Manager.getMessage("job_log_balloontitle"), action+ " : "+path);
+		Manager.getInstance().notifyUser(Manager.getMessage("job_log_balloontitle"), action+ " : "+path, this.currentJobNodeID);
 	}
 	
 	protected boolean ignoreTreeConflict(Integer remoteChange, Integer localChange, Node remoteNode, Node localNode){

@@ -47,8 +47,15 @@ public class SysTray {
 	private boolean schedulerStateStarted = true;
 	private AnimationThread at;
 	
-	public void notifyUser(String title, String message){
-		if(!showNotifications || menu.isVisible()){
+	public void notifyUser(String title, String message, String nodeId){
+		String jobLabel = "";
+		if(nodeId != null){
+			Node n = Manager.getInstance().getSynchroNode(nodeId);
+			jobLabel = Manager.getInstance().makeJobLabel(n, true)+": ";
+		}
+		item.setToolTipText( jobLabel + title + " ("+message+")");
+		
+		if(!showNotifications || menu.isVisible()){			
 			return;
 		}
 		if(tip != null && tip.isVisible()) {
@@ -61,7 +68,7 @@ public class SysTray {
 		}
 		tip.setText(title);
 		tip.setMessage(message);
-		tip.setVisible(true);
+		tip.setVisible(true);		
 	}
 	
 	public boolean isDisposed(){
@@ -81,6 +88,8 @@ public class SysTray {
 			this.currentStartItems.get(nodeId).setEnabled(!state);
 		}
 		this.setIconState(state?"running":"idle");
+		Node n = Manager.getInstance().getSynchroNode(nodeId);
+		item.setToolTipText(Manager.getInstance().makeJobLabel(n, true)+": " + this.computeSyncStatus(n));
 	}
 	protected Image getImage(String name){
 		return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));
@@ -161,6 +170,7 @@ public class SysTray {
 			currentStateItem.setEnabled(false);
 			if(syncNode.getStatus() == Node.NODE_STATUS_ERROR){
 				jobMenu.setDefaultItem(currentStateItem);
+				currentStateItem.setEnabled(true);
 				currentStateItem.addListener (SWT.Selection, new Listener () {
 					public void handleEvent (Event event) {
 						openConfiguration(shell, nodeId, "logs");
@@ -450,12 +460,17 @@ public class SysTray {
 		int currentIndex = 0;
 		public boolean requireInterrupt = false;
 		public Image restoreImage;
+		Image[] images;
 
 		public void delayedAnimation(TrayItem i, int delay, String imgRadical, int number) {
 			this.item = i;
 			this.delay = delay;
 			this.img = imgRadical;
 			this.number = number;
+			images = new Image[10];
+			for(int ind=0;ind<this.number; ind++){
+				images[ind] = new Image(display, SysTray.this.getClass().getClassLoader().getResourceAsStream("images/"+this.img+"-"+ind+".png"));
+			}
 		}
 
 		public Image getImage(){
@@ -464,8 +479,8 @@ public class SysTray {
 			}else{
 				currentIndex = 0;
 			}
-			Image image = new Image(display, SysTray.this.getClass().getClassLoader().getResourceAsStream("images/"+this.img+"-"+currentIndex+".png"));
-			return image;
+			//Image image = new Image(display, SysTray.this.getClass().getClassLoader().getResourceAsStream("images/"+this.img+"-"+currentIndex+".png"));
+			return images[currentIndex];
 		}
 		
 		public void run() {

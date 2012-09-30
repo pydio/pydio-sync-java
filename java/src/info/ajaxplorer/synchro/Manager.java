@@ -64,6 +64,7 @@ public class Manager {
 	//private HashMap<String, WatchDir> watchers;
 	public static String defaultHome;
 	public boolean firstRun = false;
+	private boolean schedulerInitialized = false; 	
 	
 	public RdiffProcessor getRdiffProc() {
 		return rdiffProc;
@@ -191,7 +192,7 @@ public class Manager {
 		return Manager.instance;
 	}
 	
-	public void notifyUser(final String title, final String message){
+	public void notifyUser(final String title, final String message, final String nodeId){
 		if(this.sysTray == null) {
 			Logger.getRootLogger().info("No systray - message was " + message);
 			return;
@@ -200,7 +201,7 @@ public class Manager {
 			
 			public void run() {
 				if(!sysTray.isDisposed()){
-					sysTray.notifyUser(title, message);
+					sysTray.notifyUser(title, message, nodeId);
 				}else{
 					Logger.getRootLogger().info("No systray - message was " + message);
 				}
@@ -272,7 +273,7 @@ public class Manager {
 	
 	public int close(){
 		try {
-			this.notifyUser(getMessage("notif_shuttingdown_title"), getMessage("notif_shuttingdown"));
+			this.notifyUser(getMessage("notif_shuttingdown_title"), getMessage("notif_shuttingdown"), null);
 			Set<JobKey> keys = scheduler.getJobKeys(GroupMatcher.jobGroupEquals("sync"));
 			Iterator<JobKey> it = keys.iterator();
 			while(it.hasNext()){
@@ -580,6 +581,9 @@ public class Manager {
 	}
 	
 	public Collection<Node> listSynchroNodes(){
+		if(!schedulerInitialized){
+			this.initScheduler();
+		}
 		ConnectionSource cSource = this.getConnection();
 		Collection<Node> n = new ArrayList<Node>();
 		try {
@@ -599,8 +603,10 @@ public class Manager {
 		}
 		return n;
 	}
-	
+		
 	protected void initScheduler(){
+		if(schedulerInitialized) return;
+		schedulerInitialized = true;
 		try {
 			Collection<Node> l = listSynchroNodes();
 			ConnectionSource cSource = this.getConnection();
