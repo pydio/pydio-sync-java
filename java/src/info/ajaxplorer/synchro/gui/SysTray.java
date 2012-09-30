@@ -404,7 +404,7 @@ public class SysTray {
 				return;
 			}
 			at = new AnimationThread();
-			at.delayedAnimation(item, 100, "AjxpLogo16-"+(isMac?"BW":"Bi")+"-Bouncing", 9);
+			at.delayedAnimation(item, 90, "AjxpLogo16-"+(isMac?"BW":"Bi")+"-Bouncing", 9);
 			at.start();					
 		}else if(state.equals("idle")){
 			Image restore = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
