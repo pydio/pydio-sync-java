@@ -47,7 +47,7 @@ public class SysTray {
 	private boolean schedulerStateStarted = true;
 	private AnimationThread at;
 	
-	public void notifyUser(String title, String message, String nodeId){
+	public void notifyUser(String title, String message, String nodeId, boolean forceDisplay){
 		String jobLabel = "";
 		if(nodeId != null){
 			Node n = Manager.getInstance().getSynchroNode(nodeId);
@@ -55,7 +55,7 @@ public class SysTray {
 		}
 		item.setToolTipText( jobLabel + title + " ("+message+")");
 		
-		if(!showNotifications || menu.isVisible()){			
+		if( (!showNotifications && !forceDisplay ) || menu.isVisible()){			
 			return;
 		}
 		if(tip != null && tip.isVisible()) {
@@ -129,6 +129,7 @@ public class SysTray {
 				syncStatus = messages.getString("tray_menu_status_na");
 			}
 		}
+		//Logger.getRootLogger().info("-- Status : " + syncNode.id + " ==> " + syncNode.getPropertyValue("sync_running_status"));
 		return syncStatus;
 	}
 	
@@ -221,8 +222,8 @@ public class SysTray {
 
 			
 			MenuItem qaTrig = new MenuItem (jobMenu, SWT.CASCADE);
-			qaTrig.setText ("Quick access ...");
-			qaTrig.setImage(getImage("folder_home"));
+			qaTrig.setText (messages.getString("tray_menu_quick"));
+			qaTrig.setImage(getImage("go_jump"));
 			
 			Menu qaMenu = new Menu(shell, SWT.DROP_DOWN);
 			qaTrig.setMenu(qaMenu);			
@@ -248,8 +249,8 @@ public class SysTray {
 			});		
 			
 			MenuItem configTrig = new MenuItem (jobMenu, SWT.CASCADE);
-			configTrig.setText ("Task parameters ...");
-			configTrig.setImage(getImage("folder_home"));
+			configTrig.setText (messages.getString("tray_menu_task_params"));
+			configTrig.setImage(getImage("configure"));
 			
 			Menu configMenu = new Menu(shell, SWT.DROP_DOWN);
 			configTrig.setMenu(configMenu);	
@@ -268,14 +269,6 @@ public class SysTray {
 			mij2.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					openConfiguration(shell, nodeId, "parameters");
-				}
-			});
-			MenuItem mij1 = new MenuItem (configMenu, SWT.PUSH);
-			mij1.setText ( messages.getString("jobeditor_stack_logs") );
-			mij1.setImage(getImage("view_list_text"));
-			mij1.addListener (SWT.Selection, new Listener () {
-				public void handleEvent (Event event) {
-					openConfiguration(shell, nodeId, "logs");
 				}
 			});
 			
@@ -301,6 +294,14 @@ public class SysTray {
 				}
 			});
 			
+			MenuItem mij1 = new MenuItem (jobMenu, SWT.PUSH);
+			mij1.setText ( messages.getString("jobeditor_stack_logs") );
+			mij1.setImage(getImage("view_list_text"));
+			mij1.addListener (SWT.Selection, new Listener () {
+				public void handleEvent (Event event) {
+					openConfiguration(shell, nodeId, "logs");
+				}
+			});
 						
 			
 			
@@ -309,8 +310,8 @@ public class SysTray {
 		new MenuItem(menu, SWT.SEPARATOR);
 
 		MenuItem generalTrig = new MenuItem (menu, SWT.CASCADE);
-		generalTrig.setText ("Configurations ...");
-		generalTrig.setImage(getImage("folder_home"));
+		generalTrig.setText (messages.getString("tray_menu_preferences"));
+		generalTrig.setImage(getImage("parameters"));
 		
 		Menu generalMenu = new Menu(shell, SWT.DROP_DOWN);
 		generalTrig.setMenu(generalMenu);			
@@ -367,7 +368,7 @@ public class SysTray {
 		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
 		mi2.setText (Manager.getMessage("tray_menu_quit"));
-		mi2.setImage(getImage("system_log_out"));
+		mi2.setImage(getImage("exit"));
 		mi2.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				int res = Manager.getInstance().close();

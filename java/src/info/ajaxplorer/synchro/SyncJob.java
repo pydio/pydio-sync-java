@@ -155,7 +155,11 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	private void exitWithStatusAndNotify(int status, String titleId, String messageId) throws SQLException{
-		Manager.getInstance().notifyUser(Manager.getMessage(titleId), Manager.getMessage(messageId), this.currentJobNodeID);
+		Manager.getInstance().notifyUser(
+				Manager.getMessage(titleId), 
+				Manager.getMessage(messageId), 
+				this.currentJobNodeID, 
+				(status == Node.NODE_STATUS_ERROR) );
 		exitWithStatus(status);
 	}
 	
@@ -172,17 +176,21 @@ public class SyncJob implements InterruptableJob {
 		return true;
 
 	}
-	
-	protected void updateRunningStatus(Integer status){
+
+	protected void updateRunningStatus(Integer status, boolean running){
 		if(currentRepository != null && propertyDao != null){
 			currentRepository.setProperty("sync_running_status", status.toString(), propertyDao);
 			Manager.getInstance().updateSynchroState(currentJobNodeID, true);
 		}
 	}
 	
+	protected void updateRunningStatus(Integer status){
+		updateRunningStatus(status, true);
+	}
+	
 	public void run() {
 				
-		Manager.getInstance().updateSynchroState(currentJobNodeID, true);
+		Manager.getInstance().updateSynchroState(currentJobNodeID, (localWatchOnly? false:true));
 		try{
 			// instantiate the daos
 			ConnectionSource connectionSource = Manager.getInstance().getConnection();
@@ -193,7 +201,7 @@ public class SyncJob implements InterruptableJob {
 			
 			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
-			updateRunningStatus(RUNNING_STATUS_INITIALIZING);
+			updateRunningStatus(RUNNING_STATUS_INITIALIZING, (localWatchOnly? false:true));
 			if(currentRepository == null){
 				throw new Exception("The database returned an empty node.");
 			}
@@ -203,19 +211,13 @@ public class SyncJob implements InterruptableJob {
 			RestStateHolder.getInstance().setServer(s);		
 			RestStateHolder.getInstance().setRepository(currentRepository);
 			AjxpAPI.getInstance().setServer(s);		
-			updateRunningStatus(RUNNING_STATUS_TESTING_CONNEXION);
-			if(!testConnexion()){
-				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
-				return;
-			}
-			
 			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 			direction = currentRepository.getPropertyValue("synchro_direction");
 	
 	        //if(!localWatchOnly) {
 	        	//Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
 	        //}
-			updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
+			updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES, (localWatchOnly? false:true));
 	    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
 	    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
 			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
@@ -225,7 +227,7 @@ public class SyncJob implements InterruptableJob {
 				return;
 			}
 			
-			updateRunningStatus(RUNNING_STATUS_LOCAL_CHANGES);
+			updateRunningStatus(RUNNING_STATUS_LOCAL_CHANGES, (localWatchOnly? false:true));
 			if(clearSnapshots) {
 				this.clearSnapshot("local_snapshot");
 				this.clearSnapshot("remote_snapshot");
@@ -235,19 +237,22 @@ public class SyncJob implements InterruptableJob {
 			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);			
 			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
 			
-			if(localWatchOnly && localDiff.size() == 0){
-				this.exitWithStatus(Node.NODE_STATUS_LOADED);
-				//Logger.getRootLogger().info(" >> Nothing changed locally, exiting");
-				return;				
-			}
-			if(localWatchOnly){
-				// If we are here, then we must have detected some changes
-	        	// Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
-			}
 			if(unsolvedConflicts){
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
 				return;				
 			}
+			if(localWatchOnly && localDiff.size() == 0){
+				this.exitWithStatus(Node.NODE_STATUS_LOADED);
+				return;				
+			}
+			
+			// If we are here, then we must have detected some changes
+			updateRunningStatus(RUNNING_STATUS_TESTING_CONNEXION);
+			if(!testConnexion()){
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
+				return;
+			}
+			
 			updateRunningStatus(RUNNING_STATUS_REMOTE_CHANGES);
 			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
@@ -350,7 +355,7 @@ public class SyncJob implements InterruptableJob {
 			
 			String message = e.getMessage();
 			if(message == null && e.getCause() != null) message = e.getCause().getMessage();
-			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message, this.currentJobNodeID);
+			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message, this.currentJobNodeID, true);
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
@@ -501,6 +506,8 @@ public class SyncJob implements InterruptableJob {
 					countFilesUploaded ++;
 					
 				}else if(v == TASK_DO_NOTHING && value[2] == STATUS_CONFLICT){
+					
+					// Recheck that it's a real conflict?
 					
 					this.logChange(Manager.getMessage("job_log_conflict"), k);
 					notApplied.put(k, value);

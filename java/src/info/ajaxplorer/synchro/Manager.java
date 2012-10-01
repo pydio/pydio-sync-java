@@ -192,7 +192,7 @@ public class Manager {
 		return Manager.instance;
 	}
 	
-	public void notifyUser(final String title, final String message, final String nodeId){
+	public void notifyUser(final String title, final String message, final String nodeId, final boolean forceDisplay){
 		if(this.sysTray == null) {
 			Logger.getRootLogger().info("No systray - message was " + message);
 			return;
@@ -201,12 +201,16 @@ public class Manager {
 			
 			public void run() {
 				if(!sysTray.isDisposed()){
-					sysTray.notifyUser(title, message, nodeId);
+					sysTray.notifyUser(title, message, nodeId, forceDisplay);
 				}else{
 					Logger.getRootLogger().info("No systray - message was " + message);
 				}
 			}
-		});
+		});		
+	}
+	
+	public void notifyUser(final String title, final String message, final String nodeId){
+		notifyUser(title, message, nodeId, false);
 	}
 	
 	public void updateSynchroState(final String nodeId, final boolean running){
@@ -394,6 +398,7 @@ public class Manager {
 			node.addProperty("synchro_active", data.get("ACTIVE"));
 			node.addProperty("synchro_direction", data.get("DIRECTION"));
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
+			node.addProperty("sync_running_status", "-1");
 			nDao.update(node);
 			try {
 				this.scheduleJob(node);
@@ -559,7 +564,11 @@ public class Manager {
 			s = s.replace("LOCAL", f.getName());			
 		}
 		if(node.getPropertyValue("synchro_active").equals("false")){
-			s = s + " (inactive)";
+			s = s + " - " + getMessage("sync_short_status_inactive");
+		}else if(node.getStatus() == Node.NODE_STATUS_LOADING){
+			s = s + " - " + getMessage("sync_short_status_running");
+		}else if(node.getStatus() == Node.NODE_STATUS_ERROR){
+			s = s + " - " + getMessage("sync_short_status_error");
 		}
 		return s.toString();
 	}
