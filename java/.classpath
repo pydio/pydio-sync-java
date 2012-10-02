@@ -3,7 +3,6 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="res"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/Java Ajxp Client"/>
 	<classpathentry kind="lib" path="F:/EclispeAndroidWorkspace/httpcomponents-client-4.1.2/lib/commons-logging-1.1.1.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/ormlite-jdbc-4.31.jar"/>
 	<classpathentry kind="lib" path="G:/DEV/JARS/ormlite-core-4.31.jar"/>
@@ -26,5 +25,6 @@
 	<classpathentry kind="lib" path="G:/DEV/JARS/commons-daemon-1.0.10/commons-daemon-1.0.10.jar"/>
 	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.nebula.widgets.gallery_0.5.3.201205011846.jar"/>
 	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.nebula.widgets.gallery.source_0.5.3.201205011846.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ajaxplorer-sdk-java"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
