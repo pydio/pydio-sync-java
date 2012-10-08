@@ -17,6 +17,7 @@ Select the appropriate installer in the download page, it should install everyth
 
 * Windows : XP, Vista 7, 32 or 64 bits should be automatically detected
 * Mac OS : Tested on 10.7.4, but will be more dependant on the java version probably.
+* Linux : Not yet supported, should be quite straightforward to launch as it's nothing more than a Jar, but lately problems where found with the SWT SystemTray used not being displayed on Ubuntu.
 
 Java Runtime Environnement must be at least 1.6 ( = "Java 6"), see http://java.com/
 The Windows installer is based on a test version of Advanced Installer, thus it will trigger an alarm on install and uninstall, you can safely ignore this.
