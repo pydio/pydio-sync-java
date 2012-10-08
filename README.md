@@ -4,7 +4,7 @@ Please be aware that the application is not yet considered totally stable, thus 
 
 ## Server requirements : v4.2.0+ & PHP rsync extension
 
-It is not mandatory, but to get a low bandwith consumption, you should enable the use of the rsync algorithm on the server. This is done by installating the *PECL Rsync extension* (http://pecl.php.net/package/rsync), that interfaces PHP with the librsync functions (namely rdiff and all its declinaisons). This is not so easy to install, but was currently successfully tested on Debian 6. Please report (by creating a "Feature" issue) if you could successfully install it on other distributions. 
+It is not mandatory, but to get a low bandwith consumption, you should enable the use of the rsync algorithm on the server. This is done by installating the *PECL Rsync extension* (http://pecl.php.net/package/rsync), that interfaces PHP with the librsync functions (namely rdiff and all its declinaisons). This is not so easy to install, but was currently successfully tested on Debian 6, CentOS5 and CentOS6. Please report (by creating a "Feature" issue) if you could successfully install it on other distributions. 
 Windows Server users, we will add some link to rdiff.exe , but it's not done yet.
 
 Once this is installed, make sure that the repository has the "Meta Source" *meta.filehasher* enabled.
