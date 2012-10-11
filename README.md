@@ -14,6 +14,7 @@ This extension will probably made optional in the next release, but it is not au
 ## Client installation 
 
 Installers Downloads will be made available on Sourceforge, please go to https://sourceforge.net/projects/ajaxplorer/files/
+
 Select the appropriate installer it should install everything needed on your computer :
 
 * Windows : XP, Vista 7, 32 or 64 bits should be automatically detected
