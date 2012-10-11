@@ -32,3 +32,7 @@ At first start, the client will open a dialog for creating a synchronization tas
 * *User* & *Password* : AjaXplorer user name & password
 * *Repository* : once the previous fields are filled, click on the "load" button to get the list of repositories from the server, and select the one you want to synchronize
 * *Local folder* : If not already pre-filled, browse your computer and choose the folder to which it will be synchronized.
+
+## Rsync & Rdiff
+
+We the network delta minimisation relies on the Librsync project (LGPL), the source can be found on Sourceforge : https://sourceforge.net/projects/librsync/
