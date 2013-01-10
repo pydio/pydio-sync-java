@@ -112,7 +112,11 @@ public class SysTray {
 		item.setToolTipText(Manager.getInstance().makeJobLabel(n, true)+": " + this.computeSyncStatus(n));
 	}
 	protected Image getImage(String name){
-		return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));
+		try{
+			return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));			
+		}catch(Exception e){
+			return null;
+		}
 	}
 	public void refreshJobsMenu(){
 		refreshJobsMenu(Manager.getInstance());

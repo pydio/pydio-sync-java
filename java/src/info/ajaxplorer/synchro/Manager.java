@@ -37,6 +37,7 @@ import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -180,8 +181,24 @@ public class Manager {
 				}
 			}, 1000*deferInit);
 		}else{
-			Manager.getInstance().initScheduler();			
+			Manager.getInstance().initScheduler();
+			/*
+			Map<String, String> headers = new HashMap<String, String>();
+			headers.put("Ajxp-User", "admin");
+			headers.put("Ajxp-Password", "admin");
+			AjxpWebSocket awS = new AjxpWebSocket(URI.create("ws://192.168.0.18:8090/ajaxplorer"), headers);
+			Thread t = new Thread(awS);
+			t.start();
+			try {
+				t.join();
+			} catch ( InterruptedException e1 ) {
+				e1.printStackTrace();
+			} finally {
+				awS.close();
+			}			
+			*/
 		}
+		
 
 		if(Manager.instance.firstRun){
 			Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
@@ -591,6 +608,17 @@ public class Manager {
 			s = s + " - " + getMessage("sync_short_status_error");
 		}
 		return s.toString();
+	}
+	
+	public Node getSynchroNode(String nodeId, Dao<Node, String> nDao){
+		try {
+			Node n = nDao.queryForId(nodeId);
+			n.setParent(nDao.queryForId(String.valueOf(n.getParent().id)));
+			return n;
+		} catch (SQLException e) {
+			Logger.getRootLogger().error("Synchro", e);
+			return null;
+		}		
 	}
 	
 	public Node getSynchroNode(String nodeId){

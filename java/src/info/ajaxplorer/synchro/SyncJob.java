@@ -21,7 +21,9 @@
 package info.ajaxplorer.synchro;
 
 import info.ajaxplorer.client.http.AjxpAPI;
+import info.ajaxplorer.client.http.AjxpHttpClient;
 import info.ajaxplorer.client.http.CountingMultipartRequestEntity;
+import info.ajaxplorer.client.http.MessageListener;
 import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
@@ -59,6 +61,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import javax.naming.AuthenticationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
@@ -167,6 +170,46 @@ public class SyncJob implements InterruptableJob {
 		interruptRequired = true;
 	}
 	
+	private MessageListener messageHandler;
+	
+	protected RestRequest getRequest(){
+		RestRequest rest = new RestRequest();
+		if(messageHandler == null){
+			
+			messageHandler = new MessageListener() {
+				private boolean interrupt = false;
+				@Override
+				public void sendMessage(int what, Object obj) {
+					if(what == MessageListener.MESSAGE_WHAT_ERROR && obj instanceof String){
+						String mess;
+						try{
+							mess = Manager.getMessage((String)obj);
+						}catch(Exception ex){
+							mess = (String) obj;
+						}
+						Manager.getInstance().notifyUser(
+								(String) obj, 
+								mess, 
+								SyncJob.this.currentJobNodeID, 
+								true );						
+					}
+				}
+				
+				@Override
+				public void requireInterrupt() {
+					this.interrupt = true;
+				}
+				
+				@Override
+				public boolean isInterruptRequired() {
+					return this.interrupt;
+				}
+			};
+			
+		}
+		rest.setHandler(messageHandler);		
+		return rest;
+	}
 	
 	public SyncJob() throws URISyntaxException, Exception{
 		
@@ -196,15 +239,15 @@ public class SyncJob implements InterruptableJob {
 		return true;
 
 	}
-
-	protected void updateRunningStatus(Integer status, boolean running){
+	
+	protected void updateRunningStatus(Integer status, boolean running) throws SQLException{
 		if(currentRepository != null && propertyDao != null){
 			currentRepository.setProperty("sync_running_status", status.toString(), propertyDao);
 			Manager.getInstance().updateSynchroState(currentJobNodeID, true);
 		}
 	}
 	
-	protected void updateRunningStatus(Integer status){
+	protected void updateRunningStatus(Integer status) throws SQLException{
 		updateRunningStatus(status, true);
 	}
 	
@@ -212,6 +255,7 @@ public class SyncJob implements InterruptableJob {
 				
 		Manager.getInstance().updateSynchroState(currentJobNodeID, (localWatchOnly? false:true));
 		try{
+			AjxpHttpClient.clearCookiesStatic();
 			// instantiate the daos
 			ConnectionSource connectionSource = Manager.getInstance().getConnection();
 			nodeDao = DaoManager.createDao(connectionSource, Node.class);				
@@ -219,13 +263,19 @@ public class SyncJob implements InterruptableJob {
 			syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
 			propertyDao = DaoManager.createDao(connectionSource, Property.class);
 			
-			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID);
-			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
-			updateRunningStatus(RUNNING_STATUS_INITIALIZING, (localWatchOnly? false:true));
+			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID, nodeDao);
 			if(currentRepository == null){
 				throw new Exception("The database returned an empty node.");
 			}
 
+			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
+			try{
+				updateRunningStatus(RUNNING_STATUS_INITIALIZING, (localWatchOnly? false:true));
+			}catch(SQLException sE){
+				Thread.sleep(100);
+				System.out.println("RETRYING AFTER 100ms");
+				updateRunningStatus(RUNNING_STATUS_INITIALIZING, (localWatchOnly? false:true));
+			}
 			nodeDao.update(currentRepository);
 			Server s = new Server(currentRepository.getParent());
 			RestStateHolder.getInstance().setServer(s);		
@@ -238,7 +288,7 @@ public class SyncJob implements InterruptableJob {
 	        	//Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
 	        //}
 			updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES, (localWatchOnly? false:true));
-	    	List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
+	    	final List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
 	    	Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
 			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(previouslyRemaining, previousChanges);
 			Map<String, Object[]> again = null;
@@ -268,7 +318,9 @@ public class SyncJob implements InterruptableJob {
 			
 			// If we are here, then we must have detected some changes
 			updateRunningStatus(RUNNING_STATUS_TESTING_CONNEXION);
-			if(!testConnexion()){
+			try{
+				testConnexion();
+			}catch(Exception e){
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
 				return;
 			}
@@ -281,7 +333,19 @@ public class SyncJob implements InterruptableJob {
 				updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
 				Logger.getRootLogger().debug("Getting previous tasks");
 				again = applyChanges(previousChanges);
-				syncChangeDao.delete(previouslyRemaining);
+				if(previouslyRemaining.size() > 999){
+					syncChangeDao.callBatchTasks(new Callable<Void>() {
+						public Void call() throws Exception{
+							for(int i=0; i< previouslyRemaining.size();i++){
+								syncChangeDao.delete(previouslyRemaining.get(i));
+							}
+							return null;						
+						}
+					});
+
+				}else{
+					syncChangeDao.delete(previouslyRemaining);
+				}
 				this.clearSnapshot("remaining_nodes");
 			}
 			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
@@ -373,27 +437,30 @@ public class SyncJob implements InterruptableJob {
 	        
 		}catch(Exception e){
 			
+			e.printStackTrace();
 			String message = e.getMessage();
 			if(message == null && e.getCause() != null) message = e.getCause().getMessage();
-			Manager.getInstance().notifyUser("Error", "An error occured during synchronization:"+message, this.currentJobNodeID, true);
+			Manager.getInstance().notifyUser("Error", "An error occured during synchronization: "+message, this.currentJobNodeID, true);
 	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
 	        Manager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
 		}
 	}
 	
-	protected boolean testConnexion(){
-		RestRequest rest = new RestRequest();
+	protected boolean testConnexion() throws Exception{
+		RestRequest rest = this.getRequest();
 		try {
 			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
-		} catch (URISyntaxException e) {
-			Logger.getRootLogger().error("Synchro", e);
-			rest.release();
-			return false;
+		} catch (AuthenticationException e){
+			
+			if(e.getMessage().equals(RestRequest.AUTH_ERROR_LOCKEDOUT)){
+				
+			}
+			
 		} catch (Exception e) {
 			Logger.getRootLogger().error("Synchro", e);
 			rest.release();
-			return false;
+			throw e;
 		}
 		rest.release();
 		return true;
@@ -406,7 +473,7 @@ public class SyncJob implements InterruptableJob {
 		// Make sure to apply those one at the end
 		Map<String, Object[]> moves = new TreeMap<String, Object[]>();
 		Map<String, Object[]> deletes = new TreeMap<String, Object[]>();
-		RestRequest rest = new RestRequest();
+		RestRequest rest = this.getRequest();
 		while(it.hasNext()){
 			Map.Entry<String, Object[]> entry = it.next();
 			String k = entry.getKey();
@@ -458,7 +525,9 @@ public class SyncJob implements InterruptableJob {
 						else throw e;
 					}
 					if(!targetFile.exists() || targetFile.length() != Integer.parseInt(n.getPropertyValue("bytesize"))){
-						throw new Exception("Error while downloading file from server");
+						JSONObject obj = this.statRemoteFile(node, "file", rest);
+						if(obj == null || obj.get("size").equals(0)) continue;
+						else throw new Exception("Error while downloading file from server");
 					}
 					if(n!=null){
 						targetFile.setLastModified(n.getLastModified().getTime());
@@ -519,7 +588,7 @@ public class SyncJob implements InterruptableJob {
 					}
 					if(!checked){
 						JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(n.getPath(true)));
-						if(!object.has("size") || object.getInt("size") != Integer.parseInt(n.getPropertyValue("bytesize"))){
+						if(!object.has("size") || object.getInt("size") != (int)sourceFile.length()){
 							throw new Exception("Could not upload file to the server");
 						}
 					}
@@ -731,6 +800,7 @@ public class SyncJob implements InterruptableJob {
 					localDiff.remove(k);
 					continue;
 				}else{				
+					
 					value[0] = TASK_DO_NOTHING;
 					value[2] = STATUS_CONFLICT;
 					localDiff.remove(k);				
@@ -849,7 +919,15 @@ public class SyncJob implements InterruptableJob {
 			public Void call() throws Exception{
 				if(save){
 					nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
-					nodeDao.delete(rootNode.children);
+					int test = rootNode.children.size();
+					if(test > 999){
+						Iterator<Node> i = rootNode.children.iterator();
+						while(i.hasNext()){
+							nodeDao.delete(i.next());
+						}
+					}else{
+						nodeDao.delete(rootNode.children);
+					}
 				}
 				listDirRecursive(currentLocalFolder, rootNode, accumulator, save, previousSnapshot);
 				return null;
@@ -932,6 +1010,7 @@ public class SyncJob implements InterruptableJob {
 				}
 				if(md5 == null){
 					//Logger.getRootLogger().info("-- Computing new md5");
+					Manager.getInstance().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
 					md5 = computeMD5(children[i]);
 				}
 				newNode.addProperty("md5", md5);
@@ -955,10 +1034,23 @@ public class SyncJob implements InterruptableJob {
 	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception{
 		
 		if(save){
-			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
-			nodeDao.delete(rootNode.children);
+			nodeDao.callBatchTasks(new Callable<Void>() {
+				public Void call() throws Exception{
+					nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+					int test = rootNode.children.size();
+					if(test > 999){
+						Iterator<Node> i = rootNode.children.iterator();
+						while(i.hasNext()){
+							nodeDao.delete(i.next());
+						}
+					}else{
+						nodeDao.delete(rootNode.children);
+					}
+					return null;
+				}
+			});			
 		}
-		RestRequest r = new RestRequest();
+		RestRequest r = this.getRequest();
 		URI uri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode);
 		Document d = r.getDocumentContent(uri);
 		//this.logDocument(d);
@@ -1113,6 +1205,7 @@ public class SyncJob implements InterruptableJob {
 			try{
 				this.uriContentToFile(AjxpAPI.getInstance().getFilehashSignatureUri(remoteNode), signatureFile, null);
 				remoteHasSignature = true;
+				
 			}catch(IllegalStateException e){				
 			}
 			if(remoteHasSignature && signatureFile.exists() && signatureFile.length() > 0){
@@ -1123,7 +1216,7 @@ public class SyncJob implements InterruptableJob {
 				signatureFile.delete();
 				if(deltaFile.exists()){
 					// Send back to server
-					RestRequest rest = new RestRequest();
+					RestRequest rest = this.getRequest();
 					logChange(Manager.getMessage("job_log_updelta"), sourceFile.getName());
 					String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
 					rest.release();
@@ -1142,7 +1235,7 @@ public class SyncJob implements InterruptableJob {
 			throw new FileNotFoundException("Cannot find file :" + sourceFile.getAbsolutePath());
 		}
 		Logger.getRootLogger().info("Uploading " + totalSize + " bytes");
-    	RestRequest rest = new RestRequest();
+    	RestRequest rest = this.getRequest();
     	// Ping to make sure the user is logged
     	rest.getStatusCodeForRequest(AjxpAPI.getInstance().getAPIUri());
     	//final long filesize = totalSize; 
@@ -1208,7 +1301,13 @@ public class SyncJob implements InterruptableJob {
 			sigFile.delete();
 			// apply patch to a tmp version
 			File patched = new File(targetFile.getParent(), targetFile.getName()+".patched");
-			proc.patch(targetFile, delta, patched);
+			if(delta.length() > 0){
+				proc.patch(targetFile, delta, patched);				
+			}
+			if(!patched.exists()){
+				this.synchronousDL(node, targetFile);	
+				return;
+			}
 			delta.delete();
 			// check md5
 			if(remoteNode != null && remoteNode.getPropertyValue("md5") != null && remoteNode.getPropertyValue("md5").equals(SyncJob.computeMD5(patched))){
@@ -1243,13 +1342,17 @@ public class SyncJob implements InterruptableJob {
 	
 	protected void uriContentToFile(URI uri, File targetFile, File uploadFile) throws Exception{
 
-    	RestRequest rest = new RestRequest();
+    	RestRequest rest = this.getRequest();
         int postedProgress = 0;
         int buffersize = 16384;
         int count = 0;
         HttpEntity entity = rest.getNotConsumedResponseEntity(uri, null, uploadFile);
 		long fullLength = entity.getContentLength();
-		Logger.getRootLogger().info("Downloaded " + fullLength + " bytes");
+		if(fullLength <= 0){
+	        rest.release();        
+	        return;
+		}
+		Logger.getRootLogger().info("Downloading " + fullLength + " bytes");			
 		
 		InputStream input = entity.getContent();
 		BufferedInputStream in = new BufferedInputStream(input,buffersize);
