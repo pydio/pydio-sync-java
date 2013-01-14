@@ -61,7 +61,6 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import javax.naming.AuthenticationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
@@ -318,10 +317,7 @@ public class SyncJob implements InterruptableJob {
 			
 			// If we are here, then we must have detected some changes
 			updateRunningStatus(RUNNING_STATUS_TESTING_CONNEXION);
-			try{
-				testConnexion();
-			}catch(Exception e){
-				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
+			if(!testConnexion()){
 				return;
 			}
 			
@@ -447,20 +443,21 @@ public class SyncJob implements InterruptableJob {
 		}
 	}
 	
-	protected boolean testConnexion() throws Exception{
+	protected boolean testConnexion() throws SQLException{
 		RestRequest rest = this.getRequest();
+		rest.throwAuthExceptions = true;
 		try {
 			rest.getStringContent(AjxpAPI.getInstance().getPingUri());
-		} catch (AuthenticationException e){
-			
-			if(e.getMessage().equals(RestRequest.AUTH_ERROR_LOCKEDOUT)){
-				
-			}
-			
 		} catch (Exception e) {
-			Logger.getRootLogger().error("Synchro", e);
+			if(e.getMessage().equals(RestRequest.AUTH_ERROR_LOCKEDOUT)){
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "auth_login_failed", "auth_locked_out_msg");				
+			}else if(e.getMessage().equals(RestRequest.AUTH_ERROR_LOGIN_FAILED)){
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "auth_login_failed", "auth_login_failed_msg");
+			}else{
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_LOADED, "no_internet_title", "no_internet_msg");
+			}
 			rest.release();
-			throw e;
+			return false;
 		}
 		rest.release();
 		return true;
@@ -514,6 +511,7 @@ public class SyncJob implements InterruptableJob {
 				
 				if(v == TASK_LOCAL_GET_CONTENT){
 					
+					if(direction.equals("up")) continue;
 					Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					node.setPath(k);
 					File targetFile = new File(currentLocalFolder, k);
@@ -531,11 +529,12 @@ public class SyncJob implements InterruptableJob {
 					}
 					if(n!=null){
 						targetFile.setLastModified(n.getLastModified().getTime());
-					}
+					}					
 					countFilesDownloaded++;
 					
 				}else if(v == TASK_LOCAL_MKDIR){
 					
+					if(direction.equals("up")) continue;
 					File f = new File(currentLocalFolder, k);
 					if(!f.exists()) {
 						this.logChange(Manager.getMessage("job_log_mkdir"), k);
@@ -548,14 +547,17 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_LOCAL_REMOVE){
 					
+					if(direction.equals("up")) continue;
 					deletes.put(k, value);
 					
 				}else if(v == TASK_REMOTE_REMOVE){
 					
+					if(direction.equals("down")) continue;
 					deletes.put(k, value);
 									
 				}else if(v == TASK_REMOTE_MKDIR){
 					
+					if(direction.equals("down")) continue;
 					this.logChange(Manager.getMessage("job_log_mkdir_remote"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
@@ -570,6 +572,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_REMOTE_PUT_CONTENT){
 	
+					if(direction.equals("down")) continue;
 					this.logChange(Manager.getMessage("job_log_uploading"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
@@ -603,6 +606,8 @@ public class SyncJob implements InterruptableJob {
 					countConflictsDetected ++;
 					
 				}else if(v == TASK_LOCAL_MOVE_FILE || v == TASK_REMOTE_MOVE_FILE){
+					if(v == TASK_LOCAL_MOVE_FILE && direction.equals("up")) continue;
+					if(v == TASK_REMOTE_MOVE_FILE && direction.equals("down")) continue;
 					moves.put(k, value);
 				}
 			}catch(FileNotFoundException ex){
@@ -913,21 +918,45 @@ public class SyncJob implements InterruptableJob {
 		propertyDao.executeRaw("VACUUM");
 	}
 	
-	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save, final List<Node> previousSnapshot) throws Exception{
-			
-		nodeDao.callBatchTasks(new Callable<Void>() {
-			public Void call() throws Exception{
-				if(save){
-					nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+	protected void emptyNodeChildren(final Node rootNode, boolean insideBatchTask) throws Exception{
+		if(rootNode.children == null || rootNode.children.size() == 0) return;
+		final int SQLITE_LIMIT = 999;
+		if(insideBatchTask){
+			nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+			int test = rootNode.children.size();
+			if(test > SQLITE_LIMIT){
+				Iterator<Node> i = rootNode.children.iterator();
+				while(i.hasNext()){
+					nodeDao.delete(i.next());
+				}
+			}else{
+				nodeDao.delete(rootNode.children);
+			}
+		}else{
+			nodeDao.callBatchTasks(new Callable<Void>() {
+				public Void call() throws Exception{
 					int test = rootNode.children.size();
-					if(test > 999){
+					if(test > SQLITE_LIMIT){
 						Iterator<Node> i = rootNode.children.iterator();
 						while(i.hasNext()){
 							nodeDao.delete(i.next());
 						}
 					}else{
 						nodeDao.delete(rootNode.children);
-					}
+					}	
+					return null;
+				}
+			});
+		}
+		
+	}
+	
+	protected void takeLocalSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save, final List<Node> previousSnapshot) throws Exception{
+			
+		nodeDao.callBatchTasks(new Callable<Void>() {
+			public Void call() throws Exception{
+				if(save){
+					emptyNodeChildren(rootNode, true);
 				}
 				listDirRecursive(currentLocalFolder, rootNode, accumulator, save, previousSnapshot);
 				return null;
@@ -1034,21 +1063,7 @@ public class SyncJob implements InterruptableJob {
 	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception{
 		
 		if(save){
-			nodeDao.callBatchTasks(new Callable<Void>() {
-				public Void call() throws Exception{
-					nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
-					int test = rootNode.children.size();
-					if(test > 999){
-						Iterator<Node> i = rootNode.children.iterator();
-						while(i.hasNext()){
-							nodeDao.delete(i.next());
-						}
-					}else{
-						nodeDao.delete(rootNode.children);
-					}
-					return null;
-				}
-			});			
+			emptyNodeChildren(rootNode, false);
 		}
 		RestRequest r = this.getRequest();
 		URI uri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode);
@@ -1076,9 +1091,9 @@ public class SyncJob implements InterruptableJob {
 		root.setPath("/");
 		final ArrayList<Node> list = new ArrayList<Node>();
 		takeRemoteSnapshot(root, list, false);
-		
+
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
-		//Logger.getRootLogger().info(diff);
+		Logger.getRootLogger().info(diff);
 		return diff;
 	}
 	
@@ -1114,7 +1129,8 @@ public class SyncJob implements InterruptableJob {
 				if(s.getPath(true).equals(c.getPath(true))){
 					found = true;
 					if(c.isLeaf()){// FILE : compare date & size
-						if(c.getLastModified().after(s.getLastModified()) || !c.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize")) ){
+						if(( c.getLastModified().after(s.getLastModified()) || !c.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize")))
+								&& (c.getPropertyValue("md5") == null || s.getPropertyValue("md5") == null || !s.getPropertyValue("md5").equals(c.getPropertyValue("md5"))) ){							
 							diff.put(c.getPath(true), makeTodoObject(NODE_CHANGE_STATUS_MODIFIED, c));
 						}
 					}
