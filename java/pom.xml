@@ -14,7 +14,7 @@
         <id>argeo-repo</id>
         <url>http://repo.argeo.org/data/public/java/org.argeo.tp-1.4.x/</url>
     </repository>
-    
+   
     <repository>
 	    <id>repo</id>
 	    <releases>
@@ -24,7 +24,7 @@
 	    <snapshots>
 	        <enabled>true</enabled>
 	    </snapshots>
-	    <url>file://${project.basedir}/in-repo</url>
+	    <url>file://${project.basedir}/lig/repo</url>
 	</repository>    
 </repositories>
   <build>
