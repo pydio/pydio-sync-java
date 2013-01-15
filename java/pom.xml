@@ -5,6 +5,9 @@
   <version>0.8.3-SNAPSHOT</version>
   <name>Ajaxplorer Synchronizer</name>
   <description>Multiplatform synchronization client for AjaXplorer</description>
+  <properties>
+  	<swt.jar_suffix>3.100.0.v4233d</swt.jar_suffix>
+  </properties>
   <repositories>
     <repository>
         <id>swt-repo</id>
@@ -80,6 +83,31 @@
                     </execution>
                 </executions>
         </plugin>
+		<plugin>
+			<artifactId>maven-assembly-plugin</artifactId>
+			<version>2.3</version>
+				<configuration>
+				<descriptors>
+				<descriptor>assembly.xml</descriptor>
+				</descriptors>
+			</configuration>
+			<executions>
+				<execution>
+					<phase>install</phase>
+					<goals>
+						<goal>single</goal>
+					</goals>
+					<configuration>
+						<descriptors>
+							<descriptor>assembly.xml</descriptor>
+						</descriptors>
+						<finalName>ajaxplorer_sync-${version}-${project.activeProfiles[0].id}</finalName>
+						<appendAssemblyId>false</appendAssemblyId>
+					</configuration>
+				</execution>
+			</executions>			
+		</plugin>
+        
     </plugins>
     <pluginManagement>
     	<plugins>
@@ -150,28 +178,13 @@
   		<artifactId>commons-daemon</artifactId>
   		<version>1.0.10</version>
   	</dependency>  	
-  	<!-- 
-  	<dependency>
-  		<groupId>org.eclipse.swt</groupId>
-  		<artifactId>org.eclipse.swt.win32.win32.x86</artifactId>
-  		<version>4.2.1</version>
-  	</dependency>  	
-  	<dependency>
-  		<groupId>org.argeo.tp.rcp.platform</groupId>
-  		<artifactId>org.eclipse.jface</artifactId>
-  		<version>3.6.2.M20110210-1200</version>
-  	</dependency>
-  	<dependency>
-  		<groupId>org.argeo.tp.rcp.platform</groupId>
-  		<artifactId>org.eclipse.ui.forms</artifactId>
-  		<version>3.5.2.r36_v20100702</version>
-  	</dependency>
-  	<dependency>
-  		<groupId>org.argeo.tp.rcp.platform</groupId>
-  		<artifactId>org.eclipse.core.commands</artifactId>
-  		<version>3.6.0.I20100512-1500</version>
-  	</dependency>
-  	-->
+	<dependency>
+		<groupId>org.eclipse.swt</groupId>
+		<artifactId>swt</artifactId>
+		<version>1.0.0</version>
+		<scope>system</scope>
+		<systemPath>${basedir}/lib/swt/${swt.version}</systemPath>
+	</dependency>  	
   	<dependency>
   		<groupId>org.slf4j</groupId>
   		<artifactId>slf4j-log4j12</artifactId>
@@ -203,4 +216,105 @@
   		<version>3.5</version>
   	</dependency>
   </dependencies>
+  <profiles>
+  	<profile>
+  		<id>win_x86</id>
+        <build><directory>${project.basedir}/target/win_x86</directory></build>  			
+  		<properties>
+  			<swt.version>org.eclipse.swt.win32.win32.x86_${swt.jar_suffix}.jar</swt.version>
+  			<zip.suffix>win_x86</zip.suffix>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>win_x86_64</id>
+        <build><directory>${project.basedir}/target/win_x86_64</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.win32.win32.x86_64_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>macos_x86</id>
+        <build><directory>${project.basedir}/target/macos_x86</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.cocoa.macosx_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>macos_x86_64</id>
+        <build><directory>${project.basedir}/target/macos_x86_64</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.cocoa.macosx.x86_64_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>aix_ppc</id>
+        <build><directory>${project.basedir}/target/aix_ppc</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.aix.ppc_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>aix_ppx64</id>
+        <build><directory>${project.basedir}/target/aix_ppc64</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.aix.ppc64_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>hpux64</id>
+        <build><directory>${project.basedir}/target/hpux64</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.hpux.ia64_32_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>linux_ppc64</id>
+        <build><directory>${project.basedir}/target/linux_ppc64</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.linux.ppc64_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>linux_390</id>
+        <build><directory>${project.basedir}/target/linux_390</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.linux.s390_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>gtk_390x</id>
+        <build><directory>${project.basedir}/target/gtk_390x</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.linux.s390x_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>linux_x86</id>
+        <build><directory>${project.basedir}/target/linux_x86</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.linux.x86_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>linux_x86_64</id>
+        <build><directory>${project.basedir}/target/linux_x86_64</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.linux.x86_64_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>solaris_sparc</id>
+        <build><directory>${project.basedir}/target/solaris_spark</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.solaris.sparc_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  	<profile>
+  		<id>solaris_x86</id>
+        <build><directory>${project.basedir}/target/solaris_x86</directory></build> 
+  		<properties>
+  			<swt.version>org.eclipse.swt.gtk.solaris.x86_${swt.jar_suffix}.jar</swt.version>
+  		</properties>  		
+  	</profile>
+  </profiles>
 </project>
