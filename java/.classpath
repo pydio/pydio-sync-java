@@ -1,30 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="src" path="res"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
-	<classpathentry kind="lib" path="F:/EclispeAndroidWorkspace/httpcomponents-client-4.1.2/lib/commons-logging-1.1.1.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/ormlite-jdbc-4.31.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/ormlite-core-4.31.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/h2-1.3.164.jar"/>
-	<classpathentry kind="lib" path="F:/EclispeAndroidWorkspace/httpcomponents-client-4.1.2/lib/httpmime-4.1.2.jar"/>
-	<classpathentry kind="lib" path="F:/EclispeAndroidWorkspace/httpcomponents-client-4.1.2/lib/httpcore-4.1.2.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/QUARTZ/quartz-2.1.3/quartz-all-2.1.3.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/QUARTZ/quartz-2.1.3/lib/c3p0-0.9.1.1.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/QUARTZ/quartz-2.1.3/lib/slf4j-log4j12-1.6.1.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/QUARTZ/quartz-2.1.3/lib/slf4j-api-1.6.1.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/QUARTZ/quartz-2.1.3/lib/log4j-1.2.16.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/SWT/swt.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/json-rpc-1.0.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/sqlite-jdbc-3.6.20.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/commons-codec-1.6/commons-codec-1.6.jar"/>
-	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.ui.forms_3.5.100.v20110425.jar"/>
-	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.jface_3.7.0.I20110522-1430.jar"/>
-	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.equinox.common_3.6.0.v20110523.jar"/>
-	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.core.commands_3.6.0.I20110111-0800.jar"/>
-	<classpathentry kind="lib" path="G:/DEV/JARS/commons-daemon-1.0.10/commons-daemon-1.0.10.jar"/>
-	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.nebula.widgets.gallery_0.5.3.201205011846.jar"/>
-	<classpathentry kind="lib" path="C:/Program Files/aaaUtils/eclipse-3.7.1/plugins/org.eclipse.nebula.widgets.gallery.source_0.5.3.201205011846.jar"/>
+	<classpathentry including="**/*.java" kind="src" output="target/classes" path="src">
+		<attributes>
+			<attribute name="optional" value="true"/>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry including="**/*.java" kind="src" path="res"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/ajaxplorer-sdk-java"/>
-	<classpathentry kind="output" path="bin"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="embedded/java_websocket.jar"/>
+	<classpathentry kind="lib" path="embedded/org.eclipse.nebula.widgets.gallery_0.5.3.201205011846.jar"/>
+	<classpathentry kind="lib" path="embedded/org.eclipse.nebula.widgets.gallery.source_0.5.3.201205011846.jar"/>
+	<classpathentry kind="output" path="target/classes"/>
 </classpath>
