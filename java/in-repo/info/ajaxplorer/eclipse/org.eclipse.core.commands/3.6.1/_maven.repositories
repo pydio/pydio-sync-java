@@ -1,0 +1,4 @@
+#NOTE: This is an internal implementation file, its format can be changed without prior notice.
+#Tue Jan 15 22:01:42 CET 2013
+org.eclipse.core.commands-3.6.1.jar>=
+org.eclipse.core.commands-3.6.1.pom>=

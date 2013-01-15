@@ -1,0 +1,4 @@
+#NOTE: This is an internal implementation file, its format can be changed without prior notice.
+#Tue Jan 15 21:59:31 CET 2013
+org.eclipse.equinox.common-3.6.pom>=
+org.eclipse.equinox.common-3.6.jar>=
