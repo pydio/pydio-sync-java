@@ -18,8 +18,5 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="embedded/java_websocket.jar"/>
-	<classpathentry kind="lib" path="embedded/org.eclipse.nebula.widgets.gallery_0.5.3.201205011846.jar"/>
-	<classpathentry kind="lib" path="embedded/org.eclipse.nebula.widgets.gallery.source_0.5.3.201205011846.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

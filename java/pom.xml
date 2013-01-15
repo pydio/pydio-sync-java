@@ -14,16 +14,17 @@
         <id>argeo-repo</id>
         <url>http://maven.argeo.org/argeo/</url>
     </repository>
-  <repository>
-    <id>indigo</id>
-    <layout>p2</layout>
-    <url>http://download.eclipse.org/releases/indigo</url>
-  </repository>
-  <repository>
-   <id>nebula</id>
-   <layout>p2</layout>
-   <url>http://download.eclipse.org/technology/nebula/snapshot/</url>
-  </repository>
+    <repository>
+	    <id>repo</id>
+	    <releases>
+	        <enabled>true</enabled>
+	        <checksumPolicy>ignore</checksumPolicy>
+	    </releases>
+	    <snapshots>
+	        <enabled>false</enabled>
+	    </snapshots>
+	    <url>file://${project.basedir}/in-repo</url>
+	</repository>    
 </repositories>
   <build>
     <sourceDirectory>src</sourceDirectory>
@@ -50,7 +51,68 @@
           <target>1.6</target>
         </configuration>
       </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.4</version>
+        <configuration>
+          <archive>
+            <manifest>
+               <addClasspath>true</addClasspath>
+               <classpathPrefix>lib/</classpathPrefix>
+               <mainClass>info.ajaxplorer.synchro.Manager</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>      
+		<plugin>
+            <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                    	<id>copy</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+        </plugin>
     </plugins>
+    <pluginManagement>
+    	<plugins>
+    		<!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+    		<plugin>
+    			<groupId>org.eclipse.m2e</groupId>
+    			<artifactId>lifecycle-mapping</artifactId>
+    			<version>1.0.0</version>
+    			<configuration>
+    				<lifecycleMappingMetadata>
+    					<pluginExecutions>
+    						<pluginExecution>
+    							<pluginExecutionFilter>
+    								<groupId>
+    									org.apache.maven.plugins
+    								</groupId>
+    								<artifactId>
+    									maven-dependency-plugin
+    								</artifactId>
+    								<versionRange>[2.1,)</versionRange>
+    								<goals>
+    									<goal>copy-dependencies</goal>
+    								</goals>
+    							</pluginExecutionFilter>
+    							<action>
+    								<ignore></ignore>
+    							</action>
+    						</pluginExecution>
+    					</pluginExecutions>
+    				</lifecycleMappingMetadata>
+    			</configuration>
+    		</plugin>
+    	</plugins>
+    </pluginManagement>
   </build>
   <organization>
   	<name>Abstrium SAS</name>
@@ -116,6 +178,11 @@
   		<groupId>org.slf4j</groupId>
   		<artifactId>slf4j-log4j12</artifactId>
   		<version>1.6.1</version>
+  	</dependency>
+  	<dependency>
+  		<groupId>org.eclipse.nebula</groupId>
+  		<artifactId>nebula</artifactId>
+  		<version>0.5.3</version>
   	</dependency>
   </dependencies>
 </project>
