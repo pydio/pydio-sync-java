@@ -7,17 +7,17 @@
   <description>Multiplatform synchronization client for AjaXplorer</description>
   <properties>
   	<swt.jar_suffix>3.100.0.v4233d</swt.jar_suffix>
+  	<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <repositories>
-    <repository>
+    <repository>    
         <id>swt-repo</id>
         <url>https://swt-repo.googlecode.com/svn/repo/</url>
     </repository>
     <repository>
         <id>argeo-repo</id>
         <url>http://repo.argeo.org/data/public/java/org.argeo.tp-1.4.x/</url>
-    </repository>
-   
+    </repository>   
     <repository>
 	    <id>repo</id>
 	    <releases>
@@ -27,7 +27,7 @@
 	    <snapshots>
 	        <enabled>true</enabled>
 	    </snapshots>
-	    <url>file://${project.basedir}/lig/repo</url>
+	    <url>file://${project.basedir}/lib/repo</url>
 	</repository>    
 </repositories>
   <build>
@@ -67,7 +67,7 @@
             </manifest>
           </archive>
         </configuration>
-      </plugin>      
+      </plugin>            
 		<plugin>
             <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
@@ -83,6 +83,25 @@
                     </execution>
                 </executions>
         </plugin>
+		<plugin>
+		    <groupId>org.codehaus.gmaven</groupId>
+		    <artifactId>gmaven-plugin</artifactId>
+		   <executions>
+		        <execution>
+		            <phase>install</phase>
+		            <goals>
+		                <goal>execute</goal>
+		            </goals>
+		            <configuration>
+						<source>
+						    def server = settings.servers.find{ it.id.equals('ajaxplorer-nightly') }
+						    project.properties.srvuser = server.username
+						    project.properties.srvpass = server.password
+						</source>		    
+		            </configuration>
+		        </execution>
+		    </executions>			
+		</plugin>        
 		<plugin>
 			<artifactId>maven-assembly-plugin</artifactId>
 			<version>2.3</version>
@@ -101,13 +120,51 @@
 						<descriptors>
 							<descriptor>assembly.xml</descriptor>
 						</descriptors>
-						<finalName>ajaxplorer_sync-${version}-${project.activeProfiles[0].id}</finalName>
+						<finalName>ajaxplorer_sync-${project.version}-${project.activeProfiles[0].id}</finalName>
 						<appendAssemblyId>false</appendAssemblyId>
 					</configuration>
 				</execution>
 			</executions>			
 		</plugin>
-        
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.7</version>
+        <executions>
+          <execution>
+            <phase>install</phase>
+            <configuration>
+              <target>
+				<ftp server="ftp.ajaxplorer.info"
+					remotedir="dl/nightly/sync/${project.version}"
+					userid="${srvuser}"
+					password="${srvpass}"
+					depends="yes"
+					>
+					<fileset dir="${project.build.directory}">
+						<include name="*.zip" />
+					</fileset>
+					</ftp>
+              </target>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+        <dependencies>
+          <dependency>
+            <groupId>commons-net</groupId>
+            <artifactId>commons-net</artifactId>
+            <version>1.4.1</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.ant</groupId>
+            <artifactId>ant-commons-net</artifactId>
+            <version>1.8.1</version>
+          </dependency>
+        </dependencies>        
+      </plugin>
+              
     </plugins>
     <pluginManagement>
     	<plugins>
@@ -142,6 +199,14 @@
     		</plugin>
     	</plugins>
     </pluginManagement>
+    <extensions>
+      <!-- Enabling the use of FTP -->
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+         <artifactId>wagon-ftp</artifactId>
+         <version>1.0-beta-6</version>
+      </extension>
+    </extensions>    
   </build>
   <organization>
   	<name>Abstrium SAS</name>
@@ -183,7 +248,10 @@
 		<artifactId>swt</artifactId>
 		<version>1.0.0</version>
 		<scope>system</scope>
-		<systemPath>${basedir}/lib/swt/${swt.version}</systemPath>
+		<!-- REPLACE THIS LINE WHEN WORKING IN ECLIPSE
+		<systemPath>${basedir}/lib/swt/org.eclipse.swt.win32.win32.x86_${swt.jar_suffix}.jar</systemPath>
+		 -->
+		<systemPath>${project.basedir}/lib/swt/${swt.version}</systemPath>
 	</dependency>  	
   	<dependency>
   		<groupId>org.slf4j</groupId>
@@ -222,7 +290,6 @@
         <build><directory>${project.basedir}/target/win_x86</directory></build>  			
   		<properties>
   			<swt.version>org.eclipse.swt.win32.win32.x86_${swt.jar_suffix}.jar</swt.version>
-  			<zip.suffix>win_x86</zip.suffix>
   		</properties>  		
   	</profile>
   	<profile>
