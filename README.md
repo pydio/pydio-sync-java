@@ -31,7 +31,7 @@ The Windows installer is based on a test version of Advanced Installer, thus it 
 
 ## Installing from night builds
 
-The JAR's are built everynight, if you are invited by a team member to update them, you must first have the application originally installed with the installer, be it on Windows or Mac. Then you will find the correct package corresponding to your platform OS on http://ajaxplorer.info/downloads/ (tab "Nightly Builds"), download and unzip the content somewhere. 
+The JAR's are built everynight, if you are invited by a team member to update them, you must first have the application originally installed with the installer, be it on Windows or Mac. Then you will find the correct package corresponding to your platform OS on http://ajaxplorer.info/download/ (tab "Nightly Builds", section "Synchro Client Package"), download and unzip the content somewhere. 
 
 * On Mac, you have to right click the "AjaXplorer" application icon and select "Display package content", then browse to Contents / Resources / Java. 
 * On Windows, using windows Explorer, browse to the Abstrium > AjaXplorer-In-Sync program folder
