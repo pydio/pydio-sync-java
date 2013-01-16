@@ -29,6 +29,15 @@ Select the appropriate installer it should install everything needed on your com
 Java Runtime Environnement must be at least 1.6 ( = "Java 6"), see http://java.com/
 The Windows installer is based on a test version of Advanced Installer, thus it will trigger an alarm on install and uninstall, you can safely ignore this.
 
+## Installing from night builds
+
+The JAR's are built everynight, if you are invited by a team member to update them, you must first have the application originally installed with the installer, be it on Windows or Mac. Then you will find the correct package corresponding to your platform OS on http://ajaxplorer.info/downloads/ (tab "Nightly Builds"), download and unzip the content somewhere. 
+
+* On Mac, you have to right click the "AjaXplorer" application icon and select "Display package content", then browse to Contents / Resources / Java. 
+* On Windows, using windows Explorer, browse to the Abstrium > AjaXplorer-In-Sync program folder
+
+Now in both cases, backup the AjaXplorerSynchro.jar and AjaXplorerSynchro_lib folder, and replace them by the content of the zip. The new JAR will be named something like ajaxplorer-sync-X.Y.Z-SNAPSHOT.jar, rename it to AjaXplorerSynchro.jar. The folder should already have the right name. That's it.
+
 ## Configuring the client
 
 At first start, the client will open a dialog for creating a synchronization task. Fill in the form with the current values : 
@@ -42,7 +51,7 @@ At first start, the client will open a dialog for creating a synchronization tas
 
 ### Rsync & Rdiff
 
-We the network delta minimisation relies on the Librsync project (LGPL), the source can be found on Sourceforge : https://sourceforge.net/projects/librsync/
+The network delta minimisation relies on the Librsync project (LGPL), the source can be found on Sourceforge : https://sourceforge.net/projects/librsync/
 
 ### Quartz Scheduler
 
