@@ -63,7 +63,7 @@
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<classpathPrefix>lib/</classpathPrefix>
+							<classpathPrefix>AjaXplorerSynchro_lib/</classpathPrefix>
 							<mainClass>info.ajaxplorer.synchro.Manager</mainClass>
 						</manifest>
 					</archive>
@@ -79,7 +79,7 @@
 							<goal>copy-dependencies</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+							<outputDirectory>${project.build.directory}/AjaXplorerSynchro_lib</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>
