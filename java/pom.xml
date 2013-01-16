@@ -137,7 +137,7 @@
 						<configuration>
 							<target>
 								<ftp server="ftp.ajaxplorer.info" remotedir="dl/nightly/sync/${project.version}"
-									userid="${srvuser}" password="${srvpass}" depends="yes">
+									userid="${srvuser}" password="${srvpass}" depends="yes" passive="yes">
 									<fileset dir="${project.build.directory}">
 										<include name="*.zip" />
 									</fileset>
