@@ -243,12 +243,12 @@
 			<version>1.0.10</version>
 		</dependency>
 		<dependency>
-			<groupId>org.eclipse.swt</groupId>
-			<artifactId>swt</artifactId>
-			<version>1.0.0</version>
-			<scope>system</scope>
-			<!-- REPLACE THIS LINE WHEN WORKING IN ECLIPSE <systemPath>${basedir}/lib/swt/org.eclipse.swt.win32.win32.x86_${swt.jar_suffix}.jar</systemPath> -->
-			<systemPath>${project.basedir}/lib/swt/${swt.version}</systemPath>
+			<groupId>info.ajaxplorer.swt</groupId>
+			<!-- REPLACE THIS LINE WHEN WORKING IN ECLIPSE
+			<artifactId>org.eclipse.swt.win32.win32.x86</artifactId>
+			-->
+			<artifactId>${swt.version}</artifactId>
+			<version>4.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -288,7 +288,7 @@
 				<directory>${project.basedir}/target/win_x86</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.win32.win32.x86_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.win32.win32.x86</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -297,7 +297,7 @@
 				<directory>${project.basedir}/target/win_x86_64</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.win32.win32.x86_64_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.win32.win32.x86_64</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -306,7 +306,7 @@
 				<directory>${project.basedir}/target/macos_x86</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.cocoa.macosx_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.cocoa.macosx</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -315,7 +315,7 @@
 				<directory>${project.basedir}/target/macos_x86_64</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.cocoa.macosx.x86_64_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.cocoa.macosx.x86_64</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -324,7 +324,7 @@
 				<directory>${project.basedir}/target/aix_ppc</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.aix.ppc_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.aix.ppc</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -333,7 +333,7 @@
 				<directory>${project.basedir}/target/aix_ppc64</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.aix.ppc64_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.aix.ppc64</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -342,7 +342,7 @@
 				<directory>${project.basedir}/target/hpux64</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.hpux.ia64_32_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.hpux.ia64_32</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -351,7 +351,7 @@
 				<directory>${project.basedir}/target/linux_ppc64</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.linux.ppc64_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.linux.ppc64</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -360,7 +360,7 @@
 				<directory>${project.basedir}/target/linux_390</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.linux.s390_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.linux.s390</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -369,7 +369,7 @@
 				<directory>${project.basedir}/target/gtk_390x</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.linux.s390x_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.linux.s390x</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -378,7 +378,7 @@
 				<directory>${project.basedir}/target/linux_x86</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.linux.x86_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.linux.x86</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -387,7 +387,7 @@
 				<directory>${project.basedir}/target/linux_x86_64</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.linux.x86_64_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.linux.x86_64</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -396,7 +396,7 @@
 				<directory>${project.basedir}/target/solaris_spark</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.solaris.sparc_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.solaris.sparc</swt.version>
 			</properties>
 		</profile>
 		<profile>
@@ -405,7 +405,7 @@
 				<directory>${project.basedir}/target/solaris_x86</directory>
 			</build>
 			<properties>
-				<swt.version>org.eclipse.swt.gtk.solaris.x86_${swt.jar_suffix}.jar</swt.version>
+				<swt.version>org.eclipse.swt.gtk.solaris.x86</swt.version>
 			</properties>
 		</profile>
 	</profiles>
