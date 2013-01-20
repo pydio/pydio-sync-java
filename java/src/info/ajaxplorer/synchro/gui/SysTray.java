@@ -71,7 +71,7 @@ public class SysTray {
 		String jobLabel = "";
 		if(nodeId != null){
 			Node n = Manager.getInstance().getSynchroNode(nodeId);
-			jobLabel = Manager.getInstance().makeJobLabel(n, true)+": ";
+			if(n != null) jobLabel = Manager.getInstance().makeJobLabel(n, true)+": ";
 		}
 		item.setToolTipText( jobLabel + title + " ("+message+")");
 		
@@ -97,19 +97,19 @@ public class SysTray {
 	public Display getDisplay(){
 		return display;
 	}
-	public void setMenuTriggerRunning(String nodeId, boolean state){
+	public void setMenuTriggerRunning(Node node, boolean state){
+		String nodeId = String.valueOf(node.id);
 		if(this.jobEditor != null){
 			this.jobEditor.notifyJobStateChanged(nodeId, state);
 		}
 		if(this.menu.isVisible() && this.currentStateItems != null && this.currentStateItems.containsKey(nodeId)){
-			this.currentStateItems.get(nodeId).setText(this.computeSyncStatus(Manager.getInstance().getSynchroNode(nodeId)));
+			this.currentStateItems.get(nodeId).setText(this.computeSyncStatus(node));
 		}
 		if(this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)){
 			this.currentStartItems.get(nodeId).setEnabled(!state);
 		}
 		this.setIconState(state?"running":"idle");
-		Node n = Manager.getInstance().getSynchroNode(nodeId);
-		item.setToolTipText(Manager.getInstance().makeJobLabel(n, true)+": " + this.computeSyncStatus(n));
+		item.setToolTipText(Manager.getInstance().makeJobLabel(node, true)+": " + this.computeSyncStatus(node));
 	}
 	protected Image getImage(String name){
 		try{
@@ -125,6 +125,7 @@ public class SysTray {
 	protected String computeSyncStatus(Node syncNode){
 
 		String syncStatus = "";
+		if(syncNode == null) return syncStatus;
 		if(syncNode.getStatus() == Node.NODE_STATUS_LOADING){
 			syncStatus = messages.getString("tray_menu_status_running");
 			if(syncNode.getPropertyValue("sync_running_status") != null){
@@ -453,7 +454,7 @@ public class SysTray {
 			});
 			item.setImage (image);
 		}
-		shell.setBounds(0, 0, 0, 0);
+		shell.setBounds(-10, -10, 10, 10);
 		shell.open ();
 		shell.setVisible(false);
 	}

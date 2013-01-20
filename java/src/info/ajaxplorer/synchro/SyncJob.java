@@ -228,7 +228,7 @@ public class SyncJob implements InterruptableJob {
 	private boolean exitWithStatus(int status) throws SQLException{
 		currentRepository.setStatus(status);	        
 		nodeDao.update(currentRepository);
-        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+        Manager.getInstance().updateSynchroState(currentRepository, false);
         Manager.getInstance().releaseConnection();
         DaoManager.clearCache();
 		nodeDao = null;
@@ -242,7 +242,7 @@ public class SyncJob implements InterruptableJob {
 	protected void updateRunningStatus(Integer status, boolean running) throws SQLException{
 		if(currentRepository != null && propertyDao != null){
 			currentRepository.setProperty("sync_running_status", status.toString(), propertyDao);
-			Manager.getInstance().updateSynchroState(currentJobNodeID, true);
+			Manager.getInstance().updateSynchroState(currentRepository, true);
 		}
 	}
 	
@@ -252,7 +252,6 @@ public class SyncJob implements InterruptableJob {
 	
 	public void run() {
 				
-		Manager.getInstance().updateSynchroState(currentJobNodeID, (localWatchOnly? false:true));
 		try{
 			AjxpHttpClient.clearCookiesStatic();
 			// instantiate the daos
@@ -266,6 +265,7 @@ public class SyncJob implements InterruptableJob {
 			if(currentRepository == null){
 				throw new Exception("The database returned an empty node.");
 			}
+			Manager.getInstance().updateSynchroState(currentRepository, (localWatchOnly? false:true));
 
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
 			try{
@@ -420,7 +420,7 @@ public class SyncJob implements InterruptableJob {
 			sl.synchroNode = currentRepository;
 			syncLogDao.create(sl);
 			
-	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+	        Manager.getInstance().updateSynchroState(currentRepository, false);
 	        Manager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
 
@@ -437,7 +437,9 @@ public class SyncJob implements InterruptableJob {
 			String message = e.getMessage();
 			if(message == null && e.getCause() != null) message = e.getCause().getMessage();
 			Manager.getInstance().notifyUser("Error", "An error occured during synchronization: "+message, this.currentJobNodeID, true);
-	        Manager.getInstance().updateSynchroState(currentJobNodeID, false);
+			if(currentRepository != null){
+				Manager.getInstance().updateSynchroState(currentRepository, false);
+			}
 	        Manager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
 		}

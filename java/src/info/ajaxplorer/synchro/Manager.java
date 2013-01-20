@@ -249,7 +249,7 @@ public class Manager {
 		notifyUser(title, message, nodeId, false);
 	}
 	
-	public void updateSynchroState(final String nodeId, final boolean running){
+	public void updateSynchroState(final Node node, final boolean running){
 		if(running){
 			//this.stopWatcher(nodeId);
 		}else{
@@ -261,7 +261,7 @@ public class Manager {
 		this.sysTray.getDisplay().asyncExec(new Runnable() {			
 			public void run() {
 				if(!sysTray.isDisposed()){
-					sysTray.setMenuTriggerRunning(nodeId, running);
+					sysTray.setMenuTriggerRunning(node, running);
 				}
 			}
 		});
@@ -587,6 +587,7 @@ public class Manager {
 	}
 		
 	public String makeJobLabel(Node node, boolean shortFormat){
+		if(node == null) return "null node!";
 		String s = getMessage("joblabel_format");
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
