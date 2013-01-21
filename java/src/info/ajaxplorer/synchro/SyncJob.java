@@ -272,7 +272,6 @@ public class SyncJob implements InterruptableJob {
 				updateRunningStatus(RUNNING_STATUS_INITIALIZING, (localWatchOnly? false:true));
 			}catch(SQLException sE){
 				Thread.sleep(100);
-				System.out.println("RETRYING AFTER 100ms");
 				updateRunningStatus(RUNNING_STATUS_INITIALIZING, (localWatchOnly? false:true));
 			}
 			nodeDao.update(currentRepository);
@@ -916,8 +915,8 @@ public class SyncJob implements InterruptableJob {
 	
 	protected void cleanDB() throws SQLException{
 		// unlinked properties may have not been deleted
-		propertyDao.executeRaw("DELETE FROM b WHERE node_id=0");
-		propertyDao.executeRaw("VACUUM");
+		propertyDao.executeRaw("DELETE FROM b WHERE node_id=0;");
+		propertyDao.executeRaw("VACUUM;");
 	}
 	
 	protected void emptyNodeChildren(final Node rootNode, boolean insideBatchTask) throws Exception{

@@ -413,7 +413,7 @@ public class Manager {
 		Dao<Node, String>nodeDao = DaoManager.createDao(cSource, Node.class);
 		nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
 		nodeDao.delete(node);
-		nodeDao.executeRaw("DELETE FROM b WHERE node_id=0");
+		nodeDao.executeRaw("DELETE FROM b WHERE node_id=0;");
 		this.releaseConnection();
 	}
 	
