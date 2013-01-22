@@ -302,14 +302,14 @@ public class SyncJob implements InterruptableJob {
 			}			
 			List<Node> localSnapshot = new ArrayList<Node>();
 			List<Node> remoteSnapshot = new ArrayList<Node>();
-			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);			
+			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
 			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
 			
 			if(unsolvedConflicts){
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
 				return;				
 			}
-			if(localWatchOnly && localDiff.size() == 0){
+			if(localWatchOnly && localDiff.size() == 0 && previousChanges.size() == 0){
 				this.exitWithStatus(Node.NODE_STATUS_LOADED);
 				return;				
 			}
@@ -378,7 +378,10 @@ public class SyncJob implements InterruptableJob {
 	        }
 	        updateRunningStatus(RUNNING_STATUS_CLEANING);
 	        takeLocalSnapshot(localRootNode, null, true, localSnapshot);
+	        clearSnapshot("local_tmp");
+	        
 	        takeRemoteSnapshot(remoteRootNode, null, true);
+	        clearSnapshot("remote_tmp");
 	        
 			cleanDB();
 	        
@@ -464,6 +467,41 @@ public class SyncJob implements InterruptableJob {
 		return true;
 	}
 	
+	protected String currentLocalSnapId;
+	protected String currentRemoteSnapId;
+	
+	protected Map<String, Node> findNodesInTmpSnapshot(String path) throws SQLException{
+		
+		Map<String, Node> result = new HashMap<String, Node>();
+		Map<String, Object> search = new HashMap<String, Object>();
+		// LOCAL
+		if(currentLocalSnapId == null){
+			Node loc = loadRootAndSnapshot("local_tmp", null, null);
+			currentLocalSnapId = String.valueOf(loc.id);
+		}
+		search.put("resourceType", "entry");
+		search.put("parent_id", currentLocalSnapId);
+		search.put("path", path);
+		List<Node> l;
+		l = nodeDao.queryForFieldValues(search);
+		if(l.size() > 0){
+			result.put("local", l.get(0));
+		}
+		// REMOTE
+		if(currentRemoteSnapId == null){
+			Node loc = loadRootAndSnapshot("remote_tmp", null, null);
+			currentRemoteSnapId = String.valueOf(loc.id);
+		}
+		search.put("resourceType", "entry");
+		search.put("parent_id", currentRemoteSnapId);
+		List<Node> l2;
+		l2 = nodeDao.queryForFieldValues(search);
+		if(l2.size() > 0){
+			result.put("remote", l2.get(0));
+		}
+		return result;
+		
+	}
 	
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) throws Exception{
 		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet().iterator();
@@ -486,6 +524,7 @@ public class SyncJob implements InterruptableJob {
 			}
 			//Thread.sleep(2000);
 			try{
+				Map<String, Node> tmpNodes = findNodesInTmpSnapshot(k);
 				if(n.isLeaf() && value[2].equals(STATUS_CONFLICT_SOLVED)){
 					if(v.equals(TASK_SOLVE_KEEP_MINE)) {
 						v = TASK_REMOTE_PUT_CONTENT;
@@ -513,6 +552,11 @@ public class SyncJob implements InterruptableJob {
 				if(v == TASK_LOCAL_GET_CONTENT){
 					
 					if(direction.equals("up")) continue;
+					if(tmpNodes.get("local") != null && tmpNodes.get("remote") != null){
+						if(tmpNodes.get("local").getPropertyValue("md5") != null && tmpNodes.get("local").getPropertyValue("md5").equals(tmpNodes.get("remote").getPropertyValue("md5"))){
+							continue;
+						}
+					}
 					Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					node.setPath(k);
 					File targetFile = new File(currentLocalFolder, k);
@@ -574,6 +618,11 @@ public class SyncJob implements InterruptableJob {
 				}else if(v == TASK_REMOTE_PUT_CONTENT){
 	
 					if(direction.equals("down")) continue;
+					if(tmpNodes.get("local") != null && tmpNodes.get("remote") != null){
+						if(tmpNodes.get("local").getPropertyValue("md5") != null && tmpNodes.get("local").getPropertyValue("md5").equals(tmpNodes.get("remote").getPropertyValue("md5"))){
+							continue;
+						}
+					}					
 					this.logChange(Manager.getMessage("job_log_uploading"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
@@ -903,7 +952,11 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	protected void clearSnapshot(String type) throws SQLException{
-		List<Node> l = nodeDao.queryForEq("resourceType", type);
+		Map<String, Object> search = new HashMap<String, Object>();
+		search.put("resourceType", type);
+		search.put("parent_id", currentJobNodeID);
+		List<Node> l = nodeDao.queryForFieldValues(search);
+		//List<Node> l = nodeDao.queryForEq("resourceType", type);
 		Node root;
 		nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
 		if(l.size() > 0){
@@ -964,19 +1017,34 @@ public class SyncJob implements InterruptableJob {
 			}
 		});
 		if(save){
+			rootNode.setStatus(Node.NODE_STATUS_LOADED);
 			nodeDao.update(rootNode);
 		}
 	}
 	
 	protected Map<String, Object[]> loadLocalChanges(List<Node> snapshot) throws Exception{
 	
-		final Node root = new Node("local_tmp", "", null);
-		root.setPath(currentLocalFolder.getAbsolutePath());
+		List<Node> previousSnapshot;
+		List<Node> indexationSnap = new ArrayList<Node>();
+		Node index = loadRootAndSnapshot("local_tmp", indexationSnap, currentLocalFolder);
+		final Node root;
 		final List<Node> list = new ArrayList<Node>();
-		takeLocalSnapshot(root, list, false, snapshot);		
-		
+		if(indexationSnap.size() > 0){
+			index.setResourceType("previous_indexation");
+			nodeDao.update(index);
+			previousSnapshot = indexationSnap;
+			root = loadRootAndSnapshot("local_tmp", null, currentLocalFolder);
+		}else{
+			previousSnapshot = snapshot;
+			root = index;
+		}		
+
+		takeLocalSnapshot(root, list, true, previousSnapshot);				
+
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local");
-		//Logger.getRootLogger().info(diff);
+		
+		clearSnapshot("previous_indexation");
+		
 		return diff;
 		
 	}
@@ -1088,13 +1156,12 @@ public class SyncJob implements InterruptableJob {
 	
 	protected Map<String, Object[]> loadRemoteChanges(List<Node> snapshot) throws URISyntaxException, Exception{				
 		
-		final Node root = new Node("remote_root", "", currentRepository);
-		root.setPath("/");
+		final Node root = loadRootAndSnapshot("remote_tmp", null, null);
 		final ArrayList<Node> list = new ArrayList<Node>();
-		takeRemoteSnapshot(root, list, false);
+		takeRemoteSnapshot(root, list, true);
 
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
-		Logger.getRootLogger().info(diff);
+		//Logger.getRootLogger().info(diff);
 		return diff;
 	}
 	
