@@ -80,6 +80,7 @@ import org.w3c.dom.NodeList;
 import com.j256.ormlite.dao.CloseableIterator;
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.DaoManager;
+import com.j256.ormlite.stmt.SelectArg;
 import com.j256.ormlite.support.ConnectionSource;
 
 @DisallowConcurrentExecution
@@ -343,6 +344,9 @@ public class SyncJob implements InterruptableJob {
 				}
 				this.clearSnapshot("remaining_nodes");
 			}
+			if(this.interruptRequired){
+				throw new InterruptedException();
+			}
 			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
 	        Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
 	        updateRunningStatus(RUNNING_STATUS_APPLY_CHANGES);
@@ -479,11 +483,12 @@ public class SyncJob implements InterruptableJob {
 			Node loc = loadRootAndSnapshot("local_tmp", null, null);
 			currentLocalSnapId = String.valueOf(loc.id);
 		}
-		search.put("resourceType", "entry");
-		search.put("parent_id", currentLocalSnapId);
-		search.put("path", path);
+		search.put("resourceType", new SelectArg("entry"));
+		search.put("parent_id",  new SelectArg(currentLocalSnapId));
+		search.put("path", new SelectArg(path));
+		
 		List<Node> l;
-		l = nodeDao.queryForFieldValues(search);
+		l = nodeDao.queryForFieldValuesArgs(search);
 		if(l.size() > 0){
 			result.put("local", l.get(0));
 		}
@@ -492,10 +497,10 @@ public class SyncJob implements InterruptableJob {
 			Node loc = loadRootAndSnapshot("remote_tmp", null, null);
 			currentRemoteSnapId = String.valueOf(loc.id);
 		}
-		search.put("resourceType", "entry");
-		search.put("parent_id", currentRemoteSnapId);
+		//search.put("resourceType", "entry");
+		search.put("parent_id", new SelectArg(currentRemoteSnapId));
 		List<Node> l2;
-		l2 = nodeDao.queryForFieldValues(search);
+		l2 = nodeDao.queryForFieldValuesArgs(search);
 		if(l2.size() > 0){
 			result.put("remote", l2.get(0));
 		}
