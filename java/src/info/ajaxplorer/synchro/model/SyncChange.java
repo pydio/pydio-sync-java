@@ -21,7 +21,7 @@
 package info.ajaxplorer.synchro.model;
 
 import info.ajaxplorer.client.model.Node;
-import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.CoreManager;
 import info.ajaxplorer.synchro.SyncJob;
 
 import java.util.ArrayList;
@@ -107,13 +107,13 @@ public class SyncChange {
 		if(value == null){
 			value = new SyncChangeValue(changeValue);			
 			try{
-				ConnectionSource cs = Manager.getInstance().getConnection();
+				ConnectionSource cs = CoreManager.getInstance().getConnection();
 				Dao<Node, String> nodeDao = DaoManager.createDao(cs, Node.class);
 				value.n = nodeDao.queryForId(value.nodeId);
 			}catch (Exception e) {
 				Logger.getRootLogger().error("Could not load node for SyncChangeValue!");
 			} finally{
-				Manager.getInstance().releaseConnection();
+				CoreManager.getInstance().releaseConnection();
 			}
 		}
 		return value;

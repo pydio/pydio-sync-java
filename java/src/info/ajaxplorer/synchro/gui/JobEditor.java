@@ -24,7 +24,7 @@ import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Server;
-import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.CoreManager;
 
 import java.net.URISyntaxException;
 import java.sql.SQLException;
@@ -144,21 +144,21 @@ public class JobEditor extends Composite{
 		//populateToolkit(parent);	
 		stackData = new LinkedHashMap<String, HashMap<String, Object>>();
 		HashMap<String, Object> connData = new HashMap<String, Object>();
-		connData.put("LABEL", Manager.getMessage("jobeditor_stack_server"));
+		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
 		HashMap<String, Object> connData2 = new HashMap<String, Object>();
-		connData2.put("LABEL", Manager.getMessage("jobeditor_stack_params"));
+		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 200);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
 		HashMap<String, Object> connData3 = new HashMap<String, Object>();
-		connData3.put("LABEL", Manager.getMessage("jobeditor_stack_logs"));
+		connData3.put("LABEL", CoreManager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 520);
 		connData3.put("HEIGHT", 420);
 		connData3.put("ICON", "view_list_text");
@@ -178,7 +178,7 @@ public class JobEditor extends Composite{
 	
 	public void initShell(final Shell shell){
 				
-        shell.setText(Manager.getMessage("shell_title"));
+        shell.setText(CoreManager.getMessage("shell_title"));
         shell.setImage(new Image(shell.getDisplay(), this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-Bi.png")));        
         this.moveShellWithMouse(this, shell);
 		shell.setLayout(new FillLayout(SWT.HORIZONTAL|SWT.VERTICAL));		        
@@ -202,7 +202,7 @@ public class JobEditor extends Composite{
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
 			this.loadFormData(values);		
 			if(this.form != null){
-				//((FormHeading)this.form.getHead()).setText(Manager.getInstance().makeJobLabel(baseNode, true));				
+				//((FormHeading)this.form.getHead()).setText(CoreManager.getInstance().makeJobLabel(baseNode, true));				
 				updateFormActions();
 			}
 			if(this.logs != null) this.logs.loadSynchroLog(baseNode);
@@ -336,8 +336,8 @@ public class JobEditor extends Composite{
 							String accessType = attributes.getNamedItem("access_type").getNodeValue();
 							String repositoryId = attributes.getNamedItem("id").getNodeValue();
 							boolean excluded = false;
-							for(int p =0;p<Manager.EXCLUDED_ACCESS_TYPES.length;p++){
-								if(accessType.equalsIgnoreCase(Manager.EXCLUDED_ACCESS_TYPES[p])){
+							for(int p =0;p<CoreManager.EXCLUDED_ACCESS_TYPES.length;p++){
+								if(accessType.equalsIgnoreCase(CoreManager.EXCLUDED_ACCESS_TYPES[p])){
 									excluded = true; break;
 								}
 							}
@@ -383,7 +383,7 @@ public class JobEditor extends Composite{
 		form.getBody().setLayout(sLayout);				
 
 
-		connexionSection = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_connection"),Manager.getMessage("jobeditor_legend_connection"), 1, false);
+		connexionSection = configureSection(toolkit, form, CoreManager.getMessage("jobeditor_header_connection"),CoreManager.getMessage("jobeditor_legend_connection"), 1, false);
 		sectionClient = toolkit.createComposite(connexionSection);		
 		GridLayout layout = new GridLayout();
 		sectionClient.setLayout(layout);
@@ -396,26 +396,26 @@ public class JobEditor extends Composite{
 		
 		
 		// HOST
-		Label label = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_hostURL"));
+		Label label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_hostURL"));
 		label.setLayoutData(getGridDataLabel());
 		tfHost = toolkit.createText(sectionClient, "");
 		tfHost.setLayoutData(getGridDataField(2));
 
 		
 		// LOGIN
-		label = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_login"));
+		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_login"));
 		label.setLayoutData(getGridDataLabel());
 		tfLogin = toolkit.createText(sectionClient, "");
 		tfLogin.setLayoutData(getGridDataField(2));
 		
 		// PASSWORD
-		label = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_password"));
+		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_password"));
 		label.setLayoutData(getGridDataLabel());
 		tfPassword = toolkit.createText(sectionClient, "", SWT.PASSWORD);
 		tfPassword.setLayoutData(getGridDataField(2));
 		
 		// REPOSITORY CHOOSER
-		label = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_repository"));
+		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_repository"));
 		label.setLayoutData(getGridDataLabel());
 		
 		
@@ -437,8 +437,8 @@ public class JobEditor extends Composite{
 			public void linkActivated(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {
 				if( tfRepo != null && ( tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") )){
 					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_WARNING | SWT.OK );
-					dialog.setText(Manager.getMessage("jobeditor_diag_noserverdata"));
-					dialog.setMessage(Manager.getMessage("jobeditor_diag_noserverdata_msg"));
+					dialog.setText(CoreManager.getMessage("jobeditor_diag_noserverdata"));
+					dialog.setMessage(CoreManager.getMessage("jobeditor_diag_noserverdata_msg"));
 					dialog.open();					
 					return;
 				}					
@@ -450,7 +450,7 @@ public class JobEditor extends Composite{
 		});
 
 		// TARGET FOLDER CHOOSER
-		label = toolkit.createLabel(sectionClient, Manager.getMessage("jobeditor_localfolder"));
+		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_localfolder"));
 		label.setLayoutData(getGridDataLabel());
 		tfTarget = toolkit.createText(sectionClient, "", SWT.READ_ONLY);		
 		tfTarget.setLayoutData(getGridDataField(1));
@@ -475,7 +475,7 @@ public class JobEditor extends Composite{
 			}
 		});
 		
-		parametersSection = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), Manager.getMessage("jobeditor_legend_execution"), 1, true);		
+		parametersSection = configureSection(toolkit, form, CoreManager.getMessage("jobeditor_header_execution"), CoreManager.getMessage("jobeditor_legend_execution"), 1, true);		
 		Composite sectionClient3 = toolkit.createComposite(parametersSection);
 		TableWrapLayout layout2 = new TableWrapLayout();
 		sectionClient3.setLayout(layout2);
@@ -483,7 +483,7 @@ public class JobEditor extends Composite{
 		parametersSection.setClient(sectionClient3);			
 		stackData.get("parameters").put("SECTION", parametersSection);		
 		
-		Label lab = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_direction") + " : ");
+		Label lab = toolkit.createLabel(sectionClient3, CoreManager.getMessage("jobeditor_direction") + " : ");
 		lab.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp = toolkit.createComposite(sectionClient3);
 		rComp.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
@@ -492,9 +492,9 @@ public class JobEditor extends Composite{
 		rComp.setLayout(layout2);
 		comboDirection = new Combo(sectionClient3, SWT.READ_ONLY|SWT.BORDER);
 	    comboDirection.setItems(new String[] { 
-	    		Manager.getMessage("jobeditor_bi"), 
-	    		Manager.getMessage("jobeditor_up"), 
-	    		Manager.getMessage("jobeditor_down") 
+	    		CoreManager.getMessage("jobeditor_bi"), 
+	    		CoreManager.getMessage("jobeditor_up"), 
+	    		CoreManager.getMessage("jobeditor_down") 
 	    		});
 	    //toolkit.adapt(comboDirection);
 	    TableWrapData test = new TableWrapData(TableWrapData.FILL_GRAB);
@@ -502,16 +502,16 @@ public class JobEditor extends Composite{
 	    comboDirection.setLayoutData(test);
 	    comboDirection.select(0);
 				
-		Label lab2 = toolkit.createLabel(sectionClient3, Manager.getMessage("jobeditor_frequency") + " : ");
+		Label lab2 = toolkit.createLabel(sectionClient3, CoreManager.getMessage("jobeditor_frequency") + " : ");
 		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp2= toolkit.createComposite(sectionClient3);
 		rComp2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		layout2 = new TableWrapLayout();
 		layout2.numColumns = 3;
 		rComp2.setLayout(layout2);
-		radioSyncInterval1 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_min"), SWT.RADIO);
-		radioSyncInterval2 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_hours"), SWT.RADIO);
-		radioSyncInterval3 = toolkit.createButton(rComp2, Manager.getMessage("jobeditor_days"), SWT.RADIO);
+		radioSyncInterval1 = toolkit.createButton(rComp2, CoreManager.getMessage("jobeditor_min"), SWT.RADIO);
+		radioSyncInterval2 = toolkit.createButton(rComp2, CoreManager.getMessage("jobeditor_hours"), SWT.RADIO);
+		radioSyncInterval3 = toolkit.createButton(rComp2, CoreManager.getMessage("jobeditor_days"), SWT.RADIO);
 		radioSyncInterval2.setSelection(true);
 		
 		saveAction = new Action("Save", new ImageDescriptor() {
@@ -563,8 +563,8 @@ public class JobEditor extends Composite{
 				super.run();
 				if(saveAction.isEnabled()){
 					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
-					dialog.setText(Manager.getMessage("jobeditor_diag_savenotchanges"));
-					dialog.setMessage(Manager.getMessage("jobeditor_diag_savenotchanges_msg"));
+					dialog.setText(CoreManager.getMessage("jobeditor_diag_savenotchanges"));
+					dialog.setMessage(CoreManager.getMessage("jobeditor_diag_savenotchanges_msg"));
 					int returnCode = dialog.open();					
 					if(returnCode == SWT.CANCEL) return;
 				}
@@ -591,7 +591,7 @@ public class JobEditor extends Composite{
 		updateFormActions();
 		
 		
-		logsSection = configureSection(toolkit, form, Manager.getMessage("jobeditor_header_execution"), null, 1, false);		
+		logsSection = configureSection(toolkit, form, CoreManager.getMessage("jobeditor_header_execution"), null, 1, false);		
 		logs = new LogViewer(logsSection, SWT.NONE);
 		logs.initGUI();
 		logsSection.setClient(logs);				
@@ -812,7 +812,7 @@ public class JobEditor extends Composite{
 	
 	protected boolean saveConfig(){
 		try {
-			Node n = Manager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
+			Node n = CoreManager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
 			this.setCurrentNode(n);
 			return true;
 		} catch (SQLException e) {
@@ -828,7 +828,7 @@ public class JobEditor extends Composite{
 	protected void deleteConfig(){
 		try {
 			closeConfig();
-			Manager.getInstance().deleteSynchroNode(currentSynchroNode);
+			CoreManager.getInstance().deleteSynchroNode(currentSynchroNode);
 		} catch (SchedulerException e) {
 			Logger.getRootLogger().error("Synchro", e);
 		} catch (SQLException e) {
@@ -839,8 +839,8 @@ public class JobEditor extends Composite{
 		if(n == null){
 			currentSynchroNode = null;
 			clearFormData();
-			if(Manager.defaultHome != null){
-				tfTarget.setText(Manager.defaultHome);
+			if(CoreManager.defaultHome != null){
+				tfTarget.setText(CoreManager.defaultHome);
 			}
 			logs.clearSynchroLog();
 		}else{

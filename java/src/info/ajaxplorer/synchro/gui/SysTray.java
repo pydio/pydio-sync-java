@@ -21,7 +21,7 @@
 package info.ajaxplorer.synchro.gui;
 
 import info.ajaxplorer.client.model.Node;
-import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.CoreManager;
 import info.ajaxplorer.synchro.SyncJob;
 
 import java.sql.SQLException;
@@ -32,6 +32,7 @@ import java.util.Locale;
 import java.util.ResourceBundle;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.spi.RootLogger;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
@@ -70,8 +71,8 @@ public class SysTray {
 	public void notifyUser(String title, String message, String nodeId, boolean forceDisplay){
 		String jobLabel = "";
 		if(nodeId != null){
-			Node n = Manager.getInstance().getSynchroNode(nodeId);
-			if(n != null) jobLabel = Manager.getInstance().makeJobLabel(n, true)+": ";
+			Node n = CoreManager.getInstance().getSynchroNode(nodeId);
+			if(n != null) jobLabel = CoreManager.getInstance().makeJobLabel(n, true)+": ";
 		}
 		item.setToolTipText( jobLabel + title + " ("+message+")");
 		
@@ -109,7 +110,7 @@ public class SysTray {
 			this.currentStartItems.get(nodeId).setEnabled(!state);
 		}
 		this.setIconState(state?"running":"idle");
-		item.setToolTipText(Manager.getInstance().makeJobLabel(node, true)+": " + this.computeSyncStatus(node));
+		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true)+": " + this.computeSyncStatus(node));
 	}
 	protected Image getImage(String name){
 		try{
@@ -119,7 +120,7 @@ public class SysTray {
 		}
 	}
 	public void refreshJobsMenu(){
-		refreshJobsMenu(Manager.getInstance());
+		refreshJobsMenu(CoreManager.getInstance());
 	}
 	
 	protected String computeSyncStatus(Node syncNode){
@@ -158,7 +159,7 @@ public class SysTray {
 		return syncStatus;
 	}
 	
-	public void refreshJobsMenu(Manager managerInstance){
+	public void refreshJobsMenu(CoreManager managerInstance){
 		
 		for(MenuItem item:menu.getItems()){
 			item.dispose();
@@ -214,7 +215,7 @@ public class SysTray {
 				mI.addListener (SWT.Selection, new Listener () {
 					public void handleEvent (Event event) {
 						try {
-							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
+							CoreManager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
 						} catch (SchedulerException e) {
 							Logger.getRootLogger().error("Synchro", e);
 						}
@@ -224,17 +225,17 @@ public class SysTray {
 			}
 			
 			MenuItem mAct = new MenuItem(jobMenu, SWT.PUSH);			
-			mAct.setText( Manager.getMessage(currentActiveState?"tray_menu_jobstatus_active":"tray_menu_jobstatus_inactive"));
+			mAct.setText( CoreManager.getMessage(currentActiveState?"tray_menu_jobstatus_active":"tray_menu_jobstatus_inactive"));
 			mAct.setImage(getImage(currentActiveState?"media_playback_pause":"media_playback_start"));
 			mAct.setData(syncNode);
 			//if(running) mAct.setEnabled(false);
 			mAct.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
-					Manager.getInstance().changeSynchroState((Node)event.widget.getData(), !currentActiveState);
+					CoreManager.getInstance().changeSynchroState((Node)event.widget.getData(), !currentActiveState);
 					/*
 					if(!currentActiveState){
 						try {
-							Manager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
+							CoreManager.getInstance().triggerJobNow((Node)event.widget.getData(), false);
 						} catch (SchedulerException e) {
 							Logger.getRootLogger().error("Synchro", e);
 						}						
@@ -259,7 +260,7 @@ public class SysTray {
 			mI2.setData(syncNode);
 			mI2.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
-					Manager.getInstance().openLocalTarget((Node)event.widget.getData());
+					CoreManager.getInstance().openLocalTarget((Node)event.widget.getData());
 				}
 			});
 			
@@ -269,7 +270,7 @@ public class SysTray {
 			mI3.setData(syncNode);
 			mI3.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
-					Manager.getInstance().openRemoteTarget((Node)event.widget.getData());
+					CoreManager.getInstance().openRemoteTarget((Node)event.widget.getData());
 				}
 			});		
 			
@@ -298,19 +299,19 @@ public class SysTray {
 			});
 			
 			MenuItem mDel = new MenuItem(configMenu, SWT.PUSH);			
-			mDel.setText(Manager.getMessage("tray_menu_jobdelete"));
+			mDel.setText(CoreManager.getMessage("tray_menu_jobdelete"));
 			mDel.setImage(getImage("editdelete"));
 			mDel.setData(syncNode);
 			//if(running) mDel.setEnabled(false);
 			mDel.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					MessageBox dialog = new MessageBox(shell, SWT.ICON_QUESTION | SWT.OK| SWT.CANCEL);
-					dialog.setText(Manager.getMessage("jobeditor_diag_delete"));
-					dialog.setMessage(Manager.getMessage("jobeditor_diag_deletem"));
+					dialog.setText(CoreManager.getMessage("jobeditor_diag_delete"));
+					dialog.setMessage(CoreManager.getMessage("jobeditor_diag_deletem"));
 					int returnCode = dialog.open();					
 					if(returnCode == SWT.CANCEL) return;
 					try {
-						Manager.getInstance().deleteSynchroNode((Node)event.widget.getData());
+						CoreManager.getInstance().deleteSynchroNode((Node)event.widget.getData());
 					} catch (SchedulerException e) {
 						Logger.getRootLogger().error("Synchro", e);
 					} catch (SQLException e) {
@@ -366,15 +367,15 @@ public class SysTray {
 		
 		
 		MenuItem mAct = new MenuItem(generalMenu, SWT.PUSH);			
-		mAct.setText( Manager.getMessage(schedulerStateStarted?"tray_menu_scheduler_pauseall":"tray_menu_scheduler_startall"));
+		mAct.setText( CoreManager.getMessage(schedulerStateStarted?"tray_menu_scheduler_pauseall":"tray_menu_scheduler_startall"));
 		mAct.setImage(getImage(schedulerStateStarted?"media_playback_pause":"media_playback_start"));
 		mAct.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				boolean res;
 				if(schedulerStateStarted){
-					res = Manager.getInstance().pauseAll();
+					res = CoreManager.getInstance().pauseAll();
 				}else{
-					res = Manager.getInstance().restartAll();
+					res = CoreManager.getInstance().restartAll();
 				}
 				if(res){
 					schedulerStateStarted = !schedulerStateStarted;
@@ -392,17 +393,17 @@ public class SysTray {
 		});
 		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
-		mi2.setText (Manager.getMessage("tray_menu_quit"));
+		mi2.setText (CoreManager.getMessage("tray_menu_quit"));
 		mi2.setImage(getImage("exit"));
 		mi2.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
-				int res = Manager.getInstance().close();
+				int res = CoreManager.getInstance().close();
 				System.exit(res);
 			}
 		});					
 	}
 	
-	public SysTray(final Shell shell, ResourceBundle messages, Manager managerInstance){
+	public SysTray(final Shell shell, ResourceBundle messages, CoreManager managerInstance){
 		
 		this.shell = shell;
 		this.messages = messages;
@@ -558,7 +559,7 @@ public class SysTray {
 			jobEditor = new JobEditor(shell, this, stack);
 			try {
 				if(nodeId != null){
-					Node n = Manager.getInstance().getSynchroNode(nodeId);
+					Node n = CoreManager.getInstance().getSynchroNode(nodeId);
 					if(n != null){
 						jobEditor.setCurrentNode(n);
 					}
@@ -566,12 +567,13 @@ public class SysTray {
 					jobEditor.setCurrentNode(null);
 				}
 			} catch (Exception e) {
+				RootLogger.getLogger("ajxp").error(e);
 			}				
 			shell.setVisible(true);
 		}else{
 			try {
 				if(nodeId != null){
-					Node n = Manager.getInstance().getSynchroNode(nodeId);
+					Node n = CoreManager.getInstance().getSynchroNode(nodeId);
 					if(n != null){
 						jobEditor.setCurrentNode(n);
 					}

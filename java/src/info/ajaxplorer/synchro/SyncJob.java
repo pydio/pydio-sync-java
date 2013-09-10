@@ -183,11 +183,11 @@ public class SyncJob implements InterruptableJob {
 					if(what == MessageListener.MESSAGE_WHAT_ERROR && obj instanceof String){
 						String mess;
 						try{
-							mess = Manager.getMessage((String)obj);
+							mess = CoreManager.getMessage((String)obj);
 						}catch(Exception ex){
 							mess = (String) obj;
 						}
-						Manager.getInstance().notifyUser(
+						CoreManager.getInstance().notifyUser(
 								(String) obj, 
 								mess, 
 								SyncJob.this.currentJobNodeID, 
@@ -213,14 +213,14 @@ public class SyncJob implements InterruptableJob {
 	
 	public SyncJob() throws URISyntaxException, Exception{
 		
-        //nodeDao = Manager.getInstance().getNodeDao();		
+        //nodeDao = CoreManager.getInstance().getNodeDao();		
 		
 	}
 	
 	private void exitWithStatusAndNotify(int status, String titleId, String messageId) throws SQLException{
-		Manager.getInstance().notifyUser(
-				Manager.getMessage(titleId), 
-				Manager.getMessage(messageId), 
+		CoreManager.getInstance().notifyUser(
+				CoreManager.getMessage(titleId), 
+				CoreManager.getMessage(messageId), 
 				this.currentJobNodeID, 
 				(status == Node.NODE_STATUS_ERROR) );
 		exitWithStatus(status);
@@ -229,8 +229,8 @@ public class SyncJob implements InterruptableJob {
 	private boolean exitWithStatus(int status) throws SQLException{
 		currentRepository.setStatus(status);	        
 		nodeDao.update(currentRepository);
-        Manager.getInstance().updateSynchroState(currentRepository, false);
-        Manager.getInstance().releaseConnection();
+        CoreManager.getInstance().updateSynchroState(currentRepository, false);
+        CoreManager.getInstance().releaseConnection();
         DaoManager.clearCache();
 		nodeDao = null;
 		syncChangeDao = null;
@@ -243,7 +243,7 @@ public class SyncJob implements InterruptableJob {
 	protected void updateRunningStatus(Integer status, boolean running) throws SQLException{
 		if(currentRepository != null && propertyDao != null){
 			currentRepository.setProperty("sync_running_status", status.toString(), propertyDao);
-			Manager.getInstance().updateSynchroState(currentRepository, true);
+			CoreManager.getInstance().updateSynchroState(currentRepository, true);
 		}
 	}
 	
@@ -256,17 +256,17 @@ public class SyncJob implements InterruptableJob {
 		try{
 			AjxpHttpClient.clearCookiesStatic();
 			// instantiate the daos
-			ConnectionSource connectionSource = Manager.getInstance().getConnection();
+			ConnectionSource connectionSource = CoreManager.getInstance().getConnection();
 			nodeDao = DaoManager.createDao(connectionSource, Node.class);				
 			syncChangeDao = DaoManager.createDao(connectionSource, SyncChange.class);
 			syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
 			propertyDao = DaoManager.createDao(connectionSource, Property.class);
 			
-			currentRepository = Manager.getInstance().getSynchroNode(currentJobNodeID, nodeDao);
+			currentRepository = CoreManager.getInstance().getSynchroNode(currentJobNodeID, nodeDao);
 			if(currentRepository == null){
 				throw new Exception("The database returned an empty node.");
 			}
-			Manager.getInstance().updateSynchroState(currentRepository, (localWatchOnly? false:true));
+			CoreManager.getInstance().updateSynchroState(currentRepository, (localWatchOnly? false:true));
 
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
 			try{
@@ -284,7 +284,7 @@ public class SyncJob implements InterruptableJob {
 			direction = currentRepository.getPropertyValue("synchro_direction");
 	
 	        //if(!localWatchOnly) {
-	        	//Manager.getInstance().notifyUser(Manager.getMessage("job_running"), "Synchronizing " + s.getUrl());
+	        	//CoreManager.getInstance().notifyUser(CoreManager.getMessage("job_running"), "Synchronizing " + s.getUrl());
 	        //}
 			updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES, (localWatchOnly? false:true));
 	    	final List<SyncChange> previouslyRemaining = syncChangeDao.queryForEq("jobId", currentJobNodeID);
@@ -399,25 +399,25 @@ public class SyncJob implements InterruptableJob {
 			String summary = "";
 			if(countConflictsDetected > 0) {
 				status = SyncLog.LOG_STATUS_CONFLICTS;
-				summary = Manager.getMessage("job_status_conflicts").replace("%d", countConflictsDetected+"");
+				summary = CoreManager.getMessage("job_status_conflicts").replace("%d", countConflictsDetected+"");
 			}
 			else if(countResourcesErrors > 0) {
 				status = SyncLog.LOG_STATUS_ERRORS;
-				summary = Manager.getMessage("job_status_errors").replace("%d", countResourcesErrors + "");
+				summary = CoreManager.getMessage("job_status_errors").replace("%d", countResourcesErrors + "");
 			}else {
 				if(countResourcesInterrupted > 0) status = SyncLog.LOG_STATUS_INTERRUPT;
 				else status = SyncLog.LOG_STATUS_SUCCESS;
 				if(countFilesDownloaded > 0){
-					summary = Manager.getMessage("job_status_downloads").replace("%d", countFilesDownloaded + "" );
+					summary = CoreManager.getMessage("job_status_downloads").replace("%d", countFilesDownloaded + "" );
 				}
 				if(countFilesUploaded > 0){
-					summary += Manager.getMessage("job_status_uploads").replace("%d", countFilesUploaded + "" );
+					summary += CoreManager.getMessage("job_status_uploads").replace("%d", countFilesUploaded + "" );
 				}
 				if(countResourcesSynchronized > 0){
-					summary += Manager.getMessage("job_status_resources").replace("%d", countResourcesSynchronized+ "" );
+					summary += CoreManager.getMessage("job_status_resources").replace("%d", countResourcesSynchronized+ "" );
 				}
 				if(summary.equals("")){
-					summary = Manager.getMessage("job_status_nothing");
+					summary = CoreManager.getMessage("job_status_nothing");
 				}
 			}
 			sl.jobDate = (new Date()).getTime();
@@ -426,13 +426,13 @@ public class SyncJob implements InterruptableJob {
 			sl.synchroNode = currentRepository;
 			syncLogDao.create(sl);
 			
-	        Manager.getInstance().updateSynchroState(currentRepository, false);
-	        Manager.getInstance().releaseConnection();
+	        CoreManager.getInstance().updateSynchroState(currentRepository, false);
+	        CoreManager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
 
 		}catch(InterruptedException ie){
 			
-	        Manager.getInstance().notifyUser("Stopping", "Last synchro was interrupted on user demand", this.currentJobNodeID);
+	        CoreManager.getInstance().notifyUser("Stopping", "Last synchro was interrupted on user demand", this.currentJobNodeID);
 	        try {
 				this.exitWithStatus(Node.NODE_STATUS_FRESH);
 			} catch (SQLException e) {}
@@ -442,11 +442,11 @@ public class SyncJob implements InterruptableJob {
 			e.printStackTrace();
 			String message = e.getMessage();
 			if(message == null && e.getCause() != null) message = e.getCause().getMessage();
-			Manager.getInstance().notifyUser("Error", "An error occured during synchronization: "+message, this.currentJobNodeID, true);
+			CoreManager.getInstance().notifyUser("Error", "An error occured during synchronization: "+message, this.currentJobNodeID, true);
 			if(currentRepository != null){
-				Manager.getInstance().updateSynchroState(currentRepository, false);
+				CoreManager.getInstance().updateSynchroState(currentRepository, false);
 			}
-	        Manager.getInstance().releaseConnection();
+	        CoreManager.getInstance().releaseConnection();
 	        DaoManager.clearCache();
 		}
 	}
@@ -565,7 +565,7 @@ public class SyncJob implements InterruptableJob {
 					Node node = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					node.setPath(k);
 					File targetFile = new File(currentLocalFolder, k);
-					this.logChange(Manager.getMessage("job_log_downloading"), k);
+					this.logChange(CoreManager.getMessage("job_log_downloading"), k);
 					try{
 						this.updateNode(node, targetFile, n);
 					}catch(IllegalStateException e){
@@ -587,7 +587,7 @@ public class SyncJob implements InterruptableJob {
 					if(direction.equals("up")) continue;
 					File f = new File(currentLocalFolder, k);
 					if(!f.exists()) {
-						this.logChange(Manager.getMessage("job_log_mkdir"), k);
+						this.logChange(CoreManager.getMessage("job_log_mkdir"), k);
 						boolean res = f.mkdirs();
 						if(!res){
 							throw new Exception("Error while creating local folder");
@@ -608,7 +608,7 @@ public class SyncJob implements InterruptableJob {
 				}else if(v == TASK_REMOTE_MKDIR){
 					
 					if(direction.equals("down")) continue;
-					this.logChange(Manager.getMessage("job_log_mkdir_remote"), k);
+					this.logChange(CoreManager.getMessage("job_log_mkdir_remote"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
@@ -628,7 +628,7 @@ public class SyncJob implements InterruptableJob {
 							continue;
 						}
 					}					
-					this.logChange(Manager.getMessage("job_log_uploading"), k);
+					this.logChange(CoreManager.getMessage("job_log_uploading"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
@@ -656,7 +656,7 @@ public class SyncJob implements InterruptableJob {
 					
 					// Recheck that it's a real conflict?
 					
-					this.logChange(Manager.getMessage("job_log_conflict"), k);
+					this.logChange(CoreManager.getMessage("job_log_conflict"), k);
 					notApplied.put(k, value);
 					countConflictsDetected ++;
 					
@@ -761,7 +761,7 @@ public class SyncJob implements InterruptableJob {
 
 				if(v == TASK_LOCAL_REMOVE){
 					
-					this.logChange(Manager.getMessage("job_log_rmlocal"), k);
+					this.logChange(CoreManager.getMessage("job_log_rmlocal"), k);
 					File f = new File(currentLocalFolder, k);
 					if(f.exists()){
 						boolean res = f.delete();
@@ -773,7 +773,7 @@ public class SyncJob implements InterruptableJob {
 					
 				}else if(v == TASK_REMOTE_REMOVE){
 					
-					this.logChange(Manager.getMessage("job_log_rmremote"), k);
+					this.logChange(CoreManager.getMessage("job_log_rmremote"), k);
 					Node currentDirectory = new Node(Node.NODE_TYPE_ENTRY, "", null);
 					int lastSlash = k.lastIndexOf("/");
 					currentDirectory.setPath(k.substring(0, lastSlash));
@@ -819,7 +819,7 @@ public class SyncJob implements InterruptableJob {
 	}
 	
 	protected void logChange(String action, String path){
-		Manager.getInstance().notifyUser(Manager.getMessage("job_log_balloontitle"), action+ " : "+path, this.currentJobNodeID);
+		CoreManager.getInstance().notifyUser(CoreManager.getMessage("job_log_balloontitle"), action+ " : "+path, this.currentJobNodeID);
 	}
 	
 	protected boolean ignoreTreeConflict(Integer remoteChange, Integer localChange, Node remoteNode, Node localNode){
@@ -1069,8 +1069,8 @@ public class SyncJob implements InterruptableJob {
 		}
 		//Logger.getRootLogger().info("Searching "+directory.getAbsolutePath());
 		File[] children = directory.listFiles();
-		String[] start = Manager.getInstance().EXCLUDED_FILES_START;
-		String[] end = Manager.getInstance().EXCLUDED_FILES_END;
+		String[] start = CoreManager.getInstance().EXCLUDED_FILES_START;
+		String[] end = CoreManager.getInstance().EXCLUDED_FILES_END;
 		for(int i=0;i<children.length;i++){
 			boolean ignore = false;
 			for(int j=0;j<start.length;j++){
@@ -1113,7 +1113,7 @@ public class SyncJob implements InterruptableJob {
 				}
 				if(md5 == null){
 					//Logger.getRootLogger().info("-- Computing new md5");
-					Manager.getInstance().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
+					CoreManager.getInstance().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
 					md5 = computeMD5(children[i]);
 				}
 				newNode.addProperty("md5", md5);
@@ -1287,7 +1287,7 @@ public class SyncJob implements InterruptableJob {
 	
 	protected boolean synchronousUP(Node folderNode, final File sourceFile, Node remoteNode) throws Exception{
 
-		if(Manager.getInstance().getRdiffProc() != null && Manager.getInstance().getRdiffProc().rdiffEnabled()){
+		if(CoreManager.getInstance().getRdiffProc() != null && CoreManager.getInstance().getRdiffProc().rdiffEnabled()){
 			// RDIFF ! 
 			File signatureFile = tmpFileName(sourceFile, "sig");
 			boolean remoteHasSignature = false;
@@ -1300,13 +1300,13 @@ public class SyncJob implements InterruptableJob {
 			if(remoteHasSignature && signatureFile.exists() && signatureFile.length() > 0){
 				// Compute delta
 				File deltaFile = tmpFileName(sourceFile, "delta");
-				RdiffProcessor proc = Manager.getInstance().getRdiffProc();
+				RdiffProcessor proc = CoreManager.getInstance().getRdiffProc();
 				proc.delta(signatureFile, sourceFile, deltaFile);
 				signatureFile.delete();
 				if(deltaFile.exists()){
 					// Send back to server
 					RestRequest rest = this.getRequest();
-					logChange(Manager.getMessage("job_log_updelta"), sourceFile.getName());
+					logChange(CoreManager.getMessage("job_log_updelta"), sourceFile.getName());
 					String patchedFileMd5 = rest.getStringContent(AjxpAPI.getInstance().getFilehashPatchUri(remoteNode), null, deltaFile, null);
 					rest.release();
 					deltaFile.delete();
@@ -1344,7 +1344,7 @@ public class SyncJob implements InterruptableJob {
 				}
 				currentPercent = Math.min(Math.max(currentPercent,0), 100);
 				if(currentPercent > previousPercent){					
-					logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " - "+currentPercent+"%");
+					logChange(CoreManager.getMessage("job_log_uploading"), sourceFile.getName() + " - "+currentPercent+"%");
 				}
 				previousPercent = currentPercent;
 			}
@@ -1357,7 +1357,7 @@ public class SyncJob implements InterruptableJob {
 					throw new IOException("Upload interrupted on demand");
 				}
 				Logger.getRootLogger().info("PARTS " + " ["+(part+1)+"/"+total+"]");
-				logChange(Manager.getMessage("job_log_uploading"), sourceFile.getName() + " ["+(part+1)+"/"+total+"]");
+				logChange(CoreManager.getMessage("job_log_uploading"), sourceFile.getName() + " ["+(part+1)+"/"+total+"]");
 			}
 		});
     	String targetName = sourceFile.getName();
@@ -1376,15 +1376,15 @@ public class SyncJob implements InterruptableJob {
 	
 	protected void updateNode(Node node, File targetFile, Node remoteNode) throws Exception{
 
-		if(targetFile.exists() && Manager.getInstance().getRdiffProc()!=null && Manager.getInstance().getRdiffProc().rdiffEnabled()){
+		if(targetFile.exists() && CoreManager.getInstance().getRdiffProc()!=null && CoreManager.getInstance().getRdiffProc().rdiffEnabled()){
 			
 			// Compute signature
 			File sigFile = tmpFileName(targetFile, "sig");
 			File delta = tmpFileName(targetFile, "delta");
-			RdiffProcessor proc = Manager.getInstance().getRdiffProc();
+			RdiffProcessor proc = CoreManager.getInstance().getRdiffProc();
 			proc.signature(targetFile, sigFile);
 			// Post it to the server to retrieve delta,
-			logChange(Manager.getMessage("job_log_downdelta"), targetFile.getName());
+			logChange(CoreManager.getMessage("job_log_downdelta"), targetFile.getName());
 			URI uri = AjxpAPI.getInstance().getFilehashDeltaUri(node);
 			this.uriContentToFile(uri, delta, sigFile);
 			sigFile.delete();
@@ -1475,7 +1475,7 @@ public class SyncJob implements InterruptableJob {
 					double ETC = bytesleft/(speed*10);
             	}
             	if(tmpProgress != postedProgress){
-            		logChange(Manager.getMessage("job_log_downloading"), targetFile.getName() + " - "+tmpProgress+"%");
+            		logChange(CoreManager.getMessage("job_log_downloading"), targetFile.getName() + " - "+tmpProgress+"%");
             	}
             	postedProgress=tmpProgress;
             }

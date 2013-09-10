@@ -21,7 +21,7 @@
 package info.ajaxplorer.synchro.gui;
 
 import info.ajaxplorer.client.model.Node;
-import info.ajaxplorer.synchro.Manager;
+import info.ajaxplorer.synchro.CoreManager;
 import info.ajaxplorer.synchro.SyncJob;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
@@ -118,7 +118,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 		currentConflictsCount = 0;
 		ConnectionSource cs;
 		try {			
-			cs = Manager.getInstance().getConnection();
+			cs = CoreManager.getInstance().getConnection();
 			Dao<SyncLog, String> logDao = DaoManager.createDao(cs, SyncLog.class);
 			Dao<SyncChange, String> changeDao = DaoManager.createDao(cs, SyncChange.class);
 			this.currentSynchroNode = synchroNode;
@@ -156,8 +156,8 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 				TableItem it = new TableItem(table2, SWT.NONE);
 				SyncChangeValue v = change.getChangeValue();
 				it.setText(0, change.getKey());
-				it.setText(1, Manager.getMessage("logviewer_status") + " : "+v.getStatusString());
-				it.setText(2, Manager.getMessage("logviewer_task") + " : "+v.getTaskString());
+				it.setText(1, CoreManager.getMessage("logviewer_status") + " : "+v.getStatusString());
+				it.setText(2, CoreManager.getMessage("logviewer_task") + " : "+v.getTaskString());
 				it.setData(change);
 				if(v.status == SyncJob.STATUS_CONFLICT) currentConflictsCount ++;
 			}
@@ -171,7 +171,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 		} catch (SQLException e) {
 			Logger.getRootLogger().error("Synchro", e);
 		} finally{
-			Manager.getInstance().releaseConnection();
+			CoreManager.getInstance().releaseConnection();
 		}
 	}
 	
@@ -195,7 +195,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					composite1.setLayout(composite1Layout);
 					{
 						label1 = new Label(composite1, SWT.NONE);
-						label1.setText(Manager.getMessage("logviewer_synclogs"));
+						label1.setText(CoreManager.getMessage("logviewer_synclogs"));
 						FormData label1FormData = new FormData();
 						label1FormData.left =  new FormAttachment(0, 1000, 5);
 						label1FormData.top =  new FormAttachment(0, 1000, 10);
@@ -256,19 +256,19 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						table1.setLayoutData(table1FormData);
 						{
 							table1ColumnDate = new TableColumn(table1, SWT.NONE);
-							table1ColumnDate.setText(Manager.getMessage("logviewer_column_date"));
+							table1ColumnDate.setText(CoreManager.getMessage("logviewer_column_date"));
 							table1ColumnDate.setData("date");
 							table1ColumnDate.addListener(SWT.Selection, sortListener);							
 						}
 						{
 							table1ColumnResult = new TableColumn(table1, SWT.NONE);
-							table1ColumnResult.setText(Manager.getMessage("logviewer_column_result"));
+							table1ColumnResult.setText(CoreManager.getMessage("logviewer_column_result"));
 							table1ColumnResult.setData("result");
 							table1ColumnResult.addListener(SWT.Selection, sortListener);
 						}
 						{
 							table1ColumnSummary = new TableColumn(table1, SWT.NONE);
-							table1ColumnSummary.setText(Manager.getMessage("logviewer_column_summary"));
+							table1ColumnSummary.setText(CoreManager.getMessage("logviewer_column_summary"));
 							table1ColumnSummary.setData("summary");
 							table1ColumnSummary.addListener(SWT.Selection, sortListener);
 						}					
@@ -281,7 +281,7 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					composite2.setLayout(composite1Layout);
 					{
 						label2 = new Label(composite2, SWT.NONE);
-						label2.setText(Manager.getMessage("logviewer_interrupted_tasks"));
+						label2.setText(CoreManager.getMessage("logviewer_interrupted_tasks"));
 						FormData label1FormData = new FormData();
 						label1FormData.left =  new FormAttachment(0, 1000, 5);
 						label1FormData.top =  new FormAttachment(0, 1000, 10);
@@ -303,15 +303,15 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 						table2.setLayoutData(table1FormData);
 						{
 							table2ColumnFile = new TableColumn(table2, SWT.NONE);
-							table2ColumnFile.setText(Manager.getMessage("logviewer_column_file"));
+							table2ColumnFile.setText(CoreManager.getMessage("logviewer_column_file"));
 						}
 						{
 							table2ColumnStatus = new TableColumn(table2, SWT.NONE);
-							table2ColumnStatus.setText(Manager.getMessage("logviewer_column_status"));
+							table2ColumnStatus.setText(CoreManager.getMessage("logviewer_column_status"));
 						}
 						{
 							TableColumn table2ColumnTask = new TableColumn(table2, SWT.NONE);
-							table2ColumnTask.setText(Manager.getMessage("logviewer_column_task"));
+							table2ColumnTask.setText(CoreManager.getMessage("logviewer_column_task"));
 						}
 					}
 				}			
@@ -341,12 +341,12 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 solveMenu = new Menu(this.getShell(),
                      SWT.POP_UP);
 			 itemSolveKeepMine = new MenuItem(solveMenu, SWT.PUSH);
-			 itemSolveKeepMine.setText(Manager.getMessage("logviewer_conflict_keepmine"));
+			 itemSolveKeepMine.setText(CoreManager.getMessage("logviewer_conflict_keepmine"));
 			 itemSolveKeepMine.setData("mine");
 			 SelectionListener listener = new SelectionListener() {				 
 				 public void widgetSelected(SelectionEvent arg0) {
 					 boolean changes = false;
-					 ConnectionSource cs = Manager.getInstance().getConnection();
+					 ConnectionSource cs = CoreManager.getInstance().getConnection();
 					 try{
 					 for(TableItem currentTarget:table2.getSelection()){
 						 SyncChange c = (SyncChange)currentTarget.getData();
@@ -369,16 +369,16 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 					 }catch(SQLException e){
 						 Logger.getRootLogger().error("Synchro", e);
 					 }finally{
-						 Manager.getInstance().releaseConnection();
+						 CoreManager.getInstance().releaseConnection();
 					 }
 					 if(changes) reload();
 					 solveMenu.setVisible(false);
 					 if(currentConflictsCount == 0){
 						MessageBox messageBox = new MessageBox(LogViewer.this.getShell(), SWT.ICON_QUESTION|SWT.YES|SWT.NO);
-					    messageBox.setMessage(Manager.getMessage("logviewer_conflict_solved"));
+					    messageBox.setMessage(CoreManager.getMessage("logviewer_conflict_solved"));
 					    if(messageBox.open() == SWT.YES){
 					    	try {
-								Manager.getInstance().triggerJobNow(currentSynchroNode, false);
+								CoreManager.getInstance().triggerJobNow(currentSynchroNode, false);
 							} catch (SchedulerException e) {
 								Logger.getRootLogger().error("Synchro", e);
 							}
@@ -389,15 +389,15 @@ public class LogViewer extends org.eclipse.swt.widgets.Composite {
 			 };			 
 			 itemSolveKeepMine.addSelectionListener(listener);
 			 itemSolveKeepTheir = new MenuItem(solveMenu, SWT.PUSH);
-			 itemSolveKeepTheir.setText(Manager.getMessage("logviewer_conflict_keeptheir"));
+			 itemSolveKeepTheir.setText(CoreManager.getMessage("logviewer_conflict_keeptheir"));
 			 itemSolveKeepTheir.setData("their");
 			 itemSolveKeepTheir.addSelectionListener(listener);
 			 itemSolveKeepBoth = new MenuItem(solveMenu, SWT.PUSH);
-			 itemSolveKeepBoth.setText(Manager.getMessage("logviewer_conflict_keepboth"));
+			 itemSolveKeepBoth.setText(CoreManager.getMessage("logviewer_conflict_keepboth"));
 			 itemSolveKeepBoth.setData("both");
 			 itemSolveKeepBoth.addSelectionListener(listener);
              itemSolveIgnore = new MenuItem(solveMenu, SWT.PUSH);
-             itemSolveIgnore.setText(Manager.getMessage("logviewer_conflict_ignore"));
+             itemSolveIgnore.setText(CoreManager.getMessage("logviewer_conflict_ignore"));
              itemSolveIgnore.setData("ignore");
              itemSolveIgnore.addSelectionListener(listener);
 			this.layout();
