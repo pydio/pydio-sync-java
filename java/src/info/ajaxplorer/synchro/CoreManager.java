@@ -65,7 +65,9 @@ import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
 
 public class CoreManager {
-
+	
+	private Logger log = Logger.getLogger(getClass());
+	
 	
 	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "mysql", "imap", "jsapi"};
 	public String[] EXCLUDED_FILES_START = {".", "Thumbs.db"};
@@ -316,10 +318,22 @@ public class CoreManager {
 		}
 	}
 	
+	/**
+	 * Return home directory for DB
+	 * @return
+	 */
+	protected String getDBHomeDir() {
+		return System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer";
+	}
+	
 	protected boolean initializeDAO() throws SQLException{
 
-		File work = new File(System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer");
-		if(!work.exists()) work.mkdir();
+		String dbHomeDir = getDBHomeDir();
+		
+		log.info("CoreManager " + getClass() + " initializeDao: " + dbHomeDir);
+		
+		File work = new File(dbHomeDir);
+		if(!work.exists()) work.mkdirs();
 		File dbFile = new File(work, "ajxpsync.db");
 		boolean dbAlreadyCreated = dbFile.exists();
 		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();		
