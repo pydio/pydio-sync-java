@@ -29,6 +29,7 @@ import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
+import info.ajaxplorer.synchro.model.SyncLogDetails;
 
 import java.io.File;
 import java.net.URI;
@@ -338,19 +339,27 @@ public class CoreManager {
 		boolean dbAlreadyCreated = dbFile.exists();
 		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();		
 
+
 		if(!dbAlreadyCreated){
 			ConnectionSource cs = this.getConnection();
 			TableUtils.createTable(cs, Node.class);
 			TableUtils.createTable(cs, Property.class);
 			TableUtils.createTable(cs, SyncChange.class);
 			TableUtils.createTable(cs, SyncLog.class);
+			TableUtils.createTable(cs, SyncLogDetails.class);
 
 			DaoManager.createDao(cs, Node.class).executeRaw("CREATE TRIGGER on_delete_cascade AFTER DELETE ON a BEGIN\n" + 
 					"  DELETE FROM b WHERE node_id=old.id;\n" +
 					"  DELETE FROM a WHERE parent_id=old.id;\n" +
 					"END;");
 			this.releaseConnection();
-		}        		
+		} else {
+			// we have added some new tables?
+			// backwar compatibility
+			ConnectionSource cs = this.getConnection();
+			TableUtils.createTableIfNotExists(cs, SyncLogDetails.class);
+			this.releaseConnection();
+		}
 		return dbAlreadyCreated;
 	}
 	

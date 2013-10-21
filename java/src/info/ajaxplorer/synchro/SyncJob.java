@@ -32,10 +32,10 @@ import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.exceptions.SynchroFileOperationException;
 import info.ajaxplorer.synchro.exceptions.SynchroOperationException;
-import info.ajaxplorer.synchro.gui.SysTray;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
+import info.ajaxplorer.synchro.model.SyncLogDetails;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -60,6 +60,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -135,6 +136,7 @@ public class SyncJob implements InterruptableJob {
 	Dao<SyncChange, String> syncChangeDao;
 	Dao<SyncLog, String> syncLogDao;
 	Dao<Property, Integer> propertyDao;
+	Dao<SyncLogDetails, String> syncLogDetailsDao;
 
 	private String currentJobNodeID;
 	private boolean clearSnapshots = false;
@@ -150,6 +152,11 @@ public class SyncJob implements InterruptableJob {
 	private int countResourcesInterrupted = 0;
 	private int countResourcesErrors = 0;
 	private int countConflictsDetected = 0;
+
+	// FIXME - i do not think so it is good idea to handle it globally
+	// should be passed by return object from sync methods...
+	// also above fields
+	private Map<String, String> errorMessages = new HashMap<String, String>();
 
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
@@ -241,6 +248,7 @@ public class SyncJob implements InterruptableJob {
 		nodeDao = null;
 		syncChangeDao = null;
 		syncLogDao = null;
+		syncLogDetailsDao = null;
 		propertyDao = null;
 		return true;
 
@@ -292,6 +300,9 @@ public class SyncJob implements InterruptableJob {
 			syncLogDao = DaoManager.createDao(connectionSource, SyncLog.class);
 			propertyDao = DaoManager
 					.createDao(connectionSource, Property.class);
+
+			syncLogDetailsDao = DaoManager.createDao(connectionSource,
+					SyncLogDetails.class);
 
 			currentRepository = getCoreManager().getSynchroNode(
 					currentJobNodeID, nodeDao);
@@ -396,8 +407,6 @@ public class SyncJob implements InterruptableJob {
 				throw new InterruptedException();
 			}
 			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
-			// FIXME - potential danger - changes are merged when file cannot be
-			// accessed?
 			Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
 			updateRunningStatus(RUNNING_STATUS_APPLY_CHANGES);
 			Map<String, Object[]> remainingChanges = applyChanges(changes);
@@ -488,6 +497,22 @@ public class SyncJob implements InterruptableJob {
 			sl.jobSummary = summary;
 			sl.synchroNode = currentRepository;
 			syncLogDao.create(sl);
+
+			// if there are any errors we just save them connected with actual
+			// SyncLog
+			Iterator<Entry<String, String>> errorMessagesIterator = errorMessages
+					.entrySet().iterator();
+			while (errorMessagesIterator.hasNext()) {
+				Entry<String, String> entry = errorMessagesIterator.next();
+				SyncLogDetails details = new SyncLogDetails();
+				details.setFileName(entry.getKey());
+				details.setMessage(entry.getValue());
+				details.setParentLog(sl);
+
+				syncLogDetailsDao.create(details);
+			}
+			// clear error messages for new synchronisation
+			errorMessages.clear();
 
 			getCoreManager().updateSynchroState(currentRepository, false);
 			getCoreManager().releaseConnection();
@@ -582,8 +607,7 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
-	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes)
-			 {
+	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) {
 		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet()
 				.iterator();
 		Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
@@ -786,11 +810,13 @@ public class SyncJob implements InterruptableJob {
 					moves.put(k, value);
 				}
 			} catch (FileNotFoundException ex) {
+				addSyncDetailMessage(k, ex);
 				ex.printStackTrace();
 				countResourcesErrors++;
 				// Do not put in the notApplied again, otherwise it will
 				// indefinitely happen.
 			} catch (Exception e) {
+				addSyncDetailMessage(k, e);
 				Logger.getRootLogger().error("Synchro", e);
 				countResourcesErrors++;
 				value[2] = STATUS_ERROR;
@@ -857,13 +883,14 @@ public class SyncJob implements InterruptableJob {
 					countResourcesSynchronized++;
 
 				}
-
 			} catch (FileNotFoundException ex) {
+				addSyncDetailMessage(k, ex);
 				ex.printStackTrace();
 				countResourcesErrors++;
 				// Do not put in the notApplied again, otherwise it will
 				// indefinitely happen.
 			} catch (Exception e) {
+				addSyncDetailMessage(k, e);
 				Logger.getRootLogger().error("Synchro", e);
 				countResourcesErrors++;
 				value[2] = STATUS_ERROR;
@@ -921,11 +948,13 @@ public class SyncJob implements InterruptableJob {
 				}
 
 			} catch (FileNotFoundException ex) {
+				addSyncDetailMessage(k, ex);
 				ex.printStackTrace();
 				countResourcesErrors++;
 				// Do not put in the notApplied again, otherwise it will
 				// indefinitely happen.
 			} catch (Exception e) {
+				addSyncDetailMessage(k, e);
 				Logger.getRootLogger().error("Synchro", e);
 				countResourcesErrors++;
 				value[2] = STATUS_ERROR;
@@ -934,6 +963,20 @@ public class SyncJob implements InterruptableJob {
 		}
 		rest.release();
 		return notApplied;
+	}
+
+	/**
+	 * Add detailed message to error messages collection executed during any
+	 * error occurred which increases error count will handle details for
+	 * SyncLog
+	 * 
+	 * @param fileName
+	 * @param ex
+	 */
+	private void addSyncDetailMessage(String fileName, Throwable ex) {
+		if (!errorMessages.containsKey(fileName)) {
+			errorMessages.put(fileName, ex.getMessage());
+		}
 	}
 
 	protected JSONObject statRemoteFile(Node n, String type, RestRequest rest) {
@@ -1632,8 +1675,9 @@ public class SyncJob implements InterruptableJob {
 	 * @throws SynchroFileOperationException
 	 * @throws InterruptedException
 	 */
-	protected void updateNode(Node node, File targetFile, Node remoteNode) throws SynchroOperationException, SynchroFileOperationException, InterruptedException
-			 {
+	protected void updateNode(Node node, File targetFile, Node remoteNode)
+			throws SynchroOperationException, SynchroFileOperationException,
+			InterruptedException {
 
 		if (targetFile.exists() && getCoreManager().getRdiffProc() != null
 				&& getCoreManager().getRdiffProc().rdiffEnabled()) {
@@ -1649,7 +1693,8 @@ public class SyncJob implements InterruptableJob {
 			try {
 				uri = AjxpAPI.getInstance().getFilehashDeltaUri(node);
 			} catch (URISyntaxException e) {
-				throw new SynchroOperationException("URI Syntax error:\n" + e.getMessage(), e);
+				throw new SynchroOperationException("URI Syntax error: "
+						+ e.getMessage(), e);
 			}
 			this.uriContentToFile(uri, delta, sigFile);
 			sigFile.delete();
@@ -1699,22 +1744,26 @@ public class SyncJob implements InterruptableJob {
 	 * @throws SynchroFileOperationException
 	 * @throws InterruptedException
 	 */
-	protected void synchronousDL(Node node, File targetFile) throws SynchroOperationException, SynchroFileOperationException, InterruptedException  {
+	protected void synchronousDL(Node node, File targetFile)
+			throws SynchroOperationException, SynchroFileOperationException,
+			InterruptedException {
 
 		URI uri = null;
 		try {
 			uri = AjxpAPI.getInstance().getDownloadUri(node.getPath(true));
 		} catch (URISyntaxException e) {
-			throw new SynchroOperationException("Wrong URI Syntax:\n" + e.getMessage(), e);
+			throw new SynchroOperationException("Wrong URI Syntax: "
+					+ e.getMessage(), e);
 		}
 		this.uriContentToFile(uri, targetFile, null);
 
 	}
 
 	/**
-	 * Rewrites remote file content to local file
-	 * Many things can go wrong so there are different exception types thrown
-	 * When succeded - <code>targetFile</code> contain <code>uploadFile</code> content
+	 * Rewrites remote file content to local file Many things can go wrong so
+	 * there are different exception types thrown When succeded -
+	 * <code>targetFile</code> contain <code>uploadFile</code> content
+	 * 
 	 * @param uri
 	 * @param targetFile
 	 * @param uploadFile
@@ -1723,7 +1772,8 @@ public class SyncJob implements InterruptableJob {
 	 * @throws InterruptedException
 	 */
 	protected void uriContentToFile(URI uri, File targetFile, File uploadFile)
-			throws SynchroOperationException, SynchroFileOperationException, InterruptedException {
+			throws SynchroOperationException, SynchroFileOperationException,
+			InterruptedException {
 
 		RestRequest rest = this.getRequest();
 		int postedProgress = 0;
@@ -1734,7 +1784,7 @@ public class SyncJob implements InterruptableJob {
 			entity = rest.getNotConsumedResponseEntity(uri, null, uploadFile);
 		} catch (Exception e) {
 			throw new SynchroOperationException(
-					"Error during response entity:\n" + e.getMessage(), e);
+					"Error during response entity: " + e.getMessage(), e);
 		}
 		long fullLength = entity.getContentLength();
 		if (fullLength <= 0) {
@@ -1748,11 +1798,11 @@ public class SyncJob implements InterruptableJob {
 			input = entity.getContent();
 		} catch (IllegalStateException e) {
 			throw new SynchroOperationException(
-					"Error during getting entity content:\n" + e.getMessage(),
+					"Error during getting entity content: " + e.getMessage(),
 					e);
 		} catch (IOException e) {
 			throw new SynchroOperationException(
-					"Error during getting entity content:\n" + e.getMessage(),
+					"Error during getting entity content: " + e.getMessage(),
 					e);
 		}
 		BufferedInputStream in = new BufferedInputStream(input, buffersize);
@@ -1762,7 +1812,7 @@ public class SyncJob implements InterruptableJob {
 			output = new FileOutputStream(targetFile.getPath());
 		} catch (FileNotFoundException e) {
 			throw new SynchroFileOperationException(
-					"Error during file accessing:\n" + e.getMessage(), e);
+					"Error during file accessing: " + e.getMessage(), e);
 		}
 		BufferedOutputStream out = new BufferedOutputStream(output);
 
@@ -1777,41 +1827,46 @@ public class SyncJob implements InterruptableJob {
 		long interval = (long) 2 * secondLength;
 
 		try {
-		while ((count = in.read(data)) != -1) {
-			long duration = System.nanoTime() - lastTime;
+			while ((count = in.read(data)) != -1) {
+				long duration = System.nanoTime() - lastTime;
 
 			int tmpTotal = total + count;
-			// publishing the progress....
-			int tmpProgress = (int) (tmpTotal * 100 / fullLength);
-			if (tmpProgress - postedProgress > 0 || duration > secondLength) {
-				if (duration > interval) {
-					lastTime = System.nanoTime();
-					long lastTimeBytes = (long) ((tmpTotal - lastTimeTotal)
-							* secondLength / 1024 / 1000);
-					long speed = (lastTimeBytes / (duration));
-					double bytesleft = (double) (((double) fullLength - (double) tmpTotal) / 1024);
-					@SuppressWarnings("unused")
-					double ETC = bytesleft / (speed * 10);
+				// publishing the progress....
+				int tmpProgress = (int) (tmpTotal * 100 / fullLength);
+				if (tmpProgress - postedProgress > 0 || duration > secondLength) {
+					if (duration > interval) {
+						lastTime = System.nanoTime();
+						long lastTimeBytes = (long) ((tmpTotal - lastTimeTotal)
+								* secondLength / 1024 / 1000);
+						long speed = (lastTimeBytes / (duration));
+						double bytesleft = (double) (((double) fullLength - (double) tmpTotal) / 1024);
+						@SuppressWarnings("unused")
+						double ETC = bytesleft / (speed * 10);
 				}
-				if (tmpProgress != postedProgress) {
-					logChange(getMessage("job_log_downloading"),
-							targetFile.getName() + " - " + tmpProgress + "%");
+					if (tmpProgress != postedProgress) {
+						logChange(getMessage("job_log_downloading"),
+								targetFile.getName() + " - " + tmpProgress
+										+ "%");
 				}
-				postedProgress = tmpProgress;
+					postedProgress = tmpProgress;
 			}
-			out.write(data, 0, count);
-			total = tmpTotal;
-			if (this.interruptRequired) {
-				break;
+				out.write(data, 0, count);
+				total = tmpTotal;
+				if (this.interruptRequired) {
+					break;
 			}
-		}
-		out.flush();
-		if (out != null) {
-			out.close();}
-		if (in != null){
-			in.close();}
+			}
+			out.flush();
+			if (out != null) {
+				out.close();
+			}
+			if (in != null) {
+				in.close();
+			}
 		} catch (IOException e) {
-			throw new SynchroFileOperationException("Error during file content rewriting:\n" + e.getMessage(), e);
+			throw new SynchroFileOperationException(
+					"Error during file content rewriting: " + e.getMessage(),
+					e);
 		}
 		if (this.interruptRequired) {
 			rest.release();
