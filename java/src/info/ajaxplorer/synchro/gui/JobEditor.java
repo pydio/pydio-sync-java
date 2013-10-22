@@ -234,7 +234,6 @@ public class JobEditor extends Composite{
 		values.put("TARGET", tfTarget.getText());
 		values.put("ACTIVE", (currentActiveState?"true":"false"));
 
-		// FIXME - new value
 		values.put(AUTO_KEEP_REMOTE_DATA, (autoKeepRemoteState ? "true"
 				: "false"));
 

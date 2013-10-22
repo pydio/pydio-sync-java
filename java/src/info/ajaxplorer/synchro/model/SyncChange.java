@@ -83,9 +83,6 @@ public class SyncChange {
 			value[1] = changes.get(i).getChangeValue().n;
 			value[2] = changes.get(i).getChangeValue().status;
 
-			// FIXME - second place to implement /23
-			// change [0] to keep_their and [2] to conflict_solved
-
 			// if user want to have auto keep remote version
 			// change the node params
 			if (behavior == SyncJob.TASK_SOLVE_KEEP_THEIR) {
