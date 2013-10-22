@@ -45,6 +45,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
+import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
@@ -82,6 +83,9 @@ import org.w3c.dom.NodeList;
 
 public class JobEditor extends Composite{
 
+	public static final String AUTO_KEEP_REMOTE_DATA = "AUTOKEEPREMOTE";
+	public static final String AUTO_KEEP_REMOTE = "auto_keep_remote";
+
 	{
 		//Register as a resource user - SWTResourceManager will
 		//handle the obtaining and disposing of resources
@@ -102,6 +106,7 @@ public class JobEditor extends Composite{
 	private Button radioSyncInterval3;
 	private Button radioSyncInterval1;
 	private Combo comboDirection;
+	private Button keepAutoRemote;
 	private Text tfLogin;
 	
 	private Action saveAction;
@@ -115,6 +120,7 @@ public class JobEditor extends Composite{
 	private LogViewer logs;
 	
 	private boolean currentActiveState = true;
+	private boolean autoKeepRemoteState = false;
 	
 	private HashMap<String, String> repoItems;
 	//private ConfigPanel configPanel;
@@ -200,6 +206,10 @@ public class JobEditor extends Composite{
 			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
 			values.put("DIRECTION", baseNode.getPropertyValue("synchro_direction"));
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
+
+			values.put(AUTO_KEEP_REMOTE_DATA,
+					baseNode.getPropertyValue(AUTO_KEEP_REMOTE));
+
 			this.loadFormData(values);		
 			if(this.form != null){
 				//((FormHeading)this.form.getHead()).setText(CoreManager.getInstance().makeJobLabel(baseNode, true));				
@@ -223,6 +233,11 @@ public class JobEditor extends Composite{
 		values.put("REPOSITORY_ID", currentRepoId);
 		values.put("TARGET", tfTarget.getText());
 		values.put("ACTIVE", (currentActiveState?"true":"false"));
+
+		// FIXME - new value
+		values.put(AUTO_KEEP_REMOTE_DATA, (autoKeepRemoteState ? "true"
+				: "false"));
+
 		String dir = "bi";
 		if(comboDirection.getSelectionIndex() == 1) dir = "up";
 		else if(comboDirection.getSelectionIndex() == 2) dir = "down";
@@ -257,6 +272,10 @@ public class JobEditor extends Composite{
 		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
 		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
 		
+		keepAutoRemote
+.setSelection("true".equals(values
+				.get(AUTO_KEEP_REMOTE_DATA)));
+
 		saveAction.setEnabled(false);
 		
 	}
@@ -275,6 +294,9 @@ public class JobEditor extends Composite{
 		tfTarget.setText("");
 		comboDirection.select(0);
 		
+		autoKeepRemoteState = false;
+		keepAutoRemote.setEnabled(false);
+
 		radioSyncInterval1.setSelection(false);
 		radioSyncInterval2.setSelection(true);
 		radioSyncInterval3.setSelection(false);
@@ -501,7 +523,28 @@ public class JobEditor extends Composite{
 	    test.maxWidth = 180;
 	    comboDirection.setLayoutData(test);
 	    comboDirection.select(0);
-				
+		comboDirection.addModifyListener(new ModifyListener() {
+
+			@Override
+			public void modifyText(ModifyEvent event) {
+				int selectionIndex = comboDirection.getSelectionIndex();
+				autoKeepRemoteState = false;
+				keepAutoRemote.setSelection(false);
+				if (selectionIndex == 2) {
+					// DOWNLOAD ONLY
+					keepAutoRemote.setEnabled(true);
+				} else {
+					keepAutoRemote.setEnabled(false);
+				}
+			}
+		});
+
+		// new checkbox for setting auto keeping remote
+		keepAutoRemote = toolkit.createButton(sectionClient3,
+				CoreManager.getMessage("jobeditor_autokeepremote"), SWT.CHECK);
+		keepAutoRemote.setLayoutData(new TableWrapData(TableWrapData.LEFT,
+				TableWrapData.MIDDLE));
+
 		Label lab2 = toolkit.createLabel(sectionClient3, CoreManager.getMessage("jobeditor_frequency") + " : ");
 		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp2= toolkit.createComposite(sectionClient3);
@@ -550,6 +593,14 @@ public class JobEditor extends Composite{
 		tfPassword.addModifyListener(tfMod);
 		tfTarget.addModifyListener(tfMod);
 		comboDirection.addModifyListener(tfMod);
+		keepAutoRemote.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				super.widgetSelected(e);
+				autoKeepRemoteState = keepAutoRemote.getSelection();
+				saveAction.setEnabled(true);
+			}
+		});
 		radioSyncInterval1.addSelectionListener(rSel);
 		
 		closeAction = new Action("Close", new ImageDescriptor() {

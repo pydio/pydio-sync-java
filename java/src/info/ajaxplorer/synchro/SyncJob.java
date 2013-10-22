@@ -32,6 +32,7 @@ import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.exceptions.SynchroFileOperationException;
 import info.ajaxplorer.synchro.exceptions.SynchroOperationException;
+import info.ajaxplorer.synchro.gui.JobEditor;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
@@ -158,8 +159,19 @@ public class SyncJob implements InterruptableJob {
 	// also above fields
 	private Map<String, String> errorMessages = new HashMap<String, String>();
 
+	// denotes if user want to auto keep remote file
+	// by default is FALSE
+	// it is only available change to true, if direction == DOWNLOAD ONLY
+	private boolean autoKeepRemoteFile = true;
+
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
+		String keepRemoteData = ctx.getMergedJobDataMap().getString(
+				JobEditor.AUTO_KEEP_REMOTE);
+		if (keepRemoteData != null) {
+			autoKeepRemoteFile = Boolean.valueOf(keepRemoteData);
+		}
+
 		currentJobNodeID = ctx.getMergedJobDataMap().getString("node-id");
 		if (ctx.getMergedJobDataMap().containsKey("clear-snapshots")
 				&& ctx.getMergedJobDataMap().getBooleanValue("clear-snapshots")) {
@@ -339,8 +351,15 @@ public class SyncJob implements InterruptableJob {
 			final List<SyncChange> previouslyRemaining = syncChangeDao
 					.queryForEq("jobId", currentJobNodeID);
 			Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
+			// by default - do nothing
+			int action = SyncJob.TASK_DO_NOTHING;
+			// check if user want to keep remote automatically
+			if (autoKeepRemoteFile) {
+				action = SyncJob.TASK_SOLVE_KEEP_THEIR;
+			}
+
 			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(
-					previouslyRemaining, previousChanges);
+					previouslyRemaining, previousChanges, action);
 			Map<String, Object[]> again = null;
 			if (!localWatchOnly && unsolvedConflicts) {
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR,
@@ -1046,9 +1065,14 @@ public class SyncJob implements InterruptableJob {
 					localDiff.remove(k);
 					continue;
 				} else {
-
-					value[0] = TASK_DO_NOTHING;
-					value[2] = STATUS_CONFLICT;
+					// check if user want to have auto keep remote
+					if (autoKeepRemoteFile) {
+						value[0] = TASK_SOLVE_KEEP_THEIR;
+						value[2] = STATUS_CONFLICT_SOLVED;
+					} else {
+						value[0] = TASK_DO_NOTHING;
+						value[2] = STATUS_CONFLICT;
+					}
 					localDiff.remove(k);
 					changes.put(k, value);
 				}
