@@ -161,8 +161,12 @@ public class SyncJob implements InterruptableJob {
 
 	// denotes if user want to auto keep remote file
 	// by default is FALSE
-	// it is only available change to true, if direction == DOWNLOAD ONLY
+	// it is only available change to true, if direction == DOWNLOAD ONLY || BI
 	private boolean autoKeepRemoteFile = true;
+	// denotes if user want to auto keep local file
+	// by default is FALSE
+	// it is only available change to true, if direction == UPLOAD ONLY || BI
+	private boolean autoKeepLocalFile = true;
 
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
@@ -171,7 +175,11 @@ public class SyncJob implements InterruptableJob {
 		if (keepRemoteData != null) {
 			autoKeepRemoteFile = Boolean.valueOf(keepRemoteData);
 		}
-
+		String keepLocalData = ctx.getMergedJobDataMap().getString(
+				JobEditor.AUTO_KEEP_LOCAL);
+		if (keepLocalData != null) {
+			autoKeepLocalFile = Boolean.valueOf(keepLocalData);
+		}
 		currentJobNodeID = ctx.getMergedJobDataMap().getString("node-id");
 		if (ctx.getMergedJobDataMap().containsKey("clear-snapshots")
 				&& ctx.getMergedJobDataMap().getBooleanValue("clear-snapshots")) {
@@ -356,6 +364,8 @@ public class SyncJob implements InterruptableJob {
 			// check if user want to keep remote automatically
 			if (autoKeepRemoteFile) {
 				action = SyncJob.TASK_SOLVE_KEEP_THEIR;
+			} else if (autoKeepLocalFile) {
+				action = SyncJob.TASK_SOLVE_KEEP_MINE;
 			}
 
 			boolean unsolvedConflicts = SyncChange.syncChangesToTreeMap(
@@ -1068,6 +1078,9 @@ public class SyncJob implements InterruptableJob {
 					// check if user want to have auto keep remote
 					if (autoKeepRemoteFile) {
 						value[0] = TASK_SOLVE_KEEP_THEIR;
+						value[2] = STATUS_CONFLICT_SOLVED;
+					} else if (autoKeepLocalFile) {
+						value[0] = TASK_SOLVE_KEEP_MINE;
 						value[2] = STATUS_CONFLICT_SOLVED;
 					} else {
 						value[0] = TASK_DO_NOTHING;

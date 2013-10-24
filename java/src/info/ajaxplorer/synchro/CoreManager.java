@@ -393,6 +393,8 @@ public class CoreManager {
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
 			node.addProperty(JobEditor.AUTO_KEEP_REMOTE,
 					data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
+			node.addProperty(JobEditor.AUTO_KEEP_LOCAL,
+					data.get(JobEditor.AUTO_KEEP_LOCAL_DATA));
 
 			node.addProperty("sync_running_status", "-1");
 			nDao.update(node);
@@ -428,10 +430,15 @@ public class CoreManager {
 			Collection<Property> props = node.properties;
 			Collection<Property> toSave = new ArrayList<Property>();
 
-			// check if we already have property auto keep remote
+			// check if we already have property auto keep remote & auto keep
+			// local
 			if (node.getPropertyValue(JobEditor.AUTO_KEEP_REMOTE) == null) {
 				node.addProperty(JobEditor.AUTO_KEEP_REMOTE,
 						data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
+			}
+			if (node.getPropertyValue(JobEditor.AUTO_KEEP_LOCAL) == null) {
+				node.addProperty(JobEditor.AUTO_KEEP_LOCAL,
+						data.get(JobEditor.AUTO_KEEP_LOCAL_DATA));
 			}
 			for(Property p:props){
 				if(p.getName().equals("repository_id")
@@ -468,7 +475,13 @@ public class CoreManager {
 						&& !p.getValue().equals(
 								data.get(JobEditor.AUTO_KEEP_REMOTE_DATA))) {
 					p.setValue(data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
-					intervalChanges = true;
+					serverChanges = true;
+					toSave.add(p);
+				} else if (p.getName().equals(JobEditor.AUTO_KEEP_LOCAL)
+						&& !p.getValue().equals(
+								data.get(JobEditor.AUTO_KEEP_LOCAL_DATA))) {
+					p.setValue(data.get(JobEditor.AUTO_KEEP_LOCAL_DATA));
+					serverChanges = true;
 					toSave.add(p);
 				}
 			}
@@ -671,6 +684,8 @@ public class CoreManager {
         		.usingJobData("node-id", String.valueOf(n.id))
 				.usingJobData(JobEditor.AUTO_KEEP_REMOTE,
 						n.getPropertyValue(JobEditor.AUTO_KEEP_REMOTE))
+				.usingJobData(JobEditor.AUTO_KEEP_LOCAL,
+						n.getPropertyValue(JobEditor.AUTO_KEEP_LOCAL))
         		.build();
 
         if(firstTriggerClear){
