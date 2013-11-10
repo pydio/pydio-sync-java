@@ -75,6 +75,9 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.http.HttpEntity;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
+import org.mapdb.Utils;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.InterruptableJob;
 import org.quartz.JobExecutionContext;
@@ -1468,7 +1471,17 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> diffNodeLists(List<Node> current,
 			List<Node> snapshot, String type) {
 		List<Node> saved = new ArrayList<Node>(snapshot);
-		TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
+		// TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
+
+		/**
+		 * Open database in temporary directory
+		 */
+		File dbFile = Utils.tempDbFile();
+		DB db = DBMaker.newFileDB(dbFile)
+		/** disabling Write Ahead Log makes import much faster */
+		.transactionDisable().make();
+
+		Map<String, Object[]> diff = db.createTreeMap(type).make();
 		Iterator<Node> cIt = current.iterator();
 		List<Node> created = new ArrayList<Node>();
 		while (cIt.hasNext()) {
