@@ -62,7 +62,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -161,6 +160,10 @@ public class SyncJob implements InterruptableJob {
 	// should be passed by return object from sync methods...
 	// also above fields
 	private Map<String, String> errorMessages = new HashMap<String, String>();
+
+	// FIXME - collection of mapDbs - we will use it for
+	// closing dbs after sync
+	private List<DB> mapDBs = new ArrayList<DB>();
 
 	// denotes if user want to auto keep remote file
 	// by default is FALSE
@@ -361,7 +364,9 @@ public class SyncJob implements InterruptableJob {
 					(localWatchOnly ? false : true));
 			final List<SyncChange> previouslyRemaining = syncChangeDao
 					.queryForEq("jobId", currentJobNodeID);
-			Map<String, Object[]> previousChanges = new TreeMap<String, Object[]>();
+			// Map<String, Object[]> previousChanges = new TreeMap<String,
+			// Object[]>();
+			Map<String, Object[]> previousChanges = createMapDBFile("previous");
 			// by default - do nothing
 			int action = SyncJob.TASK_DO_NOTHING;
 			// check if user want to keep remote automatically
@@ -550,6 +555,7 @@ public class SyncJob implements InterruptableJob {
 			getCoreManager().releaseConnection();
 			DaoManager.clearCache();
 
+
 		} catch (InterruptedException ie) {
 
 			getCoreManager().notifyUser("Stopping",
@@ -574,6 +580,13 @@ public class SyncJob implements InterruptableJob {
 			}
 			getCoreManager().releaseConnection();
 			DaoManager.clearCache();
+		} finally {
+			// synchronisation is finished (or not) - we need to close all
+			// mapDBs
+			for (DB db : mapDBs) {
+				db.close();
+			}
+
 		}
 	}
 
@@ -642,10 +655,14 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) {
 		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet()
 				.iterator();
-		Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
+		// Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
+		// // Make sure to apply those one at the end
+		// Map<String, Object[]> moves = new TreeMap<String, Object[]>();
+		// Map<String, Object[]> deletes = new TreeMap<String, Object[]>();
+		Map<String, Object[]> notApplied = createMapDBFile("notApplied");
 		// Make sure to apply those one at the end
-		Map<String, Object[]> moves = new TreeMap<String, Object[]>();
-		Map<String, Object[]> deletes = new TreeMap<String, Object[]>();
+		Map<String, Object[]> moves = createMapDBFile("moves");
+		Map<String, Object[]> deletes = createMapDBFile("deletes");
 		RestRequest rest = this.getRequest();
 		while (it.hasNext()) {
 			Map.Entry<String, Object[]> entry = it.next();
@@ -1061,7 +1078,8 @@ public class SyncJob implements InterruptableJob {
 
 	protected Map<String, Object[]> mergeChanges(
 			Map<String, Object[]> remoteDiff, Map<String, Object[]> localDiff) {
-		Map<String, Object[]> changes = new TreeMap<String, Object[]>();
+		// Map<String, Object[]> changes = new TreeMap<String, Object[]>();
+		Map<String, Object[]> changes = createMapDBFile("merge");
 		Iterator<Map.Entry<String, Object[]>> it = remoteDiff.entrySet()
 				.iterator();
 		while (it.hasNext()) {
@@ -1468,20 +1486,35 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
+	/**
+	 * Creates a new mapDB collection for file accessible map
+	 * 
+	 * @param mapName
+	 * @return
+	 */
+	private Map<String, Object[]> createMapDBFile(String mapName) {
+		/**
+		 * Open database in temporary directory
+		 */
+		File dbFile = null;
+		try {
+			dbFile = File.createTempFile("pydio", "mapdb");
+		} catch (IOException e) {
+			dbFile = Utils.tempDbFile();
+		}
+		DB db = DBMaker.newFileDB(dbFile).deleteFilesAfterClose().transactionDisable().make();
+		// add db to collection for closing after syncro finishes
+		mapDBs.add(db);
+
+		return db.createTreeMap(mapName).make();
+	}
+
 	protected Map<String, Object[]> diffNodeLists(List<Node> current,
 			List<Node> snapshot, String type) {
 		List<Node> saved = new ArrayList<Node>(snapshot);
 		// TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
 
-		/**
-		 * Open database in temporary directory
-		 */
-		File dbFile = Utils.tempDbFile();
-		DB db = DBMaker.newFileDB(dbFile)
-		/** disabling Write Ahead Log makes import much faster */
-		.transactionDisable().make();
-
-		Map<String, Object[]> diff = db.createTreeMap(type).make();
+		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
 		List<Node> created = new ArrayList<Node>();
 		while (cIt.hasNext()) {
