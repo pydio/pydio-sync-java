@@ -11,6 +11,5 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry combineaccessrules="false" kind="src" path="/ajaxplorer-sdk-java"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/MapDB"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
