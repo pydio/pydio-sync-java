@@ -1229,76 +1229,77 @@ public class SyncJob implements InterruptableJob {
 		File[] children = directory.listFiles();
 		String[] start = getCoreManager().EXCLUDED_FILES_START;
 		String[] end = getCoreManager().EXCLUDED_FILES_END;
-		for (int i = 0; i < children.length; i++) {
-			boolean ignore = false;
-			for (int j = 0; j < start.length; j++) {
-				if (children[i].getName().startsWith(start[j])) {
-					ignore = true;
-					break;
-				}
-			}
-			if (ignore)
-				continue;
-			for (int j = 0; j < end.length; j++) {
-				if (children[i].getName().endsWith(end[j])) {
-					ignore = true;
-					break;
-				}
-			}
-			if (ignore)
-				continue;
-			Node newNode = new Node(Node.NODE_TYPE_ENTRY, children[i].getName(), root);
-			if (save)
-				nodeDao.create(newNode);
-			String p = children[i].getAbsolutePath().substring(root.getPath(true).length()).replace("\\", "/");
-			newNode.setPath(p);
-			newNode.properties = nodeDao.getEmptyForeignCollection("properties");
-			newNode.setLastModified(new Date(children[i].lastModified()));
-			if (children[i].isDirectory()) {
-				listDirRecursive(children[i], root, accumulator, save, previousSnapshot);
-			} else {
-				newNode.addProperty("bytesize", String.valueOf(children[i].length()));
-				String md5 = null;
-
-				if (previousSnapshot != null) {
-					// Logger.getRootLogger().info("Searching node in previous snapshot for "
-					// + p);
-					Iterator<Node> it = previousSnapshot.iterator();
-					while (it.hasNext()) {
-						Node previous = it.next();
-						if (previous.getPath(true).equals(p)) {
-							if (previous.getLastModified().equals(newNode.getLastModified())
-									&& previous.getPropertyValue("bytesize").equals(newNode.getPropertyValue("bytesize"))) {
-								md5 = previous.getPropertyValue("md5");
-								// Logger.getRootLogger().info("-- Getting md5 from previous snapshot");
-							}
-							break;
-						}
+		if (children != null) {
+			for (int i = 0; i < children.length; i++) {
+				boolean ignore = false;
+				for (int j = 0; j < start.length; j++) {
+					if (children[i].getName().startsWith(start[j])) {
+						ignore = true;
+						break;
 					}
 				}
-				if (md5 == null) {
-					// Logger.getRootLogger().info("-- Computing new md5");
-					getCoreManager().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
-					md5 = computeMD5(children[i]);
+				if (ignore)
+					continue;
+				for (int j = 0; j < end.length; j++) {
+					if (children[i].getName().endsWith(end[j])) {
+						ignore = true;
+						break;
+					}
 				}
-				newNode.addProperty("md5", md5);
-				newNode.setLeaf();
-			}
-			if (save) {
-				nodeDao.update(newNode);
-			}
-			if (accumulator != null) {
-				accumulator.add(newNode);
-			}
-			long totalMemory = Runtime.getRuntime().totalMemory();
-			long currentMemory = Runtime.getRuntime().freeMemory();
-			long percent = (currentMemory * 100 / totalMemory);
-			// Logger.getRootLogger().info( percent + "%");
-			if (percent <= 5) {
-				// System.gc();
+				if (ignore)
+					continue;
+				Node newNode = new Node(Node.NODE_TYPE_ENTRY, children[i].getName(), root);
+				if (save)
+					nodeDao.create(newNode);
+				String p = children[i].getAbsolutePath().substring(root.getPath(true).length()).replace("\\", "/");
+				newNode.setPath(p);
+				newNode.properties = nodeDao.getEmptyForeignCollection("properties");
+				newNode.setLastModified(new Date(children[i].lastModified()));
+				if (children[i].isDirectory()) {
+					listDirRecursive(children[i], root, accumulator, save, previousSnapshot);
+				} else {
+					newNode.addProperty("bytesize", String.valueOf(children[i].length()));
+					String md5 = null;
+
+					if (previousSnapshot != null) {
+						// Logger.getRootLogger().info("Searching node in previous snapshot for "
+						// + p);
+						Iterator<Node> it = previousSnapshot.iterator();
+						while (it.hasNext()) {
+							Node previous = it.next();
+							if (previous.getPath(true).equals(p)) {
+								if (previous.getLastModified().equals(newNode.getLastModified())
+										&& previous.getPropertyValue("bytesize").equals(newNode.getPropertyValue("bytesize"))) {
+									md5 = previous.getPropertyValue("md5");
+									// Logger.getRootLogger().info("-- Getting md5 from previous snapshot");
+								}
+								break;
+							}
+						}
+					}
+					if (md5 == null) {
+						// Logger.getRootLogger().info("-- Computing new md5");
+						getCoreManager().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
+						md5 = computeMD5(children[i]);
+					}
+					newNode.addProperty("md5", md5);
+					newNode.setLeaf();
+				}
+				if (save) {
+					nodeDao.update(newNode);
+				}
+				if (accumulator != null) {
+					accumulator.add(newNode);
+				}
+				long totalMemory = Runtime.getRuntime().totalMemory();
+				long currentMemory = Runtime.getRuntime().freeMemory();
+				long percent = (currentMemory * 100 / totalMemory);
+				// Logger.getRootLogger().info( percent + "%");
+				if (percent <= 5) {
+					// System.gc();
+				}
 			}
 		}
-
 	}
 
 	/**
@@ -1326,7 +1327,7 @@ public class SyncJob implements InterruptableJob {
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception {
 				// parse file structure to node tree
-				parseNodesFromFile(remoteTreeFile, rootNode, new ArrayList<Node>(), save);
+				parseNodesFromFile(remoteTreeFile, rootNode, accumulator, save);
 				return null;
 			}
 		});
@@ -1345,7 +1346,6 @@ public class SyncJob implements InterruptableJob {
 		// Logger.getRootLogger().info(diff);
 		return diff;
 	}
-
 
 	/**
 	 * Parses remote node structure directly from XML file using modified
@@ -1398,7 +1398,11 @@ public class SyncJob implements InterruptableJob {
 			is.close();
 			// delete file - we do not need it anymore
 			boolean deleted = remoteTreeFile.delete();
+			if (list != null) {
 			Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream, xml file deleted: " + deleted);
+			} else {
+				Logger.getRootLogger().info("No items to parse");
+			}
 		} catch (ParserConfigurationException e) {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (SAXException e) {
@@ -1421,6 +1425,7 @@ public class SyncJob implements InterruptableJob {
 		File dbFile = null;
 		try {
 			dbFile = File.createTempFile("pydio", "mapdb");
+			dbFile.deleteOnExit();
 		} catch (IOException e) {
 			dbFile = Utils.tempDbFile();
 		}
