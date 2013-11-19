@@ -1864,7 +1864,7 @@ public class SyncJob implements InterruptableJob {
 		int count = 0;
 		HttpEntity entity;
 		try {
-			entity = rest.getNotConsumedResponseEntity(uri, null, uploadFile);
+			entity = rest.getNotConsumedResponseEntity(uri, null, uploadFile, true);
 		} catch (Exception e) {
 			throw new SynchroOperationException(
 					"Error during response entity: " + e.getMessage(), e);
