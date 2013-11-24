@@ -1,0 +1,74 @@
+package info.ajaxplorer.synchro.utils;
+
+import info.ajaxplorer.synchro.exceptions.EhcacheListException;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import net.sf.ehcache.CacheManager;
+import net.sf.ehcache.Ehcache;
+import net.sf.ehcache.config.CacheConfiguration;
+import net.sf.ehcache.config.Configuration;
+import net.sf.ehcache.config.DiskStoreConfiguration;
+import net.sf.ehcache.config.MemoryUnit;
+import net.sf.ehcache.config.PersistenceConfiguration;
+import net.sf.ehcache.config.PersistenceConfiguration.Strategy;
+
+import org.apache.log4j.Logger;
+
+public class EhcacheListFactory {
+
+	private static EhcacheListFactory instance;
+
+	private CacheManager cacheManager;
+
+	private Map<String, EhcacheList> listsMap = new HashMap<String, EhcacheList>();
+
+	public static EhcacheListFactory getInstance() {
+		if (instance == null) {
+			instance = new EhcacheListFactory();
+		}
+		return instance;
+	}
+
+	public void initCaches(int totalMem, String... cacheNames) {
+		Configuration cacheManagerConfig = new Configuration().diskStore(
+				new DiskStoreConfiguration().path(System.getProperty("user.home")
+				+ System.getProperty("file.separator") + ".ajaxplorer" + System.getProperty("file.separator") + "ehcache"));
+
+		int oneFileMem = totalMem / cacheNames.length;
+
+		for (String name : cacheNames) {
+			CacheConfiguration cacheConfig = new CacheConfiguration().name(name)
+					.maxBytesLocalHeap(oneFileMem, MemoryUnit.MEGABYTES)
+					.persistence(new PersistenceConfiguration().strategy(Strategy.LOCALTEMPSWAP));
+
+			cacheManagerConfig.addCache(cacheConfig);
+		}
+		cacheManager = CacheManager.create(cacheManagerConfig);
+	}
+
+	public <E> EhcacheList<E> getList(String name) throws EhcacheListException {
+		if (cacheManager == null) {
+			throw new EhcacheListException("Error - no cacheManager available - call initCaches() first!");
+		}
+
+		// check if we have allready this list?
+		EhcacheList ehcacheList = listsMap.get(name);
+		if (ehcacheList == null) {
+			// create new one
+			Ehcache cache = cacheManager.getEhcache(name);
+			if (cache == null) {
+				throw new EhcacheListException("Error - no cache for: " + name + " - the name has to be denoted when initCaches() called!");
+			}
+			ehcacheList = new EhcacheList<E>(cache);
+			listsMap.put(name, ehcacheList);
+		}
+		// ensure that we have empty list
+		ehcacheList.clear();
+
+		Logger.getRootLogger().info("Return " + name + " list, size: " + ehcacheList.size());
+
+		return ehcacheList;
+	}
+}

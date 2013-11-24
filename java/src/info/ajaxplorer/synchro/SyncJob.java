@@ -30,6 +30,7 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.client.util.RdiffProcessor;
+import info.ajaxplorer.synchro.exceptions.EhcacheListException;
 import info.ajaxplorer.synchro.exceptions.SynchroFileOperationException;
 import info.ajaxplorer.synchro.exceptions.SynchroOperationException;
 import info.ajaxplorer.synchro.gui.JobEditor;
@@ -37,6 +38,7 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 import info.ajaxplorer.synchro.model.SyncLogDetails;
+import info.ajaxplorer.synchro.utils.EhcacheListFactory;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -99,6 +101,15 @@ import com.scireum.open.xml.XMLReader;
 
 @DisallowConcurrentExecution
 public class SyncJob implements InterruptableJob {
+
+	// all ehcache files
+	private static final String DIFF_NODE_LISTS_SAVED_LIST = "diffnodelistssaved";
+	private static final String DIFF_NODE_LISTS_CREATED_LIST = "diffnodelistscreated";
+	private static final String LOAD_REMOTE_CHANGES_LIST = "loadremotechangeslist";
+	private static final String LOAD_LOCAL_CHANGES_LIST = "loadlocalchangeslist";
+	private static final String INDEXATION_SNAPSHOT_LIST = "indexationsnap";
+	private static final String REMOTE_SNAPSHOT_LIST = "remotesnapshot";
+	private static final String LOCAL_SNAPSHOT_LIST = "localsnapshot";
 
 	public static Integer NODE_CHANGE_STATUS_FILE_CREATED = 2;
 	public static Integer NODE_CHANGE_STATUS_FILE_DELETED = 4;
@@ -254,6 +265,9 @@ public class SyncJob implements InterruptableJob {
 
 		// nodeDao = getCoreManager().getNodeDao();
 
+		EhcacheListFactory.getInstance().initCaches(8, DIFF_NODE_LISTS_SAVED_LIST, DIFF_NODE_LISTS_CREATED_LIST, LOAD_REMOTE_CHANGES_LIST,
+				LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
+
 	}
 
 	private void exitWithStatusAndNotify(int status, String titleId, String messageId) throws SQLException {
@@ -372,8 +386,8 @@ public class SyncJob implements InterruptableJob {
 				this.clearSnapshot("local_snapshot");
 				this.clearSnapshot("remote_snapshot");
 			}
-			List<Node> localSnapshot = new ArrayList<Node>();
-			List<Node> remoteSnapshot = new ArrayList<Node>();
+			List<Node> localSnapshot = EhcacheListFactory.getInstance().getList(LOCAL_SNAPSHOT_LIST);
+			List<Node> remoteSnapshot = EhcacheListFactory.getInstance().getList(REMOTE_SNAPSHOT_LIST);
 			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
 			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
 
@@ -1187,16 +1201,18 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> loadLocalChanges(List<Node> snapshot) throws Exception {
 
 		List<Node> previousSnapshot;
-		List<Node> indexationSnap = new ArrayList<Node>();
+		List<Node> indexationSnap = EhcacheListFactory.getInstance().getList(INDEXATION_SNAPSHOT_LIST);
 		Node index = loadRootAndSnapshot("local_tmp", indexationSnap, currentLocalFolder);
 		final Node root;
-		final List<Node> list = new ArrayList<Node>();
+		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_LOCAL_CHANGES_LIST);
 		if (indexationSnap.size() > 0) {
 			index.setResourceType("previous_indexation");
 			nodeDao.update(index);
+			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = indexationSnap;
 			root = loadRootAndSnapshot("local_tmp", null, currentLocalFolder);
 		} else {
+			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = snapshot;
 			root = index;
 		}
@@ -1339,7 +1355,7 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> loadRemoteChanges(List<Node> snapshot) throws URISyntaxException, Exception {
 
 		final Node root = loadRootAndSnapshot("remote_tmp", null, null);
-		final ArrayList<Node> list = new ArrayList<Node>();
+		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_REMOTE_CHANGES_LIST);
 		takeRemoteSnapshot(root, list, true);
 
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
@@ -1436,13 +1452,14 @@ public class SyncJob implements InterruptableJob {
 		return db.createTreeMap(mapName).make();
 	}
 
-	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) {
-		List<Node> saved = new ArrayList<Node>(snapshot);
+	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) throws EhcacheListException {
+		List<Node> saved = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_SAVED_LIST);
+		saved.addAll(snapshot);
 		// TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
 
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
-		List<Node> created = new ArrayList<Node>();
+		List<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
 		while (cIt.hasNext()) {
 			Node c = cIt.next();
 			Iterator<Node> sIt = saved.iterator();
