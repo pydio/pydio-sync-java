@@ -410,6 +410,13 @@ public class SyncJob implements InterruptableJob {
 			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
 
+			Logger.getRootLogger().info("LOCAL DIFFS: " + localDiff.size());
+			Logger.getRootLogger().info("REMOTE DIFFS: " + remoteDiff.size());
+
+			if (1 == 1) {
+				return;
+			}
+
 			if (previousChanges.size() > 0) {
 				updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
 				Logger.getRootLogger().debug("Getting previous tasks");
@@ -1480,6 +1487,9 @@ public class SyncJob implements InterruptableJob {
 				}
 			}
 			if (!found) {
+
+				Logger.getRootLogger().info(type + " NOT FOUND " + c.getPath());
+
 				created.add(c);
 				// diff.put(c.getPath(true),
 				// makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED),

@@ -13,8 +13,11 @@ public class EhcacheList<E> implements List<E> {
 
 	private Ehcache cache;
 
-	/* package */EhcacheList(Ehcache tcache) {
+	private IEhcacheListDeterminant<E> determinant;
+
+	/* package */EhcacheList(Ehcache tcache, IEhcacheListDeterminant<E> tdeterminant) {
 		cache = tcache;
+		determinant = tdeterminant;
 	}
 
 	@Override
@@ -31,7 +34,8 @@ public class EhcacheList<E> implements List<E> {
 	public boolean contains(Object o) {
 		if (o == null)
 			return false; // FIXME shouldnt we denote also null values?
-		return cache.get(o.hashCode()) != null;
+		// FIXME if Ojbect is not E - we are in troubles! - FIXME
+		return cache.get(determinant.computeKey((E) o)) != null;
 	}
 
 	@Override
@@ -82,10 +86,10 @@ public class EhcacheList<E> implements List<E> {
 		if (e == null) {
 			return false; // FIXME - add nulls also?
 		}
-		if (cache.isKeyInCache(e.hashCode())) {
+		if (cache.isKeyInCache(determinant.computeKey(e))) {
 			throw new UnsupportedOperationException("List cannot containt the same element twice");
 		}
-		cache.put(new Element(e.hashCode(), e));
+		cache.put(new Element(determinant.computeKey(e), e));
 		return true;
 	}
 
@@ -93,7 +97,8 @@ public class EhcacheList<E> implements List<E> {
 	public boolean remove(Object o) {
 		if (o == null)
 			return false;
-		return cache.remove(o.hashCode());
+		// FIXME if Ojbect is not E - we are in troubles! - FIXME
+		return cache.remove(determinant.computeKey((E) o));
 	}
 
 	@Override
@@ -104,7 +109,8 @@ public class EhcacheList<E> implements List<E> {
 			if (o == null) {
 				continue;
 			}
-			containsAll = cache.isKeyInCache(o.hashCode());
+			// FIXME if Ojbect is not E - we are in troubles! - FIXME
+			containsAll = cache.isKeyInCache(determinant.computeKey((E) o));
 			if (!containsAll) {
 				break;
 			}
@@ -116,7 +122,7 @@ public class EhcacheList<E> implements List<E> {
 	public boolean addAll(Collection<? extends E> c) {
 		List<Element> newCollection = new ArrayList<Element>();
 		for (E e : c) {
-			newCollection.add(new Element(e.hashCode(), e));
+			newCollection.add(new Element(determinant.computeKey(e), e));
 		}
 		boolean result = c.size() == newCollection.size();
 		if (result) {
@@ -185,7 +191,8 @@ public class EhcacheList<E> implements List<E> {
 	public int indexOf(Object o) {
 		if (o == null)
 			return -1;
-		return cache.getKeys().indexOf(o.hashCode());
+		// FIXME if Ojbect is not E - we are in troubles! - FIXME
+		return cache.getKeys().indexOf(determinant.computeKey((E) o));
 	}
 
 	@Override

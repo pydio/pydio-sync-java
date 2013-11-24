@@ -2,6 +2,7 @@ package info.ajaxplorer.synchro.utils;
 
 import info.ajaxplorer.synchro.exceptions.EhcacheListException;
 
+import java.rmi.UnexpectedException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,6 +25,8 @@ public class EhcacheListFactory {
 
 	private Map<String, EhcacheList> listsMap = new HashMap<String, EhcacheList>();
 
+	private IEhcacheListDeterminant determinant;
+
 	public static EhcacheListFactory getInstance() {
 		if (instance == null) {
 			instance = new EhcacheListFactory();
@@ -31,7 +34,10 @@ public class EhcacheListFactory {
 		return instance;
 	}
 
-	public void initCaches(int totalMem, String... cacheNames) {
+	public void initCaches(int totalMem, IEhcacheListDeterminant tdeterminant, String... cacheNames) throws UnexpectedException {
+		if (tdeterminant == null) {
+			throw new UnexpectedException("EhcacheListFactory should have IEhcacheListDeterminant provided for object key computation");
+		}
 		Configuration cacheManagerConfig = new Configuration().diskStore(
 				new DiskStoreConfiguration().path(System.getProperty("user.home")
 				+ System.getProperty("file.separator") + ".ajaxplorer" + System.getProperty("file.separator") + "ehcache"));
@@ -61,7 +67,7 @@ public class EhcacheListFactory {
 			if (cache == null) {
 				throw new EhcacheListException("Error - no cache for: " + name + " - the name has to be denoted when initCaches() called!");
 			}
-			ehcacheList = new EhcacheList<E>(cache);
+			ehcacheList = new EhcacheList<E>(cache, determinant);
 			listsMap.put(name, ehcacheList);
 		}
 		// ensure that we have empty list
