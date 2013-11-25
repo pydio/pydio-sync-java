@@ -14,6 +14,7 @@ import net.sf.ehcache.config.DiskStoreConfiguration;
 import net.sf.ehcache.config.MemoryUnit;
 import net.sf.ehcache.config.PersistenceConfiguration;
 import net.sf.ehcache.config.PersistenceConfiguration.Strategy;
+import net.sf.ehcache.config.PinningConfiguration;
 
 import org.apache.log4j.Logger;
 
@@ -38,16 +39,20 @@ public class EhcacheListFactory {
 		if (tdeterminant == null) {
 			throw new UnexpectedException("EhcacheListFactory should have IEhcacheListDeterminant provided for object key computation");
 		}
-		Configuration cacheManagerConfig = new Configuration().diskStore(
-				new DiskStoreConfiguration().path(System.getProperty("user.home")
+		this.determinant = tdeterminant;
+
+		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(System.getProperty("user.home")
 				+ System.getProperty("file.separator") + ".ajaxplorer" + System.getProperty("file.separator") + "ehcache"));
 
 		int oneFileMem = totalMem / cacheNames.length;
 
 		for (String name : cacheNames) {
-			CacheConfiguration cacheConfig = new CacheConfiguration().name(name)
-					.maxBytesLocalHeap(oneFileMem, MemoryUnit.MEGABYTES)
+			PinningConfiguration pinningC = new PinningConfiguration();
+			pinningC.setStore(PinningConfiguration.Store.INCACHE.name());
+			CacheConfiguration cacheConfig = new CacheConfiguration().name(name).pinning(pinningC)
+					.maxBytesLocalHeap(oneFileMem, MemoryUnit.MEGABYTES).maxBytesLocalDisk(200, MemoryUnit.MEGABYTES)
 					.persistence(new PersistenceConfiguration().strategy(Strategy.LOCALTEMPSWAP));
+			cacheConfig.setEternal(true);
 
 			cacheManagerConfig.addCache(cacheConfig);
 		}

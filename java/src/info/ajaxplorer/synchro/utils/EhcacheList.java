@@ -34,7 +34,7 @@ public class EhcacheList<E> implements List<E> {
 	public boolean contains(Object o) {
 		if (o == null)
 			return false; // FIXME shouldnt we denote also null values?
-		// FIXME if Ojbect is not E - we are in troubles! - FIXME
+		// FIXME if Object is not E - we are in troubles! - FIXME
 		return cache.get(determinant.computeKey((E) o)) != null;
 	}
 
@@ -97,7 +97,7 @@ public class EhcacheList<E> implements List<E> {
 	public boolean remove(Object o) {
 		if (o == null)
 			return false;
-		// FIXME if Ojbect is not E - we are in troubles! - FIXME
+		// FIXME if Object is not E - we are in troubles! - FIXME
 		return cache.remove(determinant.computeKey((E) o));
 	}
 
@@ -109,7 +109,7 @@ public class EhcacheList<E> implements List<E> {
 			if (o == null) {
 				continue;
 			}
-			// FIXME if Ojbect is not E - we are in troubles! - FIXME
+			// FIXME if Object is not E - we are in troubles! - FIXME
 			containsAll = cache.isKeyInCache(determinant.computeKey((E) o));
 			if (!containsAll) {
 				break;
@@ -164,6 +164,11 @@ public class EhcacheList<E> implements List<E> {
 		return result;
 	}
 
+	public E get(E e) {
+		Element result = cache.get(determinant.computeKey(e));
+		return (E) (result != null ? result.getObjectValue() : null);
+	}
+
 	@Override
 	public E set(int index, E element) {
 		throw new UnsupportedOperationException("Cannot convert cache list to array - to big object!");
@@ -191,7 +196,7 @@ public class EhcacheList<E> implements List<E> {
 	public int indexOf(Object o) {
 		if (o == null)
 			return -1;
-		// FIXME if Ojbect is not E - we are in troubles! - FIXME
+		// FIXME if Object is not E - we are in troubles! - FIXME
 		return cache.getKeys().indexOf(determinant.computeKey((E) o));
 	}
 
