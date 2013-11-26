@@ -30,6 +30,7 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.client.util.RdiffProcessor;
+import info.ajaxplorer.synchro.exceptions.EhcacheListException;
 import info.ajaxplorer.synchro.exceptions.SynchroFileOperationException;
 import info.ajaxplorer.synchro.exceptions.SynchroOperationException;
 import info.ajaxplorer.synchro.gui.JobEditor;
@@ -37,6 +38,9 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 import info.ajaxplorer.synchro.model.SyncLogDetails;
+import info.ajaxplorer.synchro.utils.EhcacheList;
+import info.ajaxplorer.synchro.utils.EhcacheListFactory;
+import info.ajaxplorer.synchro.utils.IEhcacheListDeterminant;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -99,6 +103,15 @@ import com.scireum.open.xml.XMLReader;
 
 @DisallowConcurrentExecution
 public class SyncJob implements InterruptableJob {
+
+	// all ehcache files
+	private static final String DIFF_NODE_LISTS_SAVED_LIST = "diffnodelistssaved";
+	private static final String DIFF_NODE_LISTS_CREATED_LIST = "diffnodelistscreated";
+	private static final String LOAD_REMOTE_CHANGES_LIST = "loadremotechangeslist";
+	private static final String LOAD_LOCAL_CHANGES_LIST = "loadlocalchangeslist";
+	private static final String INDEXATION_SNAPSHOT_LIST = "indexationsnap";
+	private static final String REMOTE_SNAPSHOT_LIST = "remotesnapshot";
+	private static final String LOCAL_SNAPSHOT_LIST = "localsnapshot";
 
 	public static Integer NODE_CHANGE_STATUS_FILE_CREATED = 2;
 	public static Integer NODE_CHANGE_STATUS_FILE_DELETED = 4;
@@ -254,6 +267,18 @@ public class SyncJob implements InterruptableJob {
 
 		// nodeDao = getCoreManager().getNodeDao();
 
+		IEhcacheListDeterminant<Node> determinant = new IEhcacheListDeterminant<Node>() {
+
+			@Override
+			public Object computeKey(Node object) {
+				// we use path as node key in ehcache list
+				return object == null ? null : object.getPath();
+			}
+		};
+		EhcacheListFactory.getInstance().initCaches(8, determinant, DIFF_NODE_LISTS_SAVED_LIST, DIFF_NODE_LISTS_CREATED_LIST,
+				LOAD_REMOTE_CHANGES_LIST,
+				LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
+
 	}
 
 	private void exitWithStatusAndNotify(int status, String titleId, String messageId) throws SQLException {
@@ -372,8 +397,8 @@ public class SyncJob implements InterruptableJob {
 				this.clearSnapshot("local_snapshot");
 				this.clearSnapshot("remote_snapshot");
 			}
-			List<Node> localSnapshot = new ArrayList<Node>();
-			List<Node> remoteSnapshot = new ArrayList<Node>();
+			List<Node> localSnapshot = EhcacheListFactory.getInstance().getList(LOCAL_SNAPSHOT_LIST);
+			List<Node> remoteSnapshot = EhcacheListFactory.getInstance().getList(REMOTE_SNAPSHOT_LIST);
 			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
 			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
 
@@ -395,6 +420,9 @@ public class SyncJob implements InterruptableJob {
 			updateRunningStatus(RUNNING_STATUS_REMOTE_CHANGES);
 			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
 			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
+
+			Logger.getRootLogger().info("LOCAL DIFFS: " + localDiff.size());
+			Logger.getRootLogger().info("REMOTE DIFFS: " + remoteDiff.size());
 
 			if (previousChanges.size() > 0) {
 				updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
@@ -887,7 +915,7 @@ public class SyncJob implements InterruptableJob {
 					if (f.exists()) {
 						boolean res = f.delete();
 						if (!res) {
-							throw new Exception("Error while removing local resource");
+							throw new Exception("Error while removing local resource: " + f.getPath());
 						}
 						countResourcesSynchronized++;
 					}
@@ -1187,16 +1215,18 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> loadLocalChanges(List<Node> snapshot) throws Exception {
 
 		List<Node> previousSnapshot;
-		List<Node> indexationSnap = new ArrayList<Node>();
+		List<Node> indexationSnap = EhcacheListFactory.getInstance().getList(INDEXATION_SNAPSHOT_LIST);
 		Node index = loadRootAndSnapshot("local_tmp", indexationSnap, currentLocalFolder);
 		final Node root;
-		final List<Node> list = new ArrayList<Node>();
+		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_LOCAL_CHANGES_LIST);
 		if (indexationSnap.size() > 0) {
 			index.setResourceType("previous_indexation");
 			nodeDao.update(index);
+			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = indexationSnap;
 			root = loadRootAndSnapshot("local_tmp", null, currentLocalFolder);
 		} else {
+			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = snapshot;
 			root = index;
 		}
@@ -1339,7 +1369,7 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> loadRemoteChanges(List<Node> snapshot) throws URISyntaxException, Exception {
 
 		final Node root = loadRootAndSnapshot("remote_tmp", null, null);
-		final ArrayList<Node> list = new ArrayList<Node>();
+		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_REMOTE_CHANGES_LIST);
 		takeRemoteSnapshot(root, list, true);
 
 		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
@@ -1436,33 +1466,71 @@ public class SyncJob implements InterruptableJob {
 		return db.createTreeMap(mapName).make();
 	}
 
-	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) {
-		List<Node> saved = new ArrayList<Node>(snapshot);
+	/**
+	 * Little bit optimized thanks of Ehcache list
+	 * we do not need to go through second loop, as we can grab object from
+	 * ehcache list by key
+	 * key is equal path in our case (determinator do it) so we are doing the
+	 * same as
+	 * c.getPath().equals(s.getPath())
+	 * 
+	 * @param current
+	 * @param snapshot
+	 * @param type
+	 * @return
+	 * @throws EhcacheListException
+	 */
+	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) throws EhcacheListException {
+		EhcacheList<Node> saved = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_SAVED_LIST);
+		saved.addAll(snapshot);
 		// TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
 
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
-		List<Node> created = new ArrayList<Node>();
+		EhcacheList<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
 		while (cIt.hasNext()) {
 			Node c = cIt.next();
-			Iterator<Node> sIt = saved.iterator();
+			
+			// because we use comparator by path, 
+			// we can use ehcache feature here
+			Node s = saved.get(c);
 			boolean found = false;
-			while (sIt.hasNext() && !found) {
-				Node s = sIt.next();
-				if (s.getPath(true).equals(c.getPath(true))) {
-					found = true;
-					if (c.isLeaf()) {// FILE : compare date & size
-						if ((c.getLastModified().after(s.getLastModified()) || !c.getPropertyValue("bytesize").equals(
-								s.getPropertyValue("bytesize")))
-								&& (c.getPropertyValue("md5") == null || s.getPropertyValue("md5") == null || !s.getPropertyValue("md5")
-										.equals(c.getPropertyValue("md5")))) {
-							diff.put(c.getPath(true), makeTodoObject(NODE_CHANGE_STATUS_MODIFIED, c));
-						}
+			if (s != null) {
+				found = true;
+				saved.remove(s);
+				if (c.isLeaf()) {// FILE : compare date & size
+					if ((c.getLastModified().after(s.getLastModified()) || !c.getPropertyValue("bytesize").equals(
+							s.getPropertyValue("bytesize")))
+							&& (c.getPropertyValue("md5") == null || s.getPropertyValue("md5") == null || !s.getPropertyValue("md5")
+									.equals(c.getPropertyValue("md5")))) {
+						diff.put(c.getPath(true), makeTodoObject(NODE_CHANGE_STATUS_MODIFIED, c));
 					}
-					saved.remove(s);
 				}
 			}
+
+			// Iterator<Node> sIt = saved.iterator();
+			// boolean found = false;
+			// while (sIt.hasNext() && !found) {
+			// Node s = sIt.next();
+			// if (s.getPath(true).equals(c.getPath(true))) {
+			// found = true;
+			// if (c.isLeaf()) {// FILE : compare date & size
+			// if ((c.getLastModified().after(s.getLastModified()) ||
+			// !c.getPropertyValue("bytesize").equals(
+			// s.getPropertyValue("bytesize")))
+			// && (c.getPropertyValue("md5") == null ||
+			// s.getPropertyValue("md5") == null || !s.getPropertyValue("md5")
+			// .equals(c.getPropertyValue("md5")))) {
+			// diff.put(c.getPath(true),
+			// makeTodoObject(NODE_CHANGE_STATUS_MODIFIED, c));
+			// }
+			// }
+			// saved.remove(s);
+			// }
+			// }
 			if (!found) {
+
+
 				created.add(c);
 				// diff.put(c.getPath(true),
 				// makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED),
@@ -1474,22 +1542,40 @@ public class SyncJob implements InterruptableJob {
 			while (sIt.hasNext()) {
 				Node s = sIt.next();
 				if (s.isLeaf()) {
-					Iterator<Node> creaIt = created.iterator();
+					// again - we use ehcache list
 					boolean isMoved = false;
+					Node createdNode = created.get(s);
 					Node destinationNode = null;
-					while (creaIt.hasNext()) {
-						Node createdNode = creaIt.next();
-						// if(type.equals("local"))
-						// this.updateLocalMD5(createdNode);
+					if (createdNode != null) {
 						if (createdNode.isLeaf() && createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize"))) {
 							isMoved = (createdNode.getPropertyValue("md5") != null && s.getPropertyValue("md5") != null && createdNode
 									.getPropertyValue("md5").equals(s.getPropertyValue("md5")));
 							if (isMoved) {
 								destinationNode = createdNode;
-								break;
 							}
 						}
+
 					}
+
+					// Iterator<Node> creaIt = created.iterator();
+					// boolean isMoved = false;
+					// Node destinationNode = null;
+					// while (creaIt.hasNext()) {
+					// Node createdNode = creaIt.next();
+					// // if(type.equals("local"))
+					// // this.updateLocalMD5(createdNode);
+					// if (createdNode.isLeaf() &&
+					// createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize")))
+					// {
+					// isMoved = (createdNode.getPropertyValue("md5") != null &&
+					// s.getPropertyValue("md5") != null && createdNode
+					// .getPropertyValue("md5").equals(s.getPropertyValue("md5")));
+					// if (isMoved) {
+					// destinationNode = createdNode;
+					// break;
+					// }
+					// }
+					// }
 					if (isMoved) {
 						// DETECTED, DO SOMETHING.
 						created.remove(destinationNode);
