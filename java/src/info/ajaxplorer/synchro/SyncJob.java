@@ -1124,6 +1124,7 @@ public class SyncJob implements InterruptableJob {
 				CloseableIterator<Node> it = root.children.iteratorThrow();
 				while (it.hasNext()) {
 					snapshot.add(it.next());
+					freeSomeCPU();
 				}
 			}
 		} else {
@@ -1328,6 +1329,8 @@ public class SyncJob implements InterruptableJob {
 				if (percent <= 5) {
 					// System.gc();
 				}
+
+				freeSomeCPU();
 			}
 		}
 	}
@@ -1536,6 +1539,8 @@ public class SyncJob implements InterruptableJob {
 				// makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED),
 				// c));
 			}
+
+			freeSomeCPU();
 		}
 		if (saved.size() > 0) {
 			Iterator<Node> sIt = saved.iterator();
@@ -1589,6 +1594,8 @@ public class SyncJob implements InterruptableJob {
 					diff.put(s.getPath(true),
 							makeTodoObject((s.isLeaf() ? NODE_CHANGE_STATUS_FILE_DELETED : NODE_CHANGE_STATUS_DIR_DELETED), s));
 				}
+
+				freeSomeCPU();
 			}
 		}
 		// NOW ADD CREATED ITEMS
@@ -1601,6 +1608,21 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 		return diff;
+	}
+
+	/**
+	 * Frees some CPU time, so we do not kill machine
+	 */
+	private void freeSomeCPU() {
+		try {
+			// sleep 0 is enough - we do not slow the execution, but
+			// we give some breath to core when switching context
+			// and maybe other processes can grab some time
+			Thread.sleep(0);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	protected void updateLocalMD5(Node node) {
