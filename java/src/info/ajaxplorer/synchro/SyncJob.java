@@ -1432,7 +1432,7 @@ public class SyncJob implements InterruptableJob {
 			// delete file - we do not need it anymore
 			boolean deleted = remoteTreeFile.delete();
 			if (list != null) {
-			Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream, xml file deleted: " + deleted);
+				Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream, xml file deleted: " + deleted);
 			} else {
 				Logger.getRootLogger().info("No items to parse");
 			}
@@ -1486,7 +1486,6 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) throws EhcacheListException {
 		EhcacheList<Node> saved = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_SAVED_LIST);
 		saved.addAll(snapshot);
-		// TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
 
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
@@ -1511,33 +1510,8 @@ public class SyncJob implements InterruptableJob {
 				}
 			}
 
-			// Iterator<Node> sIt = saved.iterator();
-			// boolean found = false;
-			// while (sIt.hasNext() && !found) {
-			// Node s = sIt.next();
-			// if (s.getPath(true).equals(c.getPath(true))) {
-			// found = true;
-			// if (c.isLeaf()) {// FILE : compare date & size
-			// if ((c.getLastModified().after(s.getLastModified()) ||
-			// !c.getPropertyValue("bytesize").equals(
-			// s.getPropertyValue("bytesize")))
-			// && (c.getPropertyValue("md5") == null ||
-			// s.getPropertyValue("md5") == null || !s.getPropertyValue("md5")
-			// .equals(c.getPropertyValue("md5")))) {
-			// diff.put(c.getPath(true),
-			// makeTodoObject(NODE_CHANGE_STATUS_MODIFIED, c));
-			// }
-			// }
-			// saved.remove(s);
-			// }
-			// }
 			if (!found) {
-
-
 				created.add(c);
-				// diff.put(c.getPath(true),
-				// makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED),
-				// c));
 			}
 
 			freeSomeCPU();
@@ -1562,25 +1536,6 @@ public class SyncJob implements InterruptableJob {
 
 					}
 
-					// Iterator<Node> creaIt = created.iterator();
-					// boolean isMoved = false;
-					// Node destinationNode = null;
-					// while (creaIt.hasNext()) {
-					// Node createdNode = creaIt.next();
-					// // if(type.equals("local"))
-					// // this.updateLocalMD5(createdNode);
-					// if (createdNode.isLeaf() &&
-					// createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize")))
-					// {
-					// isMoved = (createdNode.getPropertyValue("md5") != null &&
-					// s.getPropertyValue("md5") != null && createdNode
-					// .getPropertyValue("md5").equals(s.getPropertyValue("md5")));
-					// if (isMoved) {
-					// destinationNode = createdNode;
-					// break;
-					// }
-					// }
-					// }
 					if (isMoved) {
 						// DETECTED, DO SOMETHING.
 						created.remove(destinationNode);
@@ -1620,8 +1575,7 @@ public class SyncJob implements InterruptableJob {
 			// and maybe other processes can grab some time
 			Thread.sleep(0);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			// FIXME - maybe some additional handling?
 		}
 	}
 

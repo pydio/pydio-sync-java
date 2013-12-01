@@ -16,8 +16,16 @@ import net.sf.ehcache.config.PersistenceConfiguration;
 import net.sf.ehcache.config.PersistenceConfiguration.Strategy;
 import net.sf.ehcache.config.PinningConfiguration;
 
-import org.apache.log4j.Logger;
-
+/**
+ * Factory for all Ehcache list objects.
+ * Ehcache cache objects have to be created before use, so this factory is
+ * intend to
+ * create initialized lists collection and deliver proper list by names.
+ * All lists are cleared when returned from factory!
+ * 
+ * @author WojT
+ * 
+ */
 public class EhcacheListFactory {
 
 	private static EhcacheListFactory instance;
@@ -35,6 +43,22 @@ public class EhcacheListFactory {
 		return instance;
 	}
 
+	/**
+	 * Initializes a list collection
+	 * Ehcache lists are configured as pinned In-cache - all objects are stored
+	 * forever
+	 * The strategy is LOCAL so we have file backed representation with some
+	 * additional memory support
+	 * 
+	 * When configuring cache lists we assign memory size equal to totalMem
+	 * split between all items
+	 * 
+	 * @param totalMem
+	 *            - how many memory we want to share for ALL ehcache lists
+	 * @param tdeterminant
+	 * @param cacheNames
+	 * @throws UnexpectedException
+	 */
 	public void initCaches(int totalMem, IEhcacheListDeterminant tdeterminant, String... cacheNames) throws UnexpectedException {
 		if (tdeterminant == null) {
 			throw new UnexpectedException("EhcacheListFactory should have IEhcacheListDeterminant provided for object key computation");
@@ -59,6 +83,14 @@ public class EhcacheListFactory {
 		cacheManager = CacheManager.create(cacheManagerConfig);
 	}
 
+	/**
+	 * Provide a cache list by name
+	 * 
+	 * @param <E>
+	 * @param name
+	 * @return
+	 * @throws EhcacheListException
+	 */
 	public <E> EhcacheList<E> getList(String name) throws EhcacheListException {
 		if (cacheManager == null) {
 			throw new EhcacheListException("Error - no cacheManager available - call initCaches() first!");
@@ -78,7 +110,6 @@ public class EhcacheListFactory {
 		// ensure that we have empty list
 		ehcacheList.clear();
 
-		Logger.getRootLogger().info("Return " + name + " list, size: " + ehcacheList.size());
 
 		return ehcacheList;
 	}
