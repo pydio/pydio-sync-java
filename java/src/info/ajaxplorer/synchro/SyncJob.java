@@ -276,8 +276,7 @@ public class SyncJob implements InterruptableJob {
 			}
 		};
 		EhcacheListFactory.getInstance().initCaches(8, determinant, DIFF_NODE_LISTS_SAVED_LIST, DIFF_NODE_LISTS_CREATED_LIST,
-				LOAD_REMOTE_CHANGES_LIST,
-				LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
+				LOAD_REMOTE_CHANGES_LIST, LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
 
 	}
 
@@ -1350,17 +1349,11 @@ public class SyncJob implements InterruptableJob {
 			emptyNodeChildren(rootNode, false);
 		}
 
-		URI uri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode);
-
-		// create temp file
-		final File remoteTreeFile = File.createTempFile("pydio", "xmlremote");
-		// save xml with remote tree content to file using input stream
-		uriContentToFile(uri, remoteTreeFile, null);
-
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception {
 				// parse file structure to node tree
-				parseNodesFromFile(remoteTreeFile, rootNode, accumulator, save);
+				parseNodesFromStream(getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode)), rootNode,
+						accumulator, save);
 				return null;
 			}
 		});
@@ -1381,11 +1374,8 @@ public class SyncJob implements InterruptableJob {
 	}
 
 	/**
-	 * Parses remote node structure directly from XML file using modified
+	 * Parses remote node structure directly from XML stream using modified
 	 * SAXparser.
-	 * 
-	 * FIXME - consider passing stream instead of file - direct stream with XML
-	 * structure from server - ommit saving to file!
 	 * 
 	 * @param remoteTreeFile
 	 * @param parentNode
@@ -1393,12 +1383,10 @@ public class SyncJob implements InterruptableJob {
 	 * @param save
 	 * @throws SynchroOperationException
 	 */
-	protected void parseNodesFromFile(File remoteTreeFile, final Node parentNode, final List<Node> list, final boolean save)
+	protected void parseNodesFromStream(InputStream is, final Node parentNode, final List<Node> list, final boolean save)
 			throws SynchroOperationException {
 
 		try {
-			InputStream is = new FileInputStream(remoteTreeFile);
-
 			XMLReader reader = new XMLReader();
 			reader.addHandler("tree", new NodeHandler() {
 
@@ -1429,10 +1417,8 @@ public class SyncJob implements InterruptableJob {
 			reader.parse(is);
 			// close the stream
 			is.close();
-			// delete file - we do not need it anymore
-			boolean deleted = remoteTreeFile.delete();
 			if (list != null) {
-				Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream, xml file deleted: " + deleted);
+				Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream");
 			} else {
 				Logger.getRootLogger().info("No items to parse");
 			}
@@ -1492,8 +1478,8 @@ public class SyncJob implements InterruptableJob {
 		EhcacheList<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
 		while (cIt.hasNext()) {
 			Node c = cIt.next();
-			
-			// because we use comparator by path, 
+
+			// because we use comparator by path,
 			// we can use ehcache feature here
 			Node s = saved.get(c);
 			boolean found = false;
@@ -1780,6 +1766,35 @@ public class SyncJob implements InterruptableJob {
 		}
 		this.uriContentToFile(uri, targetFile, null);
 
+	}
+
+	/**
+	 * Retrieves uri content as a stream
+	 * 
+	 * @param uri
+	 * @return
+	 * @throws SynchroOperationException
+	 * @throws IllegalStateException
+	 * @throws IOException
+	 */
+	protected InputStream getUriContentStream(URI uri) throws SynchroOperationException, IllegalStateException, IOException {
+		RestRequest rest = this.getRequest();
+		HttpEntity entity;
+		try {
+			entity = rest.getNotConsumedResponseEntity(uri, null, null, true);
+		} catch (Exception e) {
+			throw new SynchroOperationException("Error during response entity: " + e.getMessage(), e);
+		}
+		long fullLength = entity.getContentLength();
+		if (fullLength <= 0) {
+			rest.release();
+			return null;
+		}
+
+		InputStream contentStream = entity.getContent();
+		// FIXME should we release now?
+		rest.release();
+		return contentStream;
 	}
 
 	/**
