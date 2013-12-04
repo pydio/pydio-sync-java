@@ -276,8 +276,7 @@ public class SyncJob implements InterruptableJob {
 			}
 		};
 		EhcacheListFactory.getInstance().initCaches(8, determinant, DIFF_NODE_LISTS_SAVED_LIST, DIFF_NODE_LISTS_CREATED_LIST,
-				LOAD_REMOTE_CHANGES_LIST,
-				LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
+				LOAD_REMOTE_CHANGES_LIST, LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
 
 	}
 
@@ -1124,6 +1123,7 @@ public class SyncJob implements InterruptableJob {
 				CloseableIterator<Node> it = root.children.iteratorThrow();
 				while (it.hasNext()) {
 					snapshot.add(it.next());
+					freeSomeCPU();
 				}
 			}
 		} else {
@@ -1328,6 +1328,8 @@ public class SyncJob implements InterruptableJob {
 				if (percent <= 5) {
 					// System.gc();
 				}
+
+				freeSomeCPU();
 			}
 		}
 	}
@@ -1347,17 +1349,11 @@ public class SyncJob implements InterruptableJob {
 			emptyNodeChildren(rootNode, false);
 		}
 
-		URI uri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode);
-
-		// create temp file
-		final File remoteTreeFile = File.createTempFile("pydio", "xmlremote");
-		// save xml with remote tree content to file using input stream
-		uriContentToFile(uri, remoteTreeFile, null);
-
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception {
 				// parse file structure to node tree
-				parseNodesFromFile(remoteTreeFile, rootNode, accumulator, save);
+				parseNodesFromStream(getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode)), rootNode,
+						accumulator, save);
 				return null;
 			}
 		});
@@ -1378,11 +1374,8 @@ public class SyncJob implements InterruptableJob {
 	}
 
 	/**
-	 * Parses remote node structure directly from XML file using modified
+	 * Parses remote node structure directly from XML stream using modified
 	 * SAXparser.
-	 * 
-	 * FIXME - consider passing stream instead of file - direct stream with XML
-	 * structure from server - ommit saving to file!
 	 * 
 	 * @param remoteTreeFile
 	 * @param parentNode
@@ -1390,12 +1383,10 @@ public class SyncJob implements InterruptableJob {
 	 * @param save
 	 * @throws SynchroOperationException
 	 */
-	protected void parseNodesFromFile(File remoteTreeFile, final Node parentNode, final List<Node> list, final boolean save)
+	protected void parseNodesFromStream(InputStream is, final Node parentNode, final List<Node> list, final boolean save)
 			throws SynchroOperationException {
 
 		try {
-			InputStream is = new FileInputStream(remoteTreeFile);
-
 			XMLReader reader = new XMLReader();
 			reader.addHandler("tree", new NodeHandler() {
 
@@ -1426,10 +1417,8 @@ public class SyncJob implements InterruptableJob {
 			reader.parse(is);
 			// close the stream
 			is.close();
-			// delete file - we do not need it anymore
-			boolean deleted = remoteTreeFile.delete();
 			if (list != null) {
-			Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream, xml file deleted: " + deleted);
+				Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream");
 			} else {
 				Logger.getRootLogger().info("No items to parse");
 			}
@@ -1483,15 +1472,14 @@ public class SyncJob implements InterruptableJob {
 	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) throws EhcacheListException {
 		EhcacheList<Node> saved = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_SAVED_LIST);
 		saved.addAll(snapshot);
-		// TreeMap<String, Object[]> diff = new TreeMap<String, Object[]>();
 
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
 		EhcacheList<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
 		while (cIt.hasNext()) {
 			Node c = cIt.next();
-			
-			// because we use comparator by path, 
+
+			// because we use comparator by path,
 			// we can use ehcache feature here
 			Node s = saved.get(c);
 			boolean found = false;
@@ -1508,34 +1496,11 @@ public class SyncJob implements InterruptableJob {
 				}
 			}
 
-			// Iterator<Node> sIt = saved.iterator();
-			// boolean found = false;
-			// while (sIt.hasNext() && !found) {
-			// Node s = sIt.next();
-			// if (s.getPath(true).equals(c.getPath(true))) {
-			// found = true;
-			// if (c.isLeaf()) {// FILE : compare date & size
-			// if ((c.getLastModified().after(s.getLastModified()) ||
-			// !c.getPropertyValue("bytesize").equals(
-			// s.getPropertyValue("bytesize")))
-			// && (c.getPropertyValue("md5") == null ||
-			// s.getPropertyValue("md5") == null || !s.getPropertyValue("md5")
-			// .equals(c.getPropertyValue("md5")))) {
-			// diff.put(c.getPath(true),
-			// makeTodoObject(NODE_CHANGE_STATUS_MODIFIED, c));
-			// }
-			// }
-			// saved.remove(s);
-			// }
-			// }
 			if (!found) {
-
-
 				created.add(c);
-				// diff.put(c.getPath(true),
-				// makeTodoObject((c.isLeaf()?NODE_CHANGE_STATUS_FILE_CREATED:NODE_CHANGE_STATUS_DIR_CREATED),
-				// c));
 			}
+
+			freeSomeCPU();
 		}
 		if (saved.size() > 0) {
 			Iterator<Node> sIt = saved.iterator();
@@ -1557,25 +1522,6 @@ public class SyncJob implements InterruptableJob {
 
 					}
 
-					// Iterator<Node> creaIt = created.iterator();
-					// boolean isMoved = false;
-					// Node destinationNode = null;
-					// while (creaIt.hasNext()) {
-					// Node createdNode = creaIt.next();
-					// // if(type.equals("local"))
-					// // this.updateLocalMD5(createdNode);
-					// if (createdNode.isLeaf() &&
-					// createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize")))
-					// {
-					// isMoved = (createdNode.getPropertyValue("md5") != null &&
-					// s.getPropertyValue("md5") != null && createdNode
-					// .getPropertyValue("md5").equals(s.getPropertyValue("md5")));
-					// if (isMoved) {
-					// destinationNode = createdNode;
-					// break;
-					// }
-					// }
-					// }
 					if (isMoved) {
 						// DETECTED, DO SOMETHING.
 						created.remove(destinationNode);
@@ -1589,6 +1535,8 @@ public class SyncJob implements InterruptableJob {
 					diff.put(s.getPath(true),
 							makeTodoObject((s.isLeaf() ? NODE_CHANGE_STATUS_FILE_DELETED : NODE_CHANGE_STATUS_DIR_DELETED), s));
 				}
+
+				freeSomeCPU();
 			}
 		}
 		// NOW ADD CREATED ITEMS
@@ -1601,6 +1549,20 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 		return diff;
+	}
+
+	/**
+	 * Frees some CPU time, so we do not kill machine
+	 */
+	private void freeSomeCPU() {
+		try {
+			// sleep 0 is enough - we do not slow the execution, but
+			// we give some breath to core when switching context
+			// and maybe other processes can grab some time
+			Thread.sleep(0);
+		} catch (InterruptedException e) {
+			// FIXME - maybe some additional handling?
+		}
 	}
 
 	protected void updateLocalMD5(Node node) {
@@ -1804,6 +1766,35 @@ public class SyncJob implements InterruptableJob {
 		}
 		this.uriContentToFile(uri, targetFile, null);
 
+	}
+
+	/**
+	 * Retrieves uri content as a stream
+	 * 
+	 * @param uri
+	 * @return
+	 * @throws SynchroOperationException
+	 * @throws IllegalStateException
+	 * @throws IOException
+	 */
+	protected InputStream getUriContentStream(URI uri) throws SynchroOperationException, IllegalStateException, IOException {
+		RestRequest rest = this.getRequest();
+		HttpEntity entity;
+		try {
+			entity = rest.getNotConsumedResponseEntity(uri, null, null, true);
+		} catch (Exception e) {
+			throw new SynchroOperationException("Error during response entity: " + e.getMessage(), e);
+		}
+		long fullLength = entity.getContentLength();
+		if (fullLength <= 0) {
+			rest.release();
+			return null;
+		}
+
+		InputStream contentStream = entity.getContent();
+		// FIXME should we release now?
+		rest.release();
+		return contentStream;
 	}
 
 	/**

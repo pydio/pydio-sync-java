@@ -9,6 +9,15 @@ import java.util.ListIterator;
 import net.sf.ehcache.Ehcache;
 import net.sf.ehcache.Element;
 
+/**
+ * Ehcache implementation of List interface
+ * Supports some of List methods - only those we need for our purposes of
+ * storing and accessing Node objects
+ * 
+ * @author WojT
+ * 
+ * @param <E>
+ */
 public class EhcacheList<E> implements List<E> {
 
 	private Ehcache cache;
@@ -32,8 +41,10 @@ public class EhcacheList<E> implements List<E> {
 
 	@Override
 	public boolean contains(Object o) {
-		if (o == null)
-			return false; // FIXME shouldnt we denote also null values?
+		if (o == null) {
+			// FIXME shouldnt we denote also null values?
+			return false;
+		}
 		// FIXME if Object is not E - we are in troubles! - FIXME
 		return cache.get(determinant.computeKey((E) o)) != null;
 	}
