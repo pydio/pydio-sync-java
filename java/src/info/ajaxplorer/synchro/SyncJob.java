@@ -360,8 +360,12 @@ public class SyncJob implements InterruptableJob {
 			}
 			nodeDao.update(currentRepository);
 			Server s = new Server(currentRepository.getParent());
-			RestStateHolder.getInstance().setServer(s);
-			RestStateHolder.getInstance().setRepository(currentRepository);
+			RestStateHolder restStateHolder = RestStateHolder.getInstance();
+			restStateHolder.setServer(s);
+			restStateHolder.setRepository(currentRepository);
+			// set upload chunk size for 16K
+			restStateHolder.setFileUploadChunkSize(RestStateHolder.FILE_UPLOAD_CHUNK_16K);
+
 			AjxpAPI.getInstance().setServer(s);
 			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 			direction = currentRepository.getPropertyValue("synchro_direction");
@@ -1638,6 +1642,7 @@ public class SyncJob implements InterruptableJob {
 			private int previousPercent = 0;
 			private int currentPart = 0;
 			private int currentTotal = 1;
+
 
 			@Override
 			public void transferred(long num) throws IOException {
