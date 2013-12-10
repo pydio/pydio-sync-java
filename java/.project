@@ -3,6 +3,7 @@
 	<name>AjaXplorer Synchronizer</name>
 	<comment></comment>
 	<projects>
+		<project>Java Ajxp Client</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
