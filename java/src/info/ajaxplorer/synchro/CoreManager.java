@@ -27,8 +27,10 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Property;
 import info.ajaxplorer.client.model.Server;
 import info.ajaxplorer.client.util.RdiffProcessor;
+import info.ajaxplorer.synchro.gui.JobEditor;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
+import info.ajaxplorer.synchro.model.SyncLogDetails;
 
 import java.io.File;
 import java.net.URI;
@@ -65,7 +67,9 @@ import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
 
 public class CoreManager {
-
+	
+	private Logger log = Logger.getLogger(getClass());
+	
 	
 	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "mysql", "imap", "jsapi"};
 	public String[] EXCLUDED_FILES_START = {".", "Thumbs.db"};
@@ -316,13 +320,26 @@ public class CoreManager {
 		}
 	}
 	
+	/**
+	 * Return home directory for DB
+	 * @return
+	 */
+	protected String getDBHomeDir() {
+		return System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer";
+	}
+	
 	protected boolean initializeDAO() throws SQLException{
 
-		File work = new File(System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer");
-		if(!work.exists()) work.mkdir();
+		String dbHomeDir = getDBHomeDir();
+		
+		log.info("CoreManager " + getClass() + " initializeDao: " + dbHomeDir);
+		
+		File work = new File(dbHomeDir);
+		if(!work.exists()) work.mkdirs();
 		File dbFile = new File(work, "ajxpsync.db");
 		boolean dbAlreadyCreated = dbFile.exists();
 		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();		
+
 
 		if(!dbAlreadyCreated){
 			ConnectionSource cs = this.getConnection();
@@ -330,13 +347,20 @@ public class CoreManager {
 			TableUtils.createTable(cs, Property.class);
 			TableUtils.createTable(cs, SyncChange.class);
 			TableUtils.createTable(cs, SyncLog.class);
+			TableUtils.createTable(cs, SyncLogDetails.class);
 
 			DaoManager.createDao(cs, Node.class).executeRaw("CREATE TRIGGER on_delete_cascade AFTER DELETE ON a BEGIN\n" + 
 					"  DELETE FROM b WHERE node_id=old.id;\n" +
 					"  DELETE FROM a WHERE parent_id=old.id;\n" +
 					"END;");
 			this.releaseConnection();
-		}        		
+		} else {
+			// we have added some new tables?
+			// backwar compatibility
+			ConnectionSource cs = this.getConnection();
+			TableUtils.createTableIfNotExists(cs, SyncLogDetails.class);
+			this.releaseConnection();
+		}
 		return dbAlreadyCreated;
 	}
 	
@@ -367,6 +391,11 @@ public class CoreManager {
 			node.addProperty("synchro_active", data.get("ACTIVE"));
 			node.addProperty("synchro_direction", data.get("DIRECTION"));
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
+			node.addProperty(JobEditor.AUTO_KEEP_REMOTE,
+					data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
+			node.addProperty(JobEditor.AUTO_KEEP_LOCAL,
+					data.get(JobEditor.AUTO_KEEP_LOCAL_DATA));
+
 			node.addProperty("sync_running_status", "-1");
 			nDao.update(node);
 			try {
@@ -400,6 +429,17 @@ public class CoreManager {
 			node.setPath("/");
 			Collection<Property> props = node.properties;
 			Collection<Property> toSave = new ArrayList<Property>();
+
+			// check if we already have property auto keep remote & auto keep
+			// local
+			if (node.getPropertyValue(JobEditor.AUTO_KEEP_REMOTE) == null) {
+				node.addProperty(JobEditor.AUTO_KEEP_REMOTE,
+						data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
+			}
+			if (node.getPropertyValue(JobEditor.AUTO_KEEP_LOCAL) == null) {
+				node.addProperty(JobEditor.AUTO_KEEP_LOCAL,
+						data.get(JobEditor.AUTO_KEEP_LOCAL_DATA));
+			}
 			for(Property p:props){
 				if(p.getName().equals("repository_id")
 						&& (p.getValue() == null || !p.getValue().equals(data.get("REPOSITORY_ID")))) {
@@ -431,7 +471,21 @@ public class CoreManager {
 					intervalChanges = true;
 					toSave.add(p);
 				}
+ else if (p.getName().equals(JobEditor.AUTO_KEEP_REMOTE)
+						&& !p.getValue().equals(
+								data.get(JobEditor.AUTO_KEEP_REMOTE_DATA))) {
+					p.setValue(data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
+					serverChanges = true;
+					toSave.add(p);
+				} else if (p.getName().equals(JobEditor.AUTO_KEEP_LOCAL)
+						&& !p.getValue().equals(
+								data.get(JobEditor.AUTO_KEEP_LOCAL_DATA))) {
+					p.setValue(data.get(JobEditor.AUTO_KEEP_LOCAL_DATA));
+					serverChanges = true;
+					toSave.add(p);
+				}
 			}
+
 			try {
 				if(serverChanges){
 
@@ -628,6 +682,10 @@ public class CoreManager {
         JobDetail job = newJob(SyncJob.class)
         		.withIdentity(String.valueOf(n.id), "sync")
         		.usingJobData("node-id", String.valueOf(n.id))
+				.usingJobData(JobEditor.AUTO_KEEP_REMOTE,
+						n.getPropertyValue(JobEditor.AUTO_KEEP_REMOTE))
+				.usingJobData(JobEditor.AUTO_KEEP_LOCAL,
+						n.getPropertyValue(JobEditor.AUTO_KEEP_LOCAL))
         		.build();
 
         if(firstTriggerClear){

@@ -45,6 +45,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
+import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Image;
@@ -82,6 +83,11 @@ import org.w3c.dom.NodeList;
 
 public class JobEditor extends Composite{
 
+	public static final String AUTO_KEEP_REMOTE_DATA = "AUTOKEEPREMOTE";
+	public static final String AUTO_KEEP_REMOTE = "auto_keep_remote";
+	public static final String AUTO_KEEP_LOCAL_DATA = "AUTOKEEPLOCAL";
+	public static final String AUTO_KEEP_LOCAL = "auto_keep_local";
+
 	{
 		//Register as a resource user - SWTResourceManager will
 		//handle the obtaining and disposing of resources
@@ -102,6 +108,9 @@ public class JobEditor extends Composite{
 	private Button radioSyncInterval3;
 	private Button radioSyncInterval1;
 	private Combo comboDirection;
+
+	private Button keepAutoRemote;
+	private Button keepAutoLocal;
 	private Text tfLogin;
 	
 	private Action saveAction;
@@ -114,7 +123,12 @@ public class JobEditor extends Composite{
 	private Section logsSection;
 	private LogViewer logs;
 	
+	// FIXME later - refactor to ensure MVC pattern.
+	// all data should be stored in model object for manipulate
+
 	private boolean currentActiveState = true;
+	private boolean autoKeepRemoteState = false;
+	private boolean autoKeepLocalState = false;
 	
 	private HashMap<String, String> repoItems;
 	//private ConfigPanel configPanel;
@@ -153,7 +167,7 @@ public class JobEditor extends Composite{
 		HashMap<String, Object> connData2 = new HashMap<String, Object>();
 		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
-		connData2.put("HEIGHT", 200);
+		connData2.put("HEIGHT", 210);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
@@ -200,6 +214,12 @@ public class JobEditor extends Composite{
 			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
 			values.put("DIRECTION", baseNode.getPropertyValue("synchro_direction"));
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
+
+			values.put(AUTO_KEEP_REMOTE_DATA,
+					baseNode.getPropertyValue(AUTO_KEEP_REMOTE));
+			values.put(AUTO_KEEP_LOCAL_DATA,
+					baseNode.getPropertyValue(AUTO_KEEP_LOCAL));
+
 			this.loadFormData(values);		
 			if(this.form != null){
 				//((FormHeading)this.form.getHead()).setText(CoreManager.getInstance().makeJobLabel(baseNode, true));				
@@ -223,6 +243,12 @@ public class JobEditor extends Composite{
 		values.put("REPOSITORY_ID", currentRepoId);
 		values.put("TARGET", tfTarget.getText());
 		values.put("ACTIVE", (currentActiveState?"true":"false"));
+
+		values.put(AUTO_KEEP_REMOTE_DATA, (autoKeepRemoteState ? "true"
+				: "false"));
+		values.put(AUTO_KEEP_LOCAL_DATA,
+				(autoKeepLocalState ? "true" : "false"));
+
 		String dir = "bi";
 		if(comboDirection.getSelectionIndex() == 1) dir = "up";
 		else if(comboDirection.getSelectionIndex() == 2) dir = "down";
@@ -257,6 +283,11 @@ public class JobEditor extends Composite{
 		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
 		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
 		
+		autoKeepRemoteState = "true".equals(values.get(AUTO_KEEP_REMOTE_DATA));
+		autoKeepLocalState = "true".equals(values.get(AUTO_KEEP_LOCAL_DATA));
+
+		updateAutoKeeping(false);
+
 		saveAction.setEnabled(false);
 		
 	}
@@ -275,6 +306,9 @@ public class JobEditor extends Composite{
 		tfTarget.setText("");
 		comboDirection.select(0);
 		
+
+		updateAutoKeeping(true);
+
 		radioSyncInterval1.setSelection(false);
 		radioSyncInterval2.setSelection(true);
 		radioSyncInterval3.setSelection(false);
@@ -288,6 +322,8 @@ public class JobEditor extends Composite{
 
 	}	
 	
+
+
 	public Control getMouseHandler(){
 		return this.form.getHead();
 	}
@@ -501,7 +537,25 @@ public class JobEditor extends Composite{
 	    test.maxWidth = 180;
 	    comboDirection.setLayoutData(test);
 	    comboDirection.select(0);
-				
+		comboDirection.addModifyListener(new ModifyListener() {
+
+			@Override
+			public void modifyText(ModifyEvent event) {
+				updateAutoKeeping(true);
+			}
+		});
+
+		// checkbox for setting auto keeping remote
+		keepAutoRemote = toolkit.createButton(sectionClient3,
+				CoreManager.getMessage("jobeditor_autokeepremote"), SWT.CHECK);
+		keepAutoRemote.setLayoutData(new TableWrapData(TableWrapData.LEFT,
+				TableWrapData.MIDDLE));
+		// checkbox for setting auto keeping local
+		keepAutoLocal = toolkit.createButton(sectionClient3,
+				CoreManager.getMessage("jobeditor_autokeeplocal"), SWT.CHECK);
+		keepAutoLocal.setLayoutData(new TableWrapData(TableWrapData.LEFT,
+				TableWrapData.MIDDLE));
+
 		Label lab2 = toolkit.createLabel(sectionClient3, CoreManager.getMessage("jobeditor_frequency") + " : ");
 		lab2.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
 		Composite rComp2= toolkit.createComposite(sectionClient3);
@@ -550,6 +604,26 @@ public class JobEditor extends Composite{
 		tfPassword.addModifyListener(tfMod);
 		tfTarget.addModifyListener(tfMod);
 		comboDirection.addModifyListener(tfMod);
+		keepAutoRemote.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				super.widgetSelected(e);
+				autoKeepRemoteState = keepAutoRemote.getSelection();
+				autoKeepLocalState = false;
+				updateAutoKeeping(false);
+				saveAction.setEnabled(true);
+			}
+		});
+		keepAutoLocal.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				super.widgetSelected(e);
+				autoKeepRemoteState = false;
+				autoKeepLocalState = keepAutoLocal.getSelection();
+				updateAutoKeeping(false);
+				saveAction.setEnabled(true);
+			}
+		});
 		radioSyncInterval1.addSelectionListener(rSel);
 		
 		closeAction = new Action("Close", new ImageDescriptor() {
@@ -855,5 +929,35 @@ public class JobEditor extends Composite{
 		logs.reload();
 	}
 	
-	
+	/**
+	 * Updates autoKeeping checkbox states if reset - means, that user changed
+	 * direction option, and we need to set default states also
+	 * 
+	 * @param reset
+	 */
+	private void updateAutoKeeping(boolean reset) {
+		if (reset) {
+			int index = comboDirection.getSelectionIndex();
+			// BIDIRECTIONAL - both enabled and by default unselected - user
+			// decides
+			autoKeepLocalState = false;
+			autoKeepRemoteState = false;
+			keepAutoLocal.setEnabled(true);
+			keepAutoRemote.setEnabled(true);
+			if (index == 1) {
+				// UPLOAD - local enabled and by default selected
+				autoKeepLocalState = true;
+				keepAutoLocal.setEnabled(true);
+				keepAutoRemote.setEnabled(false);
+			} else if (index == 2) {
+				// DOWNLOAD - remote enabled and by default selected
+				autoKeepRemoteState = true;
+				keepAutoLocal.setEnabled(false);
+				keepAutoRemote.setEnabled(true);
+			}
+
+		}
+		keepAutoLocal.setSelection(autoKeepLocalState);
+		keepAutoRemote.setSelection(autoKeepRemoteState);
+	}
 }

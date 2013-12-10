@@ -73,7 +73,8 @@ public class SyncChange {
 		return changes;
 	}
 	
-	public static boolean syncChangesToTreeMap(List<SyncChange> changes, Map<String, Object[]> tree){
+	public static boolean syncChangesToTreeMap(List<SyncChange> changes,
+			Map<String, Object[]> tree, int behavior) {
 		boolean detectConflicts = false;
 		 //= new TreeMap<String, Object[]>();
 		for(int i=0;i<changes.size();i++){
@@ -81,7 +82,17 @@ public class SyncChange {
 			value[0] = changes.get(i).getChangeValue().task;
 			value[1] = changes.get(i).getChangeValue().n;
 			value[2] = changes.get(i).getChangeValue().status;
-			if(value[2] == SyncJob.STATUS_CONFLICT) detectConflicts = true;
+
+			// if user want to have auto keep remote version
+			// change the node params
+			if (behavior == SyncJob.TASK_SOLVE_KEEP_THEIR) {
+				value[0] = SyncJob.TASK_SOLVE_KEEP_THEIR;
+				value[2] = SyncJob.STATUS_CONFLICT_SOLVED;
+			} else {
+				if (value[2] == SyncJob.STATUS_CONFLICT) {
+					detectConflicts = true;
+				}
+			}
 			tree.put(changes.get(i).getKey(), value);
 		}
 		return detectConflicts;
