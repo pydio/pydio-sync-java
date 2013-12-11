@@ -68,6 +68,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -404,6 +406,8 @@ public class SyncJob implements InterruptableJob {
 			List<Node> remoteSnapshot = EhcacheListFactory.getInstance().getList(REMOTE_SNAPSHOT_LIST);
 			Node localRootNode = loadRootAndSnapshot("local_snapshot", localSnapshot, currentLocalFolder);
 			Map<String, Object[]> localDiff = loadLocalChanges(localSnapshot);
+
+			System.exit(-1);
 
 			if (unsolvedConflicts) {
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_blocking_conflicts_title", "job_blocking_conflicts");
@@ -1206,7 +1210,37 @@ public class SyncJob implements InterruptableJob {
 				if (save) {
 					emptyNodeChildren(rootNode, true);
 				}
-				listDirRecursive(currentLocalFolder, rootNode, accumulator, save, previousSnapshot);
+				Analyzer analyzer = new Analyzer();
+				listDirRecursive(currentLocalFolder, rootNode, accumulator, save, previousSnapshot, analyzer);
+				
+				// FIXME saveAnalyzer
+				
+				BufferedWriter bw = new BufferedWriter(new FileWriter("D:\\temp\\crawlanalyzer" + System.currentTimeMillis() + ".txt"));
+				
+				bw.write("NODES: " + analyzer.nodeCount + "\n");
+				bw.write("IGNORED: " + analyzer.ignoredCount + "\n");
+				bw.write("STRING COMPARE: " + analyzer.stringComparisions + "\n");
+				bw.write("NODE PROPERTY CREATION: " + analyzer.propertyCreations+ "\n");
+				bw.write("PREVIOUS SNAPSHOT CHECKS: " + analyzer.prevSnapCheck + "\n");
+				bw.write("MD5 COMPUTATIOn: " + analyzer.md5computation + "\n");
+				bw.write("NODE CREATION: " + analyzer.nodeCreations + "\n");
+				bw.write("NODE UPDATES: " + analyzer.nodeUpdates + "\n");
+				bw.write("NODES FOUND: " + analyzer.nodesFound + "\n");
+				bw.write("NODES NOT FOUND: " + analyzer.notFound + "\n");
+				
+				bw.write("------");
+				for (String key : analyzer.operations.keySet()) {
+					bw.write("OPERATIONS: " + key + "\n");
+					Set<Entry<String, Long>> entrySet = analyzer.operations.get(key).entrySet();
+					Iterator<Entry<String, Long>> iterator = entrySet.iterator();
+					while ( iterator.hasNext()) {
+						Entry<String, Long> entry = iterator.next();
+						bw.write("FILE: " + entry.getKey() + " TIME: " + entry.getValue() + "ms\n");
+					}
+				}
+				
+				bw.close();
+				
 				return null;
 			}
 		});
@@ -1224,12 +1258,14 @@ public class SyncJob implements InterruptableJob {
 		final Node root;
 		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_LOCAL_CHANGES_LIST);
 		if (indexationSnap.size() > 0) {
+			Logger.getRootLogger().info("PREVIOUS INDEXATION");
 			index.setResourceType("previous_indexation");
 			nodeDao.update(index);
 			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = indexationSnap;
 			root = loadRootAndSnapshot("local_tmp", null, currentLocalFolder);
 		} else {
+			Logger.getRootLogger().info("PREVIOUS INDEXATION");
 			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = snapshot;
 			root = index;
@@ -1245,6 +1281,94 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
+	public class Analyzer {
+
+		public static final String STRING_COMPARE = "STRING_COMPARE";
+		public static final String NODE_CREATE = "NODE_CREATE";
+		public static final String NODE_PROP_CREATE = "NODE_PROP_CREATE";
+		public static final String PREV_SNAPSHOT_CHECK = "PREV_SNAPSHOT_CHECK";
+		public static final String MD5_COMPUTE = "MD5_COMPUTE";
+		public static final String NODE_UPDATE = "NODE_UDPATE";
+
+		private long nodeCount = 0;
+		private long ignoredCount = 0;
+		private long stringComparisions = 0;
+		private long nodeCreations = 0;
+		private long propertyCreations = 0;
+		private long prevSnapCheck = 0;
+		private long md5computation = 0;
+		private long nodeUpdates = 0;
+
+		private int nodesFound = 0;
+		private int notFound = 0;
+
+		private Map<String, Map<String, Long>> operations = new HashMap<String, Map<String, Long>>();
+
+		public void incNodeCount() {
+			nodeCount++;
+		}
+
+		public void incIgnoredCount() {
+			ignoredCount++;
+		}
+
+		private void stringComparision(long time) {
+			stringComparisions += time;
+		}
+
+		private void nodeCreation(long time) {
+			nodeCreations += time;
+		}
+
+		private void propertyCreation(long time) {
+			propertyCreations += time;
+		}
+
+		private void prevSnapCheck(long time) {
+			prevSnapCheck += time;
+		}
+
+		private void md5compute(long time) {
+			md5computation += time;
+		}
+
+		private void nodeUpdate(long time) {
+			nodeUpdates += time;
+		}
+
+		public void incNodesFound() {
+			nodesFound++;
+		}
+
+		public void incNotFound() {
+			notFound++;
+		}
+
+		public void operation(String operationName, String path, long time) {
+			Map<String, Long> map = operations.get(operationName);
+			if (map == null) {
+				map = new TreeMap<String, Long>();
+				operations.put(operationName, map);
+			}
+			map.put(path, time);
+
+			if (NODE_CREATE.equals(operationName)) {
+				nodeCreation(time);
+			} else if (STRING_COMPARE.equals(operationName)) {
+				stringComparision(time);
+			} else if (NODE_PROP_CREATE.equals(operationName)) {
+				propertyCreation(time);
+			} else if (PREV_SNAPSHOT_CHECK.equals(operationName)) {
+				prevSnapCheck(time);
+			} else if (MD5_COMPUTE.equals(operationName)) {
+				md5compute(time);
+			} else if (NODE_UPDATE.equals(operationName)) {
+				nodeUpdate(time);
+			}
+		}
+
+	}
+
 	protected String normalizeUnicode(String str) {
 		Normalizer.Form form = Normalizer.Form.NFD;
 		if (!Normalizer.isNormalized(str, form)) {
@@ -1253,74 +1377,135 @@ public class SyncJob implements InterruptableJob {
 		return str;
 	}
 
-	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save, List<Node> previousSnapshot)
+	protected void listDirRecursive(File directory, Node root, List<Node> accumulator, boolean save, List<Node> previousSnapshot,
+			Analyzer analyzer)
 			throws InterruptedException, SQLException {
 
 		if (this.interruptRequired) {
 			throw new InterruptedException("Interrupt required");
 		}
-		// Logger.getRootLogger().info("Searching "+directory.getAbsolutePath());
+		Logger.getRootLogger().info("Searching " + directory.getAbsolutePath());
+
 		File[] children = directory.listFiles();
 		String[] start = getCoreManager().EXCLUDED_FILES_START;
 		String[] end = getCoreManager().EXCLUDED_FILES_END;
 		if (children != null) {
+
 			for (int i = 0; i < children.length; i++) {
+				analyzer.incNodeCount();
+
+				long stringCompare = System.currentTimeMillis();
+
 				boolean ignore = false;
+				String path = children[i].getName();
 				for (int j = 0; j < start.length; j++) {
-					if (children[i].getName().startsWith(start[j])) {
+					if (path.startsWith(start[j])) {
 						ignore = true;
 						break;
 					}
 				}
-				if (ignore)
+				if (ignore) {
+					analyzer.incIgnoredCount();
 					continue;
+				}
+
 				for (int j = 0; j < end.length; j++) {
-					if (children[i].getName().endsWith(end[j])) {
+					if (path.endsWith(end[j])) {
 						ignore = true;
 						break;
 					}
 				}
-				if (ignore)
+				if (ignore) {
+					analyzer.incIgnoredCount();
 					continue;
-				Node newNode = new Node(Node.NODE_TYPE_ENTRY, children[i].getName(), root);
-				if (save)
+				}
+
+				stringCompare = System.currentTimeMillis() - stringCompare;
+
+				
+				Node newNode = new Node(Node.NODE_TYPE_ENTRY, path, root);
+				if (save) {
+					long createTime = System.currentTimeMillis();
 					nodeDao.create(newNode);
+					createTime = System.currentTimeMillis() - createTime;
+
+					analyzer.operation(Analyzer.NODE_CREATE, path, createTime);
+
+				}
+
+				long time = System.currentTimeMillis();
 				String p = children[i].getAbsolutePath().substring(root.getPath(true).length()).replace("\\", "/");
+				stringCompare += (System.currentTimeMillis() - time);
+
 				newNode.setPath(p);
+
+				long createPropTime = System.currentTimeMillis();
 				newNode.properties = nodeDao.getEmptyForeignCollection("properties");
+				createPropTime = System.currentTimeMillis() - createPropTime;
+				analyzer.operation(Analyzer.NODE_PROP_CREATE, path, createPropTime);
+
 				newNode.setLastModified(new Date(children[i].lastModified()));
+				System.out.println("PRVSNAP: " + previousSnapshot.size() + " children " + children.length);
 				if (children[i].isDirectory()) {
-					listDirRecursive(children[i], root, accumulator, save, previousSnapshot);
+					listDirRecursive(children[i], root, accumulator, save, previousSnapshot, analyzer);
 				} else {
 					newNode.addProperty("bytesize", String.valueOf(children[i].length()));
 					String md5 = null;
 
+					long prevSnapTime = System.currentTimeMillis();
 					if (previousSnapshot != null) {
-						// Logger.getRootLogger().info("Searching node in previous snapshot for "
-						// + p);
-						Iterator<Node> it = previousSnapshot.iterator();
-						while (it.hasNext()) {
-							Node previous = it.next();
+						Logger.getRootLogger().info("Searching node in previous snapshot for " + p);
+
+						// Iterator<Node> it = previousSnapshot.iterator();
+						// while (it.hasNext()) {
+
+						// Node previous = it.next();
+
+						Node previous = ((EhcacheList<Node>) previousSnapshot).get(newNode);
+						if (previous != null) {
+							analyzer.incNodesFound();
+							Logger.getRootLogger().info("FOUND:  " + analyzer.nodesFound);
+							long time1 = System.currentTimeMillis();
 							if (previous.getPath(true).equals(p)) {
 								if (previous.getLastModified().equals(newNode.getLastModified())
 										&& previous.getPropertyValue("bytesize").equals(newNode.getPropertyValue("bytesize"))) {
 									md5 = previous.getPropertyValue("md5");
 									// Logger.getRootLogger().info("-- Getting md5 from previous snapshot");
 								}
-								break;
+								// it.remove();
+								// break;
 							}
+							stringCompare += (System.currentTimeMillis() - time1);
+						} else {
+							Logger.getRootLogger().info("NOT FOUND");
+							analyzer.incNotFound();
 						}
+						// }
 					}
+
+					prevSnapTime = System.currentTimeMillis() - prevSnapTime;
+					analyzer.operation(Analyzer.PREV_SNAPSHOT_CHECK, path, prevSnapTime);
+
+					long md5time = System.currentTimeMillis();
 					if (md5 == null) {
 						// Logger.getRootLogger().info("-- Computing new md5");
 						getCoreManager().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
 						md5 = computeMD5(children[i]);
 					}
+					md5time = System.currentTimeMillis() - md5time;
+
+					analyzer.operation(Analyzer.MD5_COMPUTE, path, md5time);
+
 					newNode.addProperty("md5", md5);
 					newNode.setLeaf();
 				}
 				if (save) {
+
+					long updateTime = System.currentTimeMillis();
 					nodeDao.update(newNode);
+					updateTime = System.currentTimeMillis() - updateTime;
+					analyzer.operation(Analyzer.NODE_UPDATE, path, updateTime);
+
 				}
 				if (accumulator != null) {
 					accumulator.add(newNode);
@@ -1332,6 +1517,9 @@ public class SyncJob implements InterruptableJob {
 				if (percent <= 5) {
 					// System.gc();
 				}
+
+				// add all string compare stuff
+				analyzer.operation(Analyzer.STRING_COMPARE, path, stringCompare);
 
 				freeSomeCPU();
 			}
