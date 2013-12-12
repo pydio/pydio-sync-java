@@ -360,8 +360,12 @@ public class SyncJob implements InterruptableJob {
 			}
 			nodeDao.update(currentRepository);
 			Server s = new Server(currentRepository.getParent());
-			RestStateHolder.getInstance().setServer(s);
-			RestStateHolder.getInstance().setRepository(currentRepository);
+			RestStateHolder restStateHolder = RestStateHolder.getInstance();
+			restStateHolder.setServer(s);
+			restStateHolder.setRepository(currentRepository);
+			// set upload chunk size for 16K
+			restStateHolder.setFileUploadChunkSize(RestStateHolder.FILE_UPLOAD_CHUNK_16K);
+
 			AjxpAPI.getInstance().setServer(s);
 			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));
 			direction = currentRepository.getPropertyValue("synchro_direction");
@@ -1220,12 +1224,14 @@ public class SyncJob implements InterruptableJob {
 		final Node root;
 		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_LOCAL_CHANGES_LIST);
 		if (indexationSnap.size() > 0) {
+			Logger.getRootLogger().info("PREVIOUS INDEXATION");
 			index.setResourceType("previous_indexation");
 			nodeDao.update(index);
 			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = indexationSnap;
 			root = loadRootAndSnapshot("local_tmp", null, currentLocalFolder);
 		} else {
+			Logger.getRootLogger().info("PREVIOUS INDEXATION");
 			// FIXME - can we copy Ehcache list that way?
 			previousSnapshot = snapshot;
 			root = index;
@@ -1241,6 +1247,7 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
+
 	protected String normalizeUnicode(String str) {
 		Normalizer.Form form = Normalizer.Form.NFD;
 		if (!Normalizer.isNormalized(str, form)) {
@@ -1255,32 +1262,43 @@ public class SyncJob implements InterruptableJob {
 		if (this.interruptRequired) {
 			throw new InterruptedException("Interrupt required");
 		}
-		// Logger.getRootLogger().info("Searching "+directory.getAbsolutePath());
+		// Logger.getRootLogger().info("Searching " +
+		// directory.getAbsolutePath());
+
 		File[] children = directory.listFiles();
 		String[] start = getCoreManager().EXCLUDED_FILES_START;
 		String[] end = getCoreManager().EXCLUDED_FILES_END;
 		if (children != null) {
+
 			for (int i = 0; i < children.length; i++) {
+
 				boolean ignore = false;
+				String path = children[i].getName();
 				for (int j = 0; j < start.length; j++) {
-					if (children[i].getName().startsWith(start[j])) {
+					if (path.startsWith(start[j])) {
 						ignore = true;
 						break;
 					}
 				}
-				if (ignore)
+				if (ignore) {
 					continue;
+				}
+
 				for (int j = 0; j < end.length; j++) {
-					if (children[i].getName().endsWith(end[j])) {
+					if (path.endsWith(end[j])) {
 						ignore = true;
 						break;
 					}
 				}
-				if (ignore)
+				if (ignore) {
 					continue;
-				Node newNode = new Node(Node.NODE_TYPE_ENTRY, children[i].getName(), root);
-				if (save)
+				}
+
+				Node newNode = new Node(Node.NODE_TYPE_ENTRY, path, root);
+				if (save) {
 					nodeDao.create(newNode);
+				}
+
 				String p = children[i].getAbsolutePath().substring(root.getPath(true).length()).replace("\\", "/");
 				newNode.setPath(p);
 				newNode.properties = nodeDao.getEmptyForeignCollection("properties");
@@ -1294,19 +1312,19 @@ public class SyncJob implements InterruptableJob {
 					if (previousSnapshot != null) {
 						// Logger.getRootLogger().info("Searching node in previous snapshot for "
 						// + p);
-						Iterator<Node> it = previousSnapshot.iterator();
-						while (it.hasNext()) {
-							Node previous = it.next();
+
+						Node previous = ((EhcacheList<Node>) previousSnapshot).get(newNode);
+						if (previous != null) {
 							if (previous.getPath(true).equals(p)) {
 								if (previous.getLastModified().equals(newNode.getLastModified())
 										&& previous.getPropertyValue("bytesize").equals(newNode.getPropertyValue("bytesize"))) {
 									md5 = previous.getPropertyValue("md5");
 									// Logger.getRootLogger().info("-- Getting md5 from previous snapshot");
 								}
-								break;
 							}
 						}
 					}
+
 					if (md5 == null) {
 						// Logger.getRootLogger().info("-- Computing new md5");
 						getCoreManager().notifyUser("Indexation", "Indexing " + p, currentJobNodeID);
@@ -1317,6 +1335,7 @@ public class SyncJob implements InterruptableJob {
 				}
 				if (save) {
 					nodeDao.update(newNode);
+
 				}
 				if (accumulator != null) {
 					accumulator.add(newNode);
@@ -1328,7 +1347,6 @@ public class SyncJob implements InterruptableJob {
 				if (percent <= 5) {
 					// System.gc();
 				}
-
 				freeSomeCPU();
 			}
 		}
@@ -1638,6 +1656,7 @@ public class SyncJob implements InterruptableJob {
 			private int previousPercent = 0;
 			private int currentPart = 0;
 			private int currentTotal = 1;
+
 
 			@Override
 			public void transferred(long num) throws IOException {
