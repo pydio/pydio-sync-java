@@ -1247,7 +1247,6 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
-
 	protected String normalizeUnicode(String str) {
 		Normalizer.Form form = Normalizer.Form.NFD;
 		if (!Normalizer.isNormalized(str, form)) {
@@ -1522,22 +1521,28 @@ public class SyncJob implements InterruptableJob {
 		}
 		if (saved.size() > 0) {
 			Iterator<Node> sIt = saved.iterator();
+
 			while (sIt.hasNext()) {
 				Node s = sIt.next();
 				if (s.isLeaf()) {
-					// again - we use ehcache list
+					// FIXME - we cannot use ehcache feature get(s) here, as it
+					// can be different path now (we are detecting moves)
+					// maybe it is possible to find quicker way?
 					boolean isMoved = false;
-					Node createdNode = created.get(s);
 					Node destinationNode = null;
-					if (createdNode != null) {
+
+					Iterator<Node> crIt = created.iterator();
+					while (crIt.hasNext()) {
+						Node createdNode = crIt.next();
+
 						if (createdNode.isLeaf() && createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize"))) {
 							isMoved = (createdNode.getPropertyValue("md5") != null && s.getPropertyValue("md5") != null && createdNode
 									.getPropertyValue("md5").equals(s.getPropertyValue("md5")));
 							if (isMoved) {
 								destinationNode = createdNode;
+								break;
 							}
 						}
-
 					}
 
 					if (isMoved) {
@@ -1656,7 +1661,6 @@ public class SyncJob implements InterruptableJob {
 			private int previousPercent = 0;
 			private int currentPart = 0;
 			private int currentTotal = 1;
-
 
 			@Override
 			public void transferred(long num) throws IOException {
