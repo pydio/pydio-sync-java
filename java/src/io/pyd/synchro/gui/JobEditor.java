@@ -341,16 +341,19 @@ public class JobEditor extends Composite{
 
 		boolean serverOk = false;
 
+		RestRequest rest = new RestRequest();
 		try {
 			Server s = new Server("Test", host, login, pass, true, false);
 			RestStateHolder.getInstance().setServer(s);
 			AjxpAPI.getInstance().setServer(s);
-			RestRequest rest = new RestRequest();
+			rest.throwAuthExceptions = true;
 			rest.getHttpClient().clearCookies();
-			rest.getDocumentContent(AjxpAPI.getInstance().getPingUri());
+			rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
 			serverOk = true;
 		} catch (URISyntaxException e) {
 		} catch (Exception e) {
+		} finally{
+			rest.release();
 		}
 
 		// check if repo is selected and local folder as well

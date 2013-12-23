@@ -118,7 +118,8 @@ public class AboutPanel extends Composite {
 		Label label = new Label(this, SWT.NULL);
 		label.setBounds(1, 200, 298, 45);
 		label.setAlignment(SWT.CENTER|SWT.BOTTOM);
-		label.setBackground(SWTResourceManager.getColor(255, 255, 255));		
+		label.setBackground(SWTResourceManager.getColor(251, 114, 92));	
+		label.setForeground(SWTResourceManager.getColor(255, 255, 255));
 		label.setText("Pydio Synchronization Tool - v" + version + "\nFree / Non supported edition\nVisit http://pyd.io/");
 		
 	}

@@ -1,10 +1,10 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>info.ajaxplorer.synchro</groupId>
-	<artifactId>ajaxplorer-sync</artifactId>
-	<version>0.8.3-SNAPSHOT</version>
-	<name>Ajaxplorer Synchronizer</name>
+	<groupId>io.pyd.synchro</groupId>
+	<artifactId>pydio-sync</artifactId>
+	<version>0.8.4-SNAPSHOT</version>
+	<name>Pydio</name>
 	<description>Multiplatform synchronization client for AjaXplorer</description>
 	<properties>
 		<swt.jar_suffix>3.100.0.v4233d</swt.jar_suffix>
@@ -212,7 +212,7 @@
 	<organization>
 		<name>Abstrium SAS</name>
 	</organization>
-	<url>http://ajaxplorer.info/</url>
+	<url>http://pyd.io/</url>
 	<dependencies>
 		<dependency>
 			<groupId>info.ajaxplorer.client</groupId>
