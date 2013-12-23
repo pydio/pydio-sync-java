@@ -246,8 +246,7 @@
 		</dependency>
 		<dependency>
 			<groupId>info.ajaxplorer.swt</groupId>
-			<artifactId>org.eclipse.swt.cocoa.macosx.x86_64</artifactId>
-			<!-- REPLACE THIS LINE WHEN WORKING IN ECLIPSE <artifactId>${swt.version}</artifactId> -->
+			<artifactId>${swt.version}</artifactId>
 			<version>4.2</version>
 		</dependency>
 		<dependency>
