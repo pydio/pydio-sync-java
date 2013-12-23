@@ -422,7 +422,14 @@ public class SyncJob implements InterruptableJob {
 
 			updateRunningStatus(RUNNING_STATUS_REMOTE_CHANGES);
 			Node remoteRootNode = loadRootAndSnapshot("remote_snapshot", remoteSnapshot, null);
-			Map<String, Object[]> remoteDiff = loadRemoteChanges(remoteSnapshot);
+			Map<String, Object[]> remoteDiff = null;
+			try {
+				remoteDiff = loadRemoteChanges(remoteSnapshot);
+			} catch (SynchroOperationException e) {
+				// there was problem with server response - cannot go further!
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_server_didnt_responsed_title", "job_server_didnt_responsed");
+				return;
+			}
 
 			Logger.getRootLogger().info("LOCAL DIFFS: " + localDiff.size());
 			Logger.getRootLogger().info("REMOTE DIFFS: " + remoteDiff.size());
@@ -488,7 +495,13 @@ public class SyncJob implements InterruptableJob {
 			takeLocalSnapshot(localRootNode, null, true, localSnapshot);
 			clearSnapshot("local_tmp");
 
-			takeRemoteSnapshot(remoteRootNode, null, true);
+			try {
+				takeRemoteSnapshot(remoteRootNode, null, true);
+			} catch (SynchroOperationException e) {
+				// there was problem with server response - cannot go further!
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_server_didnt_responsed_title", "job_server_didnt_responsed");
+				return;
+			}
 			clearSnapshot("remote_tmp");
 
 			cleanDB();
@@ -790,8 +803,15 @@ public class SyncJob implements InterruptableJob {
 						checked = this.synchronousUP(currentDirectory, sourceFile, n);
 					}
 					if (!checked) {
-						JSONObject object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(n.getPath(true)));
-						if (!object.has("size") || object.getInt("size") != (int) sourceFile.length()) {
+						JSONObject object = null;
+						String path = n.getPath(true);
+						try {
+							object = rest.getJSonContent(AjxpAPI.getInstance().getStatUri(path));
+						} catch (Exception e) {
+							Logger.getRootLogger().error("Error during uploading file: " + path, e);
+							continue;
+						}
+						if (object != null && (!object.has("size") || object.getInt("size") != (int) sourceFile.length())) {
 							throw new Exception("Could not upload file to the server");
 						}
 					}
@@ -1366,14 +1386,26 @@ public class SyncJob implements InterruptableJob {
 			emptyNodeChildren(rootNode, false);
 		}
 
+		final boolean[] streamStatusOK = { true };
+
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception {
 				// parse file structure to node tree
-				parseNodesFromStream(getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode)), rootNode,
-						accumulator, save);
+				InputStream uriContentStream = null;
+				try {
+					uriContentStream = getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode));
+					parseNodesFromStream(uriContentStream, rootNode, accumulator, save);
+				} catch (Exception e) {
+					streamStatusOK[0] = false;
+				}
 				return null;
 			}
 		});
+
+		if (!streamStatusOK[0]) {
+			throw new SynchroOperationException("Error during remote snapshot - server didnt responsed with node tree");
+		}
+
 		if (save) {
 			nodeDao.update(rootNode);
 		}
