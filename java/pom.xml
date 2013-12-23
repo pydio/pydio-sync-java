@@ -5,7 +5,7 @@
 	<artifactId>pydio-sync</artifactId>
 	<version>0.8.4-SNAPSHOT</version>
 	<name>Pydio</name>
-	<description>Multiplatform synchronization client for AjaXplorer</description>
+	<description>Multiplatform synchronization client for Pydio</description>
 	<properties>
 		<swt.jar_suffix>3.100.0.v4233d</swt.jar_suffix>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -63,8 +63,8 @@
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<classpathPrefix>AjaXplorerSynchro_lib/</classpathPrefix>
-							<mainClass>info.ajaxplorer.synchro.Manager</mainClass>
+							<classpathPrefix>PydioSync_lib/</classpathPrefix>
+							<mainClass>io.pyd.synchro.Manager</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
@@ -79,7 +79,7 @@
 							<goal>copy-dependencies</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${project.build.directory}/AjaXplorerSynchro_lib</outputDirectory>
+							<outputDirectory>${project.build.directory}/PydioSync_lib</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>
@@ -123,7 +123,7 @@
 							<descriptors>
 								<descriptor>assembly.xml</descriptor>
 							</descriptors>
-							<finalName>ajaxplorer_sync-${project.version}-${project.activeProfiles[0].id}</finalName>
+							<finalName>pydio_sync-${project.version}-${project.activeProfiles[0].id}</finalName>
 							<appendAssemblyId>false</appendAssemblyId>
 						</configuration>
 					</execution>
