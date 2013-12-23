@@ -1,6 +1,6 @@
-package info.ajaxplorer.synchro.utils;
+package io.pyd.synchro.utils;
 
-import info.ajaxplorer.synchro.exceptions.EhcacheListException;
+import io.pyd.synchro.exceptions.EhcacheListException;
 
 import java.rmi.UnexpectedException;
 import java.util.HashMap;

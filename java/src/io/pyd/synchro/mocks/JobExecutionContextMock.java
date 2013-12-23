@@ -1,4 +1,4 @@
-package info.ajaxplorer.synchro.mocks;
+package io.pyd.synchro.mocks;
 
 import java.util.Date;
 

@@ -1,7 +1,7 @@
 package info.ajaxplorer.synchro;
 
-import info.ajaxplorer.synchro.mocks.CoreManagerMock;
-import info.ajaxplorer.synchro.mocks.JobExecutionContextMock;
+import io.pyd.synchro.mocks.CoreManagerMock;
+import io.pyd.synchro.mocks.JobExecutionContextMock;
 
 import java.util.Locale;
 

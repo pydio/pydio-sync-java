@@ -1,4 +1,4 @@
-package info.ajaxplorer.synchro.utils;
+package io.pyd.synchro.utils;
 
 /**
  * Interface which helps accessing data in EhcacheList
