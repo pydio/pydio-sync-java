@@ -1,4 +1,4 @@
-package info.ajaxplorer.synchro.exceptions;
+package io.pyd.synchro.exceptions;
 
 /**
  * Exception object for all ehcache list implementation/access

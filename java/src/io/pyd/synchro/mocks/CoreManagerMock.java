@@ -1,9 +1,9 @@
-package info.ajaxplorer.synchro.mocks;
+package io.pyd.synchro.mocks;
 
 import java.util.Locale;
 import java.util.ResourceBundle;
 
-import info.ajaxplorer.synchro.CoreManager;
+import io.pyd.synchro.CoreManager;
 
 /**
  * This is a mock for CoreManager - will be used for JUnit testing purposes

@@ -1,30 +1,30 @@
 /*
  * Copyright 2012 Charles du Jeu <charles (at) ajaxplorer.info>
- * This file is part of AjaXplorer.
+ * This file is part of Pydio.
  *
- * AjaXplorer is free software: you can redistribute it and/or modify
+ * Pydio is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * AjaXplorer is distributed in the hope that it will be useful,
+ * Pydio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with AjaXplorer.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Pydio.  If not, see <http://www.gnu.org/licenses/>.
  *
- * The latest code can be found at <http://www.ajaxplorer.info/>.
+ * The latest code can be found at <http://pyd.io/>..
  *
  */
-package info.ajaxplorer.synchro.gui;
+package io.pyd.synchro.gui;
 import info.ajaxplorer.client.http.AjxpAPI;
 import info.ajaxplorer.client.http.RestRequest;
 import info.ajaxplorer.client.http.RestStateHolder;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Server;
-import info.ajaxplorer.synchro.CoreManager;
+import io.pyd.synchro.CoreManager;
 
 import java.net.URISyntaxException;
 import java.sql.SQLException;
@@ -36,6 +36,7 @@ import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 import org.eclipse.jface.action.Action;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.nebula.animation.AnimationRunner;
 import org.eclipse.nebula.animation.effects.AlphaEffect;
@@ -328,6 +329,43 @@ public class JobEditor extends Composite{
 		return this.form.getHead();
 	}
 	
+	/**
+	 * Checks whetever server configuration is ok
+	 * 
+	 * @return
+	 */
+	private boolean checkConfiguration() {
+		final String host = tfHost.getText();
+		final String login = tfLogin.getText();
+		final String pass = tfPassword.getText();
+
+		boolean serverOk = false;
+
+		try {
+			Server s = new Server("Test", host, login, pass, true, false);
+			RestStateHolder.getInstance().setServer(s);
+			AjxpAPI.getInstance().setServer(s);
+			RestRequest rest = new RestRequest();
+			rest.getHttpClient().clearCookies();
+			rest.getDocumentContent(AjxpAPI.getInstance().getPingUri());
+			serverOk = true;
+		} catch (URISyntaxException e) {
+		} catch (Exception e) {
+		}
+
+		// check if repo is selected and local folder as well
+		if (serverOk) {
+			if (currentRepoId != null && !currentRepoId.trim().isEmpty() && tfTarget != null && !tfTarget.isDisposed()
+					&& tfTarget.getText() != null && !tfTarget.getText().trim().isEmpty()) {
+				serverOk = true;
+			} else {
+				serverOk = false;
+			}
+		}
+
+		return serverOk;
+	}
+
 	private void loadRepositories(){
 		
 		Logger.getRootLogger().debug("Updating combo repo");		
@@ -402,8 +440,16 @@ public class JobEditor extends Composite{
 					
 				} catch (URISyntaxException e) {
 					Logger.getRootLogger().error("Synchro", e);
+					saveAction.setEnabled(false);
+					MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+							CoreManager.getMessage("jobeditor_diag_baddata"));
+					return;
 				} catch (Exception e) {
 					Logger.getRootLogger().error("Synchro", e);
+					saveAction.setEnabled(false);
+					MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+							CoreManager.getMessage("jobeditor_diag_baddata"));
+					return;
 				}			
 			}
 		});
@@ -471,7 +517,9 @@ public class JobEditor extends Composite{
 			
 			@Override
 			public void linkActivated(org.eclipse.ui.forms.events.HyperlinkEvent arg0) {
-				if( tfRepo != null && ( tfHost.getText().equals("") || tfLogin.getText().equals("") || tfPassword.getText().equals("") )){
+				if (tfRepo != null
+						&& (tfHost.getText().trim().equals("") || tfLogin.getText().trim().equals("") || tfPassword.getText().trim()
+								.equals(""))) {
 					MessageBox dialog = new MessageBox(getShell(), SWT.ICON_WARNING | SWT.OK );
 					dialog.setText(CoreManager.getMessage("jobeditor_diag_noserverdata"));
 					dialog.setMessage(CoreManager.getMessage("jobeditor_diag_noserverdata_msg"));
@@ -885,6 +933,13 @@ public class JobEditor extends Composite{
 	}
 	
 	protected boolean saveConfig(){
+
+		boolean serverOk = checkConfiguration();
+		if (!serverOk) {
+			MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+					CoreManager.getMessage("jobeditor_diag_baddata"));
+			return false;
+		}
 		try {
 			Node n = CoreManager.getInstance().updateSynchroNode(getFormData(), currentSynchroNode);
 			this.setCurrentNode(n);

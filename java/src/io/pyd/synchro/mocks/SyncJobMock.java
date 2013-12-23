@@ -1,9 +1,9 @@
-package info.ajaxplorer.synchro.mocks;
+package io.pyd.synchro.mocks;
 
 import java.net.URISyntaxException;
 
-import info.ajaxplorer.synchro.CoreManager;
-import info.ajaxplorer.synchro.SyncJob;
+import io.pyd.synchro.CoreManager;
+import io.pyd.synchro.SyncJob;
 
 
 public class SyncJobMock extends SyncJob {

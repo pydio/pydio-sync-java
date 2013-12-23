@@ -1,4 +1,4 @@
-package info.ajaxplorer.synchro.utils;
+package io.pyd.synchro.utils;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -1,9 +1,9 @@
 package info.ajaxplorer.synchro;
 
-import info.ajaxplorer.synchro.exceptions.EhcacheListException;
-import info.ajaxplorer.synchro.utils.EhcacheList;
-import info.ajaxplorer.synchro.utils.EhcacheListFactory;
-import info.ajaxplorer.synchro.utils.IEhcacheListDeterminant;
+import io.pyd.synchro.exceptions.EhcacheListException;
+import io.pyd.synchro.utils.EhcacheList;
+import io.pyd.synchro.utils.EhcacheListFactory;
+import io.pyd.synchro.utils.IEhcacheListDeterminant;
 
 import java.rmi.UnexpectedException;
 import java.util.Iterator;

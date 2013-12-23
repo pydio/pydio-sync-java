@@ -1,31 +1,31 @@
 /*
  * Copyright 2012 Charles du Jeu <charles (at) ajaxplorer.info>
- * This file is part of AjaXplorer.
+ * This file is part of Pydio.
  *
- * AjaXplorer is free software: you can redistribute it and/or modify
+ * Pydio is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * AjaXplorer is distributed in the hope that it will be useful,
+ * Pydio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with AjaXplorer.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Pydio.  If not, see <http://www.gnu.org/licenses/>.
  *
- * The latest code can be found at <http://www.ajaxplorer.info/>.
+ * The latest code can be found at <http://pyd.io/>..
  *
  */
-package info.ajaxplorer.synchro.gui;
+package io.pyd.synchro.gui;
 
 import info.ajaxplorer.client.model.Node;
-import info.ajaxplorer.synchro.CoreManager;
-import info.ajaxplorer.synchro.SyncJob;
-import info.ajaxplorer.synchro.model.SyncChange;
-import info.ajaxplorer.synchro.model.SyncChangeValue;
-import info.ajaxplorer.synchro.model.SyncLog;
+import io.pyd.synchro.CoreManager;
+import io.pyd.synchro.SyncJob;
+import io.pyd.synchro.model.SyncChange;
+import io.pyd.synchro.model.SyncChangeValue;
+import io.pyd.synchro.model.SyncLog;
 
 import java.sql.SQLException;
 import java.text.Collator;
