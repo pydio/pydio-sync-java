@@ -135,7 +135,7 @@
 				<executions>
 					<execution>
 						<phase>install</phase>
-						<configuration>
+						<configuration>						
 							<target>
 								<ftp server="ftp.ajaxplorer.info" remotedir="dl/nightly/sync/${project.version}"
 									userid="${srvuser}" password="${srvpass}" depends="yes"
@@ -164,7 +164,6 @@
 					</dependency>
 				</dependencies>
 			</plugin>
-
 		</plugins>
 		<pluginManagement>
 			<plugins>
@@ -245,9 +244,9 @@
 			<version>1.0.10</version>
 		</dependency>
 		<dependency>
-			<groupId>info.ajaxplorer.swt</groupId>
+			<groupId>org.eclipse.swt</groupId>
 			<artifactId>${swt.version}</artifactId>
-			<version>4.2</version>
+			<version>4.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
