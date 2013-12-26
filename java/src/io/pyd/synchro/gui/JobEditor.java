@@ -169,7 +169,8 @@ public class JobEditor extends Composite{
 		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
-		connData.put("FONT_HEIGHT", 19);
+		connData.put("FONT_HEIGHT", 18);
+		connData.put("FONT_WIDTH", 22);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
@@ -177,7 +178,8 @@ public class JobEditor extends Composite{
 		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 210);
-		connData.put("FONT_HEIGHT", 17);
+		connData2.put("FONT_HEIGHT", 17);
+		connData2.put("FONT_WIDTH", 22);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
@@ -185,7 +187,8 @@ public class JobEditor extends Composite{
 		connData3.put("LABEL", CoreManager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 520);
 		connData3.put("HEIGHT", 420);
-		connData.put("FONT_HEIGHT", 33);
+		connData3.put("FONT_HEIGHT", 33);
+		connData3.put("FONT_WIDTH", 40);		
 		connData3.put("ICON", "view_list_text");
 		stackData.put("logs", connData3);
 		
@@ -751,6 +754,9 @@ public class JobEditor extends Composite{
 		size[1] = (Integer)stackData.get(name).get("HEIGHT");
 		if(stackData.get(name).containsKey("FONT_HEIGHT")){
 			size[1] = (Integer)stackData.get(name).get("FONT_HEIGHT") * this.heightHint;			
+		}
+		if(stackData.get(name).containsKey("FONT_WIDTH")){
+			size[0] = (Integer)stackData.get(name).get("FONT_WIDTH") * this.heightHint;			
 		}
 		String os = System.getProperty("os.name").toLowerCase();
 		if(os.indexOf("windows xp") == -1){
