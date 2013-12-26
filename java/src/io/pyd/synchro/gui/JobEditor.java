@@ -38,17 +38,20 @@ import org.apache.log4j.Logger;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.nebula.animation.AnimationRunner;
 import org.eclipse.nebula.animation.effects.AlphaEffect;
 import org.eclipse.nebula.animation.effects.SetBoundsEffect;
 import org.eclipse.nebula.animation.movement.ExpoOut;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.Point;
@@ -162,6 +165,7 @@ public class JobEditor extends Composite{
 		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
+		connData.put("FONT_HEIGHT", 22);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
@@ -169,6 +173,7 @@ public class JobEditor extends Composite{
 		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 210);
+		connData2.put("FONT_HEIGHT", 19);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
@@ -176,6 +181,7 @@ public class JobEditor extends Composite{
 		connData3.put("LABEL", CoreManager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 520);
 		connData3.put("HEIGHT", 420);
+		connData3.put("FONT_HEIGHT", 44);
 		connData3.put("ICON", "view_list_text");
 		stackData.put("logs", connData3);
 		
@@ -734,17 +740,29 @@ public class JobEditor extends Composite{
 		
 		StackLayout sL = ((StackLayout)form.getBody().getLayout());
 		
+
+		FontData[] fontDatas = JFaceResources.getDialogFont().getFontData();
+		int fHeight = 0;
+        if(fontDatas.length > 0)
+        {
+        	FontData currentDialogFontData = fontDatas[0];
+        	fHeight = currentDialogFontData.getHeight();
+        }
+
 		int[] size = new int[2];		
 		sL.topControl = (Control)stackData.get(name).get("SECTION");
 		size[0] = (Integer)stackData.get(name).get("WIDTH");
 		size[1] = (Integer)stackData.get(name).get("HEIGHT");
+		if(fHeight > 0 && stackData.get(name).containsKey("FONT_HEIGHT") ){
+			size[1] = (Integer)stackData.get(name).get("FONT_HEIGHT") * fHeight;
+		}
 		String os = System.getProperty("os.name").toLowerCase();
 		if(os.indexOf("windows xp") == -1){
 			size[0] += 50;
 			size[1] += 30;
-		}
-		
-				
+		}		
+			
+        
 		Rectangle screen = getShell().getDisplay().getPrimaryMonitor().getClientArea();
 		int top;
 		int left;
