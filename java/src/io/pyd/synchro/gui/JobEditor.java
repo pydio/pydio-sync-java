@@ -26,6 +26,8 @@ import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.model.Server;
 import io.pyd.synchro.CoreManager;
 
+import java.awt.Graphics2D;
+import java.awt.font.FontRenderContext;
 import java.net.URISyntaxException;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -165,7 +167,6 @@ public class JobEditor extends Composite{
 		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
-		connData.put("FONT_HEIGHT", 22);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
@@ -173,7 +174,6 @@ public class JobEditor extends Composite{
 		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 210);
-		connData2.put("FONT_HEIGHT", 19);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
@@ -181,7 +181,6 @@ public class JobEditor extends Composite{
 		connData3.put("LABEL", CoreManager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 520);
 		connData3.put("HEIGHT", 420);
-		connData3.put("FONT_HEIGHT", 44);
 		connData3.put("ICON", "view_list_text");
 		stackData.put("logs", connData3);
 		
@@ -740,22 +739,10 @@ public class JobEditor extends Composite{
 		
 		StackLayout sL = ((StackLayout)form.getBody().getLayout());
 		
-
-		FontData[] fontDatas = JFaceResources.getDialogFont().getFontData();
-		int fHeight = 0;
-        if(fontDatas.length > 0)
-        {
-        	FontData currentDialogFontData = fontDatas[0];
-        	fHeight = currentDialogFontData.getHeight();
-        }
-
 		int[] size = new int[2];		
 		sL.topControl = (Control)stackData.get(name).get("SECTION");
 		size[0] = (Integer)stackData.get(name).get("WIDTH");
 		size[1] = (Integer)stackData.get(name).get("HEIGHT");
-		if(fHeight > 0 && stackData.get(name).containsKey("FONT_HEIGHT") ){
-			size[1] = (Integer)stackData.get(name).get("FONT_HEIGHT") * fHeight;
-		}
 		String os = System.getProperty("os.name").toLowerCase();
 		if(os.indexOf("windows xp") == -1){
 			size[0] += 50;
