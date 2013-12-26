@@ -54,6 +54,7 @@ import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.FontData;
+import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.Point;
@@ -144,6 +145,7 @@ public class JobEditor extends Composite{
 	private Map<String, HashMap<String, Object>> stackData;
 	private String anchorH;
 	private String anchorW;
+	int heightHint = 0;
 	
 	SysTray sTray;
 	Node currentSynchroNode;
@@ -167,6 +169,7 @@ public class JobEditor extends Composite{
 		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
+		connData.put("FONT_HEIGHT", 19);
 		connData.put("ICON", "network_local");
 		stackData.put("connexion", connData);
 		
@@ -174,6 +177,7 @@ public class JobEditor extends Composite{
 		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 210);
+		connData.put("FONT_HEIGHT", 17);
 		connData2.put("ICON", "history");
 		stackData.put("parameters", connData2);
 		
@@ -181,18 +185,20 @@ public class JobEditor extends Composite{
 		connData3.put("LABEL", CoreManager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 520);
 		connData3.put("HEIGHT", 420);
+		connData.put("FONT_HEIGHT", 33);
 		connData3.put("ICON", "view_list_text");
 		stackData.put("logs", connData3);
 		
 		this.setLayout(new FillLayout(SWT.HORIZONTAL|SWT.VERTICAL));
 		populateToolkit();
 		moveShellWithMouse(getMouseHandler(), getShell());
+
+		GC gc = new GC(shell);
+		this.heightHint = gc.getFontMetrics().getHeight();
+		gc.dispose();
 		
 		shell.pack();
-		
-		
 		toggleSection(stack, false);
-
 		
 	}	
 	
@@ -743,6 +749,9 @@ public class JobEditor extends Composite{
 		sL.topControl = (Control)stackData.get(name).get("SECTION");
 		size[0] = (Integer)stackData.get(name).get("WIDTH");
 		size[1] = (Integer)stackData.get(name).get("HEIGHT");
+		if(stackData.get(name).containsKey("FONT_HEIGHT")){
+			size[1] = (Integer)stackData.get(name).get("FONT_HEIGHT") * this.heightHint;			
+		}
 		String os = System.getProperty("os.name").toLowerCase();
 		if(os.indexOf("windows xp") == -1){
 			size[0] += 50;
