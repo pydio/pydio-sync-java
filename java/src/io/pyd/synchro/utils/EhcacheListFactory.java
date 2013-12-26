@@ -1,5 +1,6 @@
 package io.pyd.synchro.utils;
 
+import io.pyd.synchro.CoreManager;
 import io.pyd.synchro.exceptions.EhcacheListException;
 
 import java.rmi.UnexpectedException;
@@ -65,8 +66,7 @@ public class EhcacheListFactory {
 		}
 		this.determinant = tdeterminant;
 
-		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(System.getProperty("user.home")
-				+ System.getProperty("file.separator") + ".ajaxplorer" + System.getProperty("file.separator") + "ehcache"));
+		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(CoreManager.getDBHomeDir() + System.getProperty("file.separator") + "ehcache"));
 
 		int oneFileMem = totalMem / cacheNames.length;
 

@@ -22,12 +22,5 @@ public class CoreManagerMock extends CoreManager {
 	public static CoreManagerMock getInstance(){
 		return (CoreManagerMock) CoreManagerMock.instance;
 	}
-	
-	@Override
-	protected String getDBHomeDir() {
-		// FIXME - here we will deliver DB home dir for testing, accessible inside of project
-		// need to attach org.eclipse.core.resources for accessing ResourcesPlugin tool
-		return "C:\\a\\b\\c";
-	}
-	
+		
 }

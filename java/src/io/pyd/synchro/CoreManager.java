@@ -324,8 +324,8 @@ public class CoreManager {
 	 * Return home directory for DB
 	 * @return
 	 */
-	protected String getDBHomeDir() {
-		return System.getProperty("user.home")+System.getProperty("file.separator") + ".ajaxplorer";
+	public static String getDBHomeDir() {
+		return System.getProperty("user.home")+System.getProperty("file.separator") + ".pydio";
 	}
 	
 	protected boolean initializeDAO() throws SQLException{
