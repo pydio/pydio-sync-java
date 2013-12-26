@@ -416,7 +416,7 @@ public class SysTray {
 			Logger.getRootLogger().error("The system tray is not available");
 			item = null;			
 		} else {
-			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
+			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
 
 			item = new TrayItem (tray, SWT.NONE);
 			item.setToolTipText("Pydio Synchronizer");
@@ -467,10 +467,10 @@ public class SysTray {
 				return;
 			}
 			at = new AnimationThread();
-			at.delayedAnimation(item, 700, "AjxpLogo16-"+(isMac?"BW":"Bi")+"-Bouncing", 8);
+			at.delayedAnimation(item, 700, "AjxpLogo16-BW-Bouncing", 8);
 			at.start();					
 		}else if(state.equals("idle")){
-			Image restore = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-"+(isMac?"BW":"Bi")+".png"));
+			Image restore = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
 			if(at!=null && at.isAlive()){
 				at.requireInterrupt = true;
 				at.restoreImage = restore;
