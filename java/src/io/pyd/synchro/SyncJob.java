@@ -719,6 +719,9 @@ public class SyncJob implements InterruptableJob {
 					if (direction.equals("up"))
 						continue;
 					if (tmpNodes.get("local") != null && tmpNodes.get("remote") != null) {
+						if(tmpNodes.get("local").getPropertyValue("md5") == null){
+							updateLocalMD5(tmpNodes.get("local"));
+						}						
 						if (tmpNodes.get("local").getPropertyValue("md5") != null
 								&& tmpNodes.get("local").getPropertyValue("md5").equals(tmpNodes.get("remote").getPropertyValue("md5"))) {
 							continue;
@@ -795,6 +798,9 @@ public class SyncJob implements InterruptableJob {
 					if (direction.equals("down"))
 						continue;
 					if (tmpNodes.get("local") != null && tmpNodes.get("remote") != null) {
+						if(tmpNodes.get("local").getPropertyValue("md5") == null){
+							updateLocalMD5(tmpNodes.get("local"));
+						}
 						if (tmpNodes.get("local").getPropertyValue("md5") != null
 								&& tmpNodes.get("local").getPropertyValue("md5").equals(tmpNodes.get("remote").getPropertyValue("md5"))) {
 							continue;
