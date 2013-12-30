@@ -55,6 +55,7 @@ import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.rmi.UnexpectedException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
@@ -213,6 +214,26 @@ public class SyncJob implements InterruptableJob {
 		} else {
 			localWatchOnly = false;
 		}
+		
+		// nodeDao = getCoreManager().getNodeDao();
+
+		IEhcacheListDeterminant<Node> determinant = new IEhcacheListDeterminant<Node>() {
+
+			@Override
+			public Object computeKey(Node object) {
+				// we use path as node key in ehcache list
+				return object == null ? null : object.getPath();
+			}
+		};
+		try {
+			EhcacheListFactory.getInstance().initCaches(8, determinant, currentJobNodeID, DIFF_NODE_LISTS_SAVED_LIST,
+					DIFF_NODE_LISTS_CREATED_LIST, LOAD_REMOTE_CHANGES_LIST, LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
+		} catch (UnexpectedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
 		long start = System.nanoTime();
 		this.run();
 		long elapsedTime = System.nanoTime() - start;
@@ -261,20 +282,7 @@ public class SyncJob implements InterruptableJob {
 		return rest;
 	}
 
-	public SyncJob() throws URISyntaxException, Exception {
-
-		// nodeDao = getCoreManager().getNodeDao();
-
-		IEhcacheListDeterminant<Node> determinant = new IEhcacheListDeterminant<Node>() {
-
-			@Override
-			public Object computeKey(Node object) {
-				// we use path as node key in ehcache list
-				return object == null ? null : object.getPath();
-			}
-		};
-		EhcacheListFactory.getInstance().initCaches(8, determinant, DIFF_NODE_LISTS_SAVED_LIST, DIFF_NODE_LISTS_CREATED_LIST,
-				LOAD_REMOTE_CHANGES_LIST, LOAD_LOCAL_CHANGES_LIST, INDEXATION_SNAPSHOT_LIST, REMOTE_SNAPSHOT_LIST, LOCAL_SNAPSHOT_LIST);
+	public SyncJob() throws URISyntaxException {
 
 	}
 
@@ -575,12 +583,21 @@ public class SyncJob implements InterruptableJob {
 			String message = e.getMessage();
 			if (message == null && e.getCause() != null)
 				message = e.getCause().getMessage();
-			getCoreManager().notifyUser("Error", "An error occured during synchronization: " + message, this.currentJobNodeID, true);
+			getCoreManager().notifyUser("Error", CoreManager.getMessage("err_generic") + ": " + message, this.currentJobNodeID, true);
 			if (currentRepository != null) {
+				currentRepository.setStatus(Node.NODE_STATUS_ERROR);				
+				try {
+					updateRunningStatus(RUNNING_STATUS_CLEANING, false);
+					nodeDao.update(currentRepository);
+					clearTmpSnapshots();
+				} catch (SQLException e1) {
+					e1.printStackTrace();
+				}
 				getCoreManager().updateSynchroState(currentRepository, false);
 			}
 			getCoreManager().releaseConnection();
 			DaoManager.clearCache();
+			
 		} finally {
 			// synchronisation is finished (or not) - we need to close all
 			// mapDBs
@@ -1161,6 +1178,29 @@ public class SyncJob implements InterruptableJob {
 		return root;
 	}
 
+	protected void clearTmpSnapshots() throws SQLException{
+		nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+		Map<String, Object> search = new HashMap<String, Object>();
+		search.put("parent_id", currentJobNodeID);
+
+		search.put("resourceType", "local_tmp");
+		List<Node> l = nodeDao.queryForFieldValues(search);
+		Node root;
+		if (l.size() > 0) {
+			root = l.get(0);
+			nodeDao.delete(root);
+		}
+		
+		search.put("resourceType", "remote_tmp");
+		List<Node> l2 = nodeDao.queryForFieldValues(search);
+		Node root2;
+		if (l2.size() > 0) {
+			root2 = l.get(0);
+			nodeDao.delete(root2);
+		}		
+		
+	}
+	
 	protected void clearSnapshot(String type) throws SQLException {
 		Map<String, Object> search = new HashMap<String, Object>();
 		search.put("resourceType", type);

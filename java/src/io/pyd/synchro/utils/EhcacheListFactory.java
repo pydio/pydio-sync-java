@@ -57,16 +57,17 @@ public class EhcacheListFactory {
 	 * @param totalMem
 	 *            - how many memory we want to share for ALL ehcache lists
 	 * @param tdeterminant
+	 * @param cacheID TODO
 	 * @param cacheNames
 	 * @throws UnexpectedException
 	 */
-	public void initCaches(int totalMem, IEhcacheListDeterminant tdeterminant, String... cacheNames) throws UnexpectedException {
+	public void initCaches(int totalMem, IEhcacheListDeterminant tdeterminant, String cacheID, String... cacheNames) throws UnexpectedException {
 		if (tdeterminant == null) {
 			throw new UnexpectedException("EhcacheListFactory should have IEhcacheListDeterminant provided for object key computation");
 		}
 		this.determinant = tdeterminant;
 
-		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(CoreManager.getDBHomeDir() + System.getProperty("file.separator") + "ehcache"));
+		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(CoreManager.getDBHomeDir() + System.getProperty("file.separator") + "ehcache-" + cacheID));
 
 		int oneFileMem = totalMem / cacheNames.length;
 

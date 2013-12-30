@@ -119,6 +119,7 @@ public class JobEditor extends Composite{
 	private Button keepAutoRemote;
 	private Button keepAutoLocal;
 	private Text tfLogin;
+	private Button trustSSL;
 	
 	private Action saveAction;
 	private Action closeAction;
@@ -224,6 +225,7 @@ public class JobEditor extends Composite{
 			values.put("LOGIN", s.getUser());
 			values.put("PASSWORD", s.getPassword());
 			values.put("REPOSITORY_LABEL", baseNode.getLabel());
+			values.put("TRUST_SSL", baseNode.getPropertyValue("trust_ssl"));
 			values.put("REPOSITORY_ID", baseNode.getPropertyValue("repository_id"));
 			values.put("TARGET", baseNode.getPropertyValue("target_folder"));
 			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
@@ -253,7 +255,8 @@ public class JobEditor extends Composite{
 		
 		values.put("HOST", tfHost.getText());		
 		values.put("LOGIN", tfLogin.getText());		
-		values.put("PASSWORD", tfPassword.getText());		
+		values.put("PASSWORD", tfPassword.getText());	
+		values.put("TRUST_SSL", trustSSL.getSelection() ? "true" : "false");
 		values.put("REPOSITORY_LABEL", currentRepoLabel);
 		values.put("REPOSITORY_ID", currentRepoId);
 		values.put("TARGET", tfTarget.getText());
@@ -277,6 +280,8 @@ public class JobEditor extends Composite{
 	
 	public void loadFormData(Map<String, String> values){
 		tfHost.setText(values.get("HOST"));
+		trustSSL.setEnabled(tfHost.getText().startsWith("https://"));
+		trustSSL.setSelection(values.get("TRUST_SSL") == "true");
 		tfLogin.setText(values.get("LOGIN"));
 		tfPassword.setText(values.get("PASSWORD"));
 		currentRepoLabel = values.get("REPOSITORY_LABEL");
@@ -311,6 +316,7 @@ public class JobEditor extends Composite{
 		tfHost.setText("");
 		tfLogin.setText("");
 		tfPassword.setText("");
+		trustSSL.setEnabled(tfHost.getText().startsWith("https://"));
 		if(comboRepository!= null) {
 			comboRepository.setItems(new String[0]);
 		}
@@ -352,12 +358,13 @@ public class JobEditor extends Composite{
 		final String host = tfHost.getText();
 		final String login = tfLogin.getText();
 		final String pass = tfPassword.getText();
+		final boolean trust = trustSSL.getSelection();
 
 		boolean serverOk = false;
 
 		RestRequest rest = new RestRequest();
 		try {
-			Server s = new Server("Test", host, login, pass, true, false);
+			Server s = new Server("Test", host, login, pass, trust, false);
 			RestStateHolder.getInstance().setServer(s);
 			AjxpAPI.getInstance().setServer(s);
 			rest.throwAuthExceptions = true;
@@ -390,6 +397,7 @@ public class JobEditor extends Composite{
 		final String host = tfHost.getText();
 		final String login = tfLogin.getText();
 		final String pass = tfPassword.getText();
+		final boolean trust = trustSSL.getSelection();
 		
 		this.getDisplay().asyncExec(new Runnable() {
 			
@@ -398,7 +406,7 @@ public class JobEditor extends Composite{
 				
 				Server s;
 				try {
-					s = new Server("Test", host, login, pass, true, false);
+					s = new Server("Test", host, login, pass, trust, false);
 					RestStateHolder.getInstance().setServer(s);
 					AjxpAPI.getInstance().setServer(s);					
 					RestRequest rest = new RestRequest();
@@ -439,6 +447,7 @@ public class JobEditor extends Composite{
 						}
 					}
 					comboRepository.setItems(repoItems.keySet().toArray(new String[0]));
+					comboRepository.forceFocus();
 					comboRepository.setListVisible(true);
 					comboRepository.addModifyListener(new ModifyListener() {							
 						@Override
@@ -456,12 +465,14 @@ public class JobEditor extends Composite{
 					});
 					
 				} catch (URISyntaxException e) {
+					toggleRepositoryComponent();
 					Logger.getRootLogger().error("Synchro", e);
 					saveAction.setEnabled(false);
 					MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
 							CoreManager.getMessage("jobeditor_diag_baddata"));
 					return;
 				} catch (Exception e) {
+					toggleRepositoryComponent();
 					Logger.getRootLogger().error("Synchro", e);
 					saveAction.setEnabled(false);
 					MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
@@ -499,8 +510,25 @@ public class JobEditor extends Composite{
 		label.setLayoutData(getGridDataLabel());
 		tfHost = toolkit.createText(sectionClient, "");
 		tfHost.setLayoutData(getGridDataField(2));
-
 		
+		// TRUST
+		label = toolkit.createLabel(sectionClient, "");
+		label.setLayoutData(getGridDataLabel());
+	 	trustSSL = toolkit.createButton(sectionClient, CoreManager.getMessage("jobeditor_trustSSL"), SWT.CHECK);
+		trustSSL.setLayoutData(getGridDataField(2));
+		trustSSL.setEnabled(false);
+		
+		tfHost.addListener(SWT.FocusOut, new Listener() {
+			public void handleEvent(Event e) {
+				String t = tfHost.getText().trim();
+				if(!t.startsWith("http://") && !t.startsWith("https://")){
+					tfHost.setText("http://" + t);
+				}
+				trustSSL.setEnabled(tfHost.getText().startsWith("https://"));
+			}
+		});
+
+
 		// LOGIN
 		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_login"));
 		label.setLayoutData(getGridDataLabel());

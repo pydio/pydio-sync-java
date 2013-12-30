@@ -30,7 +30,7 @@ public class EhCacheListTest {
 
 		};
 		try {
-			EhcacheListFactory.getInstance().initCaches(8, determinant, "teststringlist");
+			EhcacheListFactory.getInstance().initCaches(8, determinant, null, "teststringlist");
 			list = EhcacheListFactory.getInstance().getList("teststringlist");
 		} catch (EhcacheListException e) {
 			// TODO Auto-generated catch block
