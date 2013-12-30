@@ -180,7 +180,7 @@ public class SysTray {
 				MenuItem jobTrig = new MenuItem (menu, SWT.CASCADE);
 				jobTrig.setText ( managerInstance.makeJobLabel(syncNode, true));
 				jobTrig.setData(syncNode);
-				jobTrig.setImage(getImage("sync"));
+				jobTrig.setImage(getImage("fa/blue/refresh"));
 				
 				jobMenu = new Menu(shell, SWT.DROP_DOWN);
 				jobTrig.setMenu(jobMenu);			
@@ -209,7 +209,7 @@ public class SysTray {
 			if(currentActiveState){
 				MenuItem mI = new MenuItem(jobMenu, SWT.PUSH);			
 				mI.setText(messages.getString("tray_menu_trigger"));
-				mI.setImage(getImage("media_playback_start"));
+				mI.setImage(getImage("fa/blue/play"));
 				mI.setData(syncNode);
 				if(running) mI.setEnabled(false);
 				mI.addListener (SWT.Selection, new Listener () {
@@ -226,7 +226,7 @@ public class SysTray {
 			
 			MenuItem mAct = new MenuItem(jobMenu, SWT.PUSH);			
 			mAct.setText( CoreManager.getMessage(currentActiveState?"tray_menu_jobstatus_active":"tray_menu_jobstatus_inactive"));
-			mAct.setImage(getImage(currentActiveState?"media_playback_pause":"media_playback_start"));
+			mAct.setImage(getImage(currentActiveState?"fa/blue/pause":"fa/blue/play"));
 			mAct.setData(syncNode);
 			//if(running) mAct.setEnabled(false);
 			mAct.addListener (SWT.Selection, new Listener () {
@@ -249,14 +249,14 @@ public class SysTray {
 			
 			MenuItem qaTrig = new MenuItem (jobMenu, SWT.CASCADE);
 			qaTrig.setText (messages.getString("tray_menu_quick"));
-			qaTrig.setImage(getImage("go_jump"));
+			qaTrig.setImage(getImage("fa/blue/arrow-circle-right"));
 			
 			Menu qaMenu = new Menu(shell, SWT.DROP_DOWN);
 			qaTrig.setMenu(qaMenu);			
 			
 			MenuItem mI2 = new MenuItem(qaMenu, SWT.PUSH);
 			mI2.setText(messages.getString("tray_menu_openlocal"));
-			mI2.setImage(getImage("folder_home"));
+			mI2.setImage(getImage("fa/blue/folder-open"));
 			mI2.setData(syncNode);
 			mI2.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
@@ -266,7 +266,7 @@ public class SysTray {
 			
 			MenuItem mI3 = new MenuItem(qaMenu, SWT.PUSH);
 			mI3.setText(messages.getString("tray_menu_openremote"));
-			mI3.setImage(getImage("network_local"));
+			mI3.setImage(getImage("fa/blue/html5"));
 			mI3.setData(syncNode);
 			mI3.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
@@ -276,14 +276,14 @@ public class SysTray {
 			
 			MenuItem configTrig = new MenuItem (jobMenu, SWT.CASCADE);
 			configTrig.setText (messages.getString("tray_menu_task_params"));
-			configTrig.setImage(getImage("configure"));
+			configTrig.setImage(getImage("fa/blue/cogs"));
 			
 			Menu configMenu = new Menu(shell, SWT.DROP_DOWN);
 			configTrig.setMenu(configMenu);	
 			
 			MenuItem mi = new MenuItem (configMenu, SWT.PUSH);
 			mi.setText ( messages.getString("jobeditor_stack_server") );
-			mi.setImage(getImage("network_local"));
+			mi.setImage(getImage("fa/blue/globe"));
 			mi.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					openConfiguration(shell, nodeId, "connexion");
@@ -291,7 +291,7 @@ public class SysTray {
 			});
 			MenuItem mij2 = new MenuItem (configMenu, SWT.PUSH);
 			mij2.setText ( messages.getString("jobeditor_stack_params") );
-			mij2.setImage(getImage("history"));
+			mij2.setImage(getImage("fa/blue/cog"));
 			mij2.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					openConfiguration(shell, nodeId, "parameters");
@@ -300,7 +300,7 @@ public class SysTray {
 			
 			MenuItem mDel = new MenuItem(configMenu, SWT.PUSH);			
 			mDel.setText(CoreManager.getMessage("tray_menu_jobdelete"));
-			mDel.setImage(getImage("editdelete"));
+			mDel.setImage(getImage("fa/blue/trash-o"));
 			mDel.setData(syncNode);
 			//if(running) mDel.setEnabled(false);
 			mDel.addListener (SWT.Selection, new Listener () {
@@ -322,7 +322,7 @@ public class SysTray {
 			
 			MenuItem mij1 = new MenuItem (jobMenu, SWT.PUSH);
 			mij1.setText ( messages.getString("jobeditor_stack_logs") );
-			mij1.setImage(getImage("view_list_text"));
+			mij1.setImage(getImage("fa/blue/list-alt"));
 			mij1.addListener (SWT.Selection, new Listener () {
 				public void handleEvent (Event event) {
 					openConfiguration(shell, nodeId, "logs");
@@ -337,7 +337,7 @@ public class SysTray {
 
 		MenuItem generalTrig = new MenuItem (menu, SWT.CASCADE);
 		generalTrig.setText (messages.getString("tray_menu_preferences"));
-		generalTrig.setImage(getImage("parameters"));
+		generalTrig.setImage(getImage("fa/black/rocket"));
 		
 		Menu generalMenu = new Menu(shell, SWT.DROP_DOWN);
 		generalTrig.setMenu(generalMenu);			
@@ -345,9 +345,9 @@ public class SysTray {
 		final MenuItem showNotifMenu = new MenuItem (generalMenu, SWT.PUSH);
 		//showNotifMenu.setSelection(showNotifications);
 		if(showNotifications){
-			showNotifMenu.setImage(getImage("apply"));
+			showNotifMenu.setImage(getImage("fa/black/check-square-o"));
 		}else{
-			showNotifMenu.setImage(getImage("apply-not"));
+			showNotifMenu.setImage(getImage("fa/black/square-o"));
 		}
 		showNotifMenu.setText(messages.getString("tray_menu_notif"));
 		showNotifMenu.addListener (SWT.Selection, new Listener() {
@@ -358,7 +358,7 @@ public class SysTray {
 		
 		MenuItem createM = new MenuItem (generalMenu, SWT.PUSH);
 		createM.setText ( messages.getString("cpanel_create_synchro") );
-		createM.setImage(getImage("add"));
+		createM.setImage(getImage("fa/black/plus-circle"));
 		createM.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				openConfiguration(shell, null, "connexion");
@@ -368,7 +368,7 @@ public class SysTray {
 		
 		MenuItem mAct = new MenuItem(generalMenu, SWT.PUSH);			
 		mAct.setText( CoreManager.getMessage(schedulerStateStarted?"tray_menu_scheduler_pauseall":"tray_menu_scheduler_startall"));
-		mAct.setImage(getImage(schedulerStateStarted?"media_playback_pause":"media_playback_start"));
+		mAct.setImage(getImage(schedulerStateStarted?"fa/black/pause":"fa/black/play"));
 		mAct.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				boolean res;
@@ -385,7 +385,7 @@ public class SysTray {
 		
 		MenuItem aboutM = new MenuItem (generalMenu, SWT.PUSH);
 		aboutM.setText ( messages.getString("tray_menu_about") );
-		aboutM.setImage(getImage("infos"));
+		aboutM.setImage(getImage("fa/black/info-circle"));
 		aboutM.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				openAboutPane();
@@ -394,7 +394,7 @@ public class SysTray {
 		
 		MenuItem mi2 = new MenuItem (menu, SWT.PUSH);
 		mi2.setText (CoreManager.getMessage("tray_menu_quit"));
-		mi2.setImage(getImage("exit"));
+		mi2.setImage(getImage("fa/black/power-off"));
 		mi2.addListener (SWT.Selection, new Listener () {
 			public void handleEvent (Event event) {
 				int res = CoreManager.getInstance().close();

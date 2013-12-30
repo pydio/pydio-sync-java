@@ -380,7 +380,7 @@ public class CoreManager {
 		Dao<Node, String> nDao = DaoManager.createDao(cSource, Node.class);
 		Dao<Property, String> pDao = DaoManager.createDao(cSource, Property.class);
 		if(node == null){
-			s = new Server(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), true, false);			
+			s = new Server(data.get("HOST"), data.get("HOST"), data.get("LOGIN"), data.get("PASSWORD"), data.get("TRUST_SSL").equals("true"), false);			
 			Node serverNode = s.createDbNode(nDao);
 			node = new Node(Node.NODE_TYPE_REPOSITORY, data.get("REPOSITORY_LABEL"), serverNode);
 			nDao.create(node);
@@ -388,6 +388,7 @@ public class CoreManager {
 			node.properties = nDao.getEmptyForeignCollection("properties");
 			node.addProperty("repository_id", data.get("REPOSITORY_ID"));
 			node.addProperty("target_folder", data.get("TARGET"));
+			node.addProperty("trust_ssl", data.get("TRUST_SSL"));
 			node.addProperty("synchro_active", data.get("ACTIVE"));
 			node.addProperty("synchro_direction", data.get("DIRECTION"));
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
@@ -430,6 +431,7 @@ public class CoreManager {
 			Collection<Property> props = node.properties;
 			Collection<Property> toSave = new ArrayList<Property>();
 
+			s.setTrustSSL(data.get("TRUST_SSL").equals("true"));
 			// check if we already have property auto keep remote & auto keep
 			// local
 			if (node.getPropertyValue(JobEditor.AUTO_KEEP_REMOTE) == null) {
@@ -471,7 +473,13 @@ public class CoreManager {
 					intervalChanges = true;
 					toSave.add(p);
 				}
- else if (p.getName().equals(JobEditor.AUTO_KEEP_REMOTE)
+				else if(p.getName().equals("trust_ssl") 
+						&& !p.getValue().equals(data.get("TRUST_SSL"))) {
+					p.setValue(data.get("TRUST_SSL"));
+					intervalChanges = true;
+					toSave.add(p);
+				}
+				else if (p.getName().equals(JobEditor.AUTO_KEEP_REMOTE)
 						&& !p.getValue().equals(
 								data.get(JobEditor.AUTO_KEEP_REMOTE_DATA))) {
 					p.setValue(data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));

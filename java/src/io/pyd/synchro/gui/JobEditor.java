@@ -225,7 +225,11 @@ public class JobEditor extends Composite{
 			values.put("LOGIN", s.getUser());
 			values.put("PASSWORD", s.getPassword());
 			values.put("REPOSITORY_LABEL", baseNode.getLabel());
-			values.put("TRUST_SSL", baseNode.getPropertyValue("trust_ssl"));
+			if(baseNode.getPropertyValue("trust_ssl") != null){
+				values.put("TRUST_SSL", baseNode.getPropertyValue("trust_ssl"));
+			}else {
+				values.put("TRUST_SSL", "false");
+			}
 			values.put("REPOSITORY_ID", baseNode.getPropertyValue("repository_id"));
 			values.put("TARGET", baseNode.getPropertyValue("target_folder"));
 			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
@@ -251,7 +255,7 @@ public class JobEditor extends Composite{
 	
 	public Map<String, String> getFormData() throws Exception{
 		HashMap<String, String> values = new HashMap<String, String>();
-		if(repoItems == null) throw new Exception("Please select a repository first!");
+		if(repoItems == null) throw new Exception("Please select a workspace first!");
 		
 		values.put("HOST", tfHost.getText());		
 		values.put("LOGIN", tfLogin.getText());		
@@ -281,7 +285,7 @@ public class JobEditor extends Composite{
 	public void loadFormData(Map<String, String> values){
 		tfHost.setText(values.get("HOST"));
 		trustSSL.setEnabled(tfHost.getText().startsWith("https://"));
-		trustSSL.setSelection(values.get("TRUST_SSL") == "true");
+		trustSSL.setSelection(values.get("TRUST_SSL").equals("true"));
 		tfLogin.setText(values.get("LOGIN"));
 		tfPassword.setText(values.get("PASSWORD"));
 		currentRepoLabel = values.get("REPOSITORY_LABEL");
@@ -371,8 +375,16 @@ public class JobEditor extends Composite{
 			rest.getHttpClient().clearCookies();
 			rest.getDocumentContent(AjxpAPI.getInstance().getGetXmlRegistryUri());
 			serverOk = true;
+		} catch (javax.net.ssl.SSLPeerUnverifiedException sE){
+			MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+					CoreManager.getMessage("jobeditor_diag_badssl"));			
 		} catch (URISyntaxException e) {
+			MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+					CoreManager.getMessage("jobeditor_diag_badserver"));
 		} catch (Exception e) {
+			MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+					CoreManager.getMessage("jobeditor_diag_baddata"));
+
 		} finally{
 			rest.release();
 		}
@@ -383,9 +395,12 @@ public class JobEditor extends Composite{
 					&& tfTarget.getText() != null && !tfTarget.getText().trim().isEmpty()) {
 				serverOk = true;
 			} else {
+				MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
+						CoreManager.getMessage("jobeditor_diag_badlocal"));
 				serverOk = false;
 			}
 		}
+
 
 		return serverOk;
 	}
@@ -696,6 +711,7 @@ public class JobEditor extends Composite{
 		tfLogin.addModifyListener(tfMod);
 		tfPassword.addModifyListener(tfMod);
 		tfTarget.addModifyListener(tfMod);
+		trustSSL.addSelectionListener(rSel);
 		comboDirection.addModifyListener(tfMod);
 		keepAutoRemote.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -987,8 +1003,6 @@ public class JobEditor extends Composite{
 
 		boolean serverOk = checkConfiguration();
 		if (!serverOk) {
-			MessageDialog.openError(getShell(), CoreManager.getMessage("jobeditor_diag_baddata_title"),
-					CoreManager.getMessage("jobeditor_diag_baddata"));
 			return false;
 		}
 		try {
