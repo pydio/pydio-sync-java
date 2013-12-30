@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Charles du Jeu <charles (at) ajaxplorer.info>
+ * Copyright 2012 Charles du Jeu <charles (at) pyd.io>
  * This file is part of Pydio.
  *
  * Pydio is free software: you can redistribute it and/or modify
