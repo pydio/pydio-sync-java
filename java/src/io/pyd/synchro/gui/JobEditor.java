@@ -41,6 +41,7 @@ import org.eclipse.jface.action.Action;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.JFaceResources;
+import org.eclipse.jface.viewers.CellEditor.LayoutData;
 import org.eclipse.nebula.animation.AnimationRunner;
 import org.eclipse.nebula.animation.effects.AlphaEffect;
 import org.eclipse.nebula.animation.effects.SetBoundsEffect;
@@ -53,6 +54,7 @@ import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
@@ -170,9 +172,9 @@ public class JobEditor extends Composite{
 		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
-		connData.put("FONT_HEIGHT", 18);
+		connData.put("FONT_HEIGHT", 23);
 		connData.put("FONT_WIDTH", 22);
-		connData.put("ICON", "network_local");
+		connData.put("ICON", "fa/blue/globe");
 		stackData.put("connexion", connData);
 		
 		HashMap<String, Object> connData2 = new HashMap<String, Object>();
@@ -181,7 +183,7 @@ public class JobEditor extends Composite{
 		connData2.put("HEIGHT", 210);
 		connData2.put("FONT_HEIGHT", 17);
 		connData2.put("FONT_WIDTH", 22);
-		connData2.put("ICON", "history");
+		connData2.put("ICON", "fa/blue/cog");
 		stackData.put("parameters", connData2);
 		
 		HashMap<String, Object> connData3 = new HashMap<String, Object>();
@@ -190,7 +192,7 @@ public class JobEditor extends Composite{
 		connData3.put("HEIGHT", 420);
 		connData3.put("FONT_HEIGHT", 33);
 		connData3.put("FONT_WIDTH", 40);		
-		connData3.put("ICON", "view_list_text");
+		connData3.put("ICON", "fa/blue/list-alt");
 		stackData.put("logs", connData3);
 		
 		this.setLayout(new FillLayout(SWT.HORIZONTAL|SWT.VERTICAL));
@@ -556,16 +558,23 @@ public class JobEditor extends Composite{
 		tfPassword = toolkit.createText(sectionClient, "", SWT.PASSWORD);
 		tfPassword.setLayoutData(getGridDataField(2));
 		
+		// EXPLANATION LABEL
+		Label t = toolkit.createLabel(sectionClient, 
+				CoreManager.getMessage("jobeditor_workspace_hint"), 
+				SWT.WRAP | SWT.READ_ONLY);
+		
+		GridData ld = getGridDataField(3);
+		if(this.heightHint > 0) ld.heightHint = this.heightHint * 4;
+		else ld.heightHint = 45;
+		t.setLayoutData(ld);		
+		
 		// REPOSITORY CHOOSER
 		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_repository"));
 		label.setLayoutData(getGridDataLabel());
 		
 		
-		tfRepo = toolkit.createText(sectionClient, "click to load the repositories...", SWT.READ_ONLY);
-		tfRepo.setLayoutData(getGridDataField(1));
-		
 		linkLoadRepositories = toolkit.createImageHyperlink(sectionClient, SWT.NULL);
-		linkLoadRepositories.setImage(new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/reload.png"))));
+		linkLoadRepositories.setImage(new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fa/blue/cloud-download.png"))));
 		linkLoadRepositories.setLayoutData(new GridData(GridData.FILL));
 		linkLoadRepositories.setUnderlined(false);
 		linkLoadRepositories.addHyperlinkListener(new IHyperlinkListener() {			
@@ -593,14 +602,17 @@ public class JobEditor extends Composite{
 			}
 		});
 
+		tfRepo = toolkit.createText(sectionClient, "click to load the repositories...", SWT.READ_ONLY);
+		tfRepo.setLayoutData(getGridDataField(1));
+		tfRepo.setBackground(new Color(this.getDisplay(), 240, 240, 240));
+		
+
 		// TARGET FOLDER CHOOSER
 		label = toolkit.createLabel(sectionClient, CoreManager.getMessage("jobeditor_localfolder"));
 		label.setLayoutData(getGridDataLabel());
-		tfTarget = toolkit.createText(sectionClient, "", SWT.READ_ONLY);		
-		tfTarget.setLayoutData(getGridDataField(1));
 		
 		buttonFileChooser = toolkit.createImageHyperlink(sectionClient, SWT.NULL);
-		buttonFileChooser.setImage(new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/folder_home.png"))));		
+		buttonFileChooser.setImage(new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fa/blue/folder-open.png"))));		
 		buttonFileChooser.setUnderlined(false);
 		buttonFileChooser.addHyperlinkListener(new IHyperlinkListener() {			
 			@Override
@@ -618,6 +630,10 @@ public class JobEditor extends Composite{
 				}
 			}
 		});
+		tfTarget = toolkit.createText(sectionClient, "", SWT.READ_ONLY);		
+		tfTarget.setLayoutData(getGridDataField(1));
+		tfTarget.setBackground(new Color(this.getDisplay(), 240, 240, 240));
+		
 		
 		parametersSection = configureSection(toolkit, form, CoreManager.getMessage("jobeditor_header_execution"), CoreManager.getMessage("jobeditor_legend_execution"), 1, true);		
 		Composite sectionClient3 = toolkit.createComposite(parametersSection);
@@ -679,7 +695,7 @@ public class JobEditor extends Composite{
 		saveAction = new Action("Save", new ImageDescriptor() {
 			@Override
 			public ImageData getImageData() {
-				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/filesave.png"));
+				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fa/blue/check-circle-o.png"));
 			}
 		}) {
 			@Override
@@ -738,7 +754,7 @@ public class JobEditor extends Composite{
 		closeAction = new Action("Close", new ImageDescriptor() {
 			@Override
 			public ImageData getImageData() {
-				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fileclose.png"));
+				return new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/fa/blue/times-circle-o.png"));
 			}
 		}) {
 			@Override

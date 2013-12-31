@@ -345,11 +345,11 @@ public class SysTray {
 		final MenuItem showNotifMenu = new MenuItem (generalMenu, SWT.PUSH);
 		//showNotifMenu.setSelection(showNotifications);
 		if(showNotifications){
-			showNotifMenu.setImage(getImage("fa/black/check-square-o"));
+			showNotifMenu.setImage(getImage("fa/black/rss-square"));
 		}else{
-			showNotifMenu.setImage(getImage("fa/black/square-o"));
+			showNotifMenu.setImage(getImage("fa/black/rss"));
 		}
-		showNotifMenu.setText(messages.getString("tray_menu_notif"));
+		showNotifMenu.setText(messages.getString( showNotifications ? "tray_menu_notif_hide" : "tray_menu_notif"));
 		showNotifMenu.addListener (SWT.Selection, new Listener() {
 			public void handleEvent (Event event) {
 				showNotifications = !showNotifications;
