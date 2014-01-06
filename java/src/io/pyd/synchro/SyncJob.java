@@ -1436,7 +1436,7 @@ public class SyncJob implements InterruptableJob {
 			public Void call() throws Exception {
 				// parse file structure to node tree
 				InputStream uriContentStream = null;
-				try {
+				try {					
 					uriContentStream = getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode));
 					parseNodesFromStream(uriContentStream, rootNode, accumulator, save);
 				} catch (Exception e) {
@@ -1884,14 +1884,15 @@ public class SyncJob implements InterruptableJob {
 		} catch (Exception e) {
 			throw new SynchroOperationException("Error during response entity: " + e.getMessage(), e);
 		}
+		/*
 		long fullLength = entity.getContentLength();
-		if (fullLength <= 0) {
+		if (fullLength == 0) {
 			rest.release();
 			return null;
 		}
+		*/
 
 		InputStream contentStream = entity.getContent();
-		// FIXME should we release now?
 		rest.release();
 		return contentStream;
 	}
@@ -1923,9 +1924,9 @@ public class SyncJob implements InterruptableJob {
 		}
 		long fullLength = entity.getContentLength();
 		if (fullLength <= 0) {
-			rest.release();
-			return;
+			fullLength = 1;
 		}
+		
 		Logger.getRootLogger().info("Downloading " + fullLength + " bytes");
 
 		InputStream input = null;
