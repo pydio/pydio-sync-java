@@ -1362,22 +1362,49 @@ public class SyncJob implements InterruptableJob {
 	 * @throws Exception
 	 */
 	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception {
-
 		if (save) {
 			emptyNodeChildren(rootNode, false);
 		}
 
 		nodeDao.callBatchTasks(new Callable<Void>() {
 			public Void call() throws Exception {
-				// parse file structure to node tree
-				parseNodesFromStream(getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode)), rootNode,
-						accumulator, save);
+				takeRemoteSnapshot(rootNode, rootNode, accumulator, save);
+
 				return null;
 			}
 		});
+		
 		if (save) {
+			rootNode.removeProperty(Node.MAX_DEPTH);
+			rootNode.removeProperty(Node.MAX_NODES);
 			nodeDao.update(rootNode);
 		}
+
+	}
+	
+	protected void takeRemoteSnapshot(final Node rootNode, final Node currentFolder, final List<Node> accumulator, final boolean save) throws Exception {
+		currentFolder.setProperty(Node.MAX_DEPTH, "1");
+		currentFolder.setProperty(Node.MAX_NODES, "100");
+		Logger.getRootLogger().info("Taking remote content for node: " + currentFolder.getPath());
+
+		final List<Node> partial = new ArrayList<Node>();
+		
+		// parse file structure to node tree
+		parseNodesFromStream(getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(currentFolder)), rootNode,
+				partial, save);
+		
+		Logger.getRootLogger().info("Loaded part: " + partial.size());
+		
+		for (Node n : partial) {
+			if (!n.isLeaf() && "true".equals(n.getPropertyValue(Node.NODE_HAS_CHILDREN))) {
+				takeRemoteSnapshot(rootNode, n, accumulator, save);
+			}
+		}
+		
+		if (accumulator != null) {
+			accumulator.addAll(partial);
+		}
+		
 	}
 
 	protected Map<String, Object[]> loadRemoteChanges(List<Node> snapshot) throws URISyntaxException, Exception {
@@ -1413,17 +1440,23 @@ public class SyncJob implements InterruptableJob {
 
 					try {
 						org.w3c.dom.Node xmlNode = node.queryXMLNode("/tree");
+						parentNode.removeProperty(Node.MAX_DEPTH);
+						parentNode.removeProperty(Node.MAX_NODES);
+						
 						Node entry = new Node(Node.NODE_TYPE_ENTRY, "", parentNode);
-						if (save) {
-							nodeDao.create(entry);
-						}
-						entry.properties = nodeDao.getEmptyForeignCollection("properties");
-						entry.initFromXmlNode(xmlNode);
-						if (save) {
-							nodeDao.update(entry);
-						}
-						if (list != null) {
-							list.add(entry);
+						List<Node> exists = nodeDao.queryForEq("path", entry.getPath());
+						if (exists.isEmpty()) {
+							if (save) {
+								nodeDao.create(entry);
+							}
+							entry.properties = nodeDao.getEmptyForeignCollection("properties");
+							entry.initFromXmlNode(xmlNode);
+							if (save) {
+								nodeDao.update(entry);
+							}
+							if (list != null) {
+								list.add(entry);
+							}
 						}
 					} catch (XPathExpressionException e) {
 						// FIXME - how to manage this errors here?
@@ -1804,11 +1837,11 @@ public class SyncJob implements InterruptableJob {
 		} catch (Exception e) {
 			throw new SynchroOperationException("Error during response entity: " + e.getMessage(), e);
 		}
-		long fullLength = entity.getContentLength();
-		if (fullLength <= 0) {
-			rest.release();
-			return null;
-		}
+//		long fullLength = entity.getContentLength();
+//		if (fullLength <= 0) {
+//			rest.release();
+//			return null;
+//		}
 
 		InputStream contentStream = entity.getContent();
 		// FIXME should we release now?
@@ -1842,11 +1875,14 @@ public class SyncJob implements InterruptableJob {
 			throw new SynchroOperationException("Error during response entity: " + e.getMessage(), e);
 		}
 		long fullLength = entity.getContentLength();
-		if (fullLength <= 0) {
-			rest.release();
-			return;
-		}
+//		if (fullLength <= 0) {
+//			rest.release();
+//			return;
+//		}
 		Logger.getRootLogger().info("Downloading " + fullLength + " bytes");
+		if (fullLength <= 0) {
+			fullLength = 1;
+		}
 
 		InputStream input = null;
 		try {

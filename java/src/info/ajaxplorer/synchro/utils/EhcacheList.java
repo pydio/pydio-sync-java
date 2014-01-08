@@ -97,10 +97,12 @@ public class EhcacheList<E> implements List<E> {
 		if (e == null) {
 			return false; // FIXME - add nulls also?
 		}
-		if (cache.isKeyInCache(determinant.computeKey(e))) {
-			throw new UnsupportedOperationException("List cannot containt the same element twice");
+		Object key = determinant.computeKey(e);
+		if (!cache.isKeyInCache(key)) {
+			cache.put(new Element(key, e));
+//			throw new UnsupportedOperationException("List cannot containt the same element twice: " + key);
 		}
-		cache.put(new Element(determinant.computeKey(e), e));
+		cache.put(new Element(key, e));
 		return true;
 	}
 
