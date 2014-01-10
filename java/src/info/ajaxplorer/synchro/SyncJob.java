@@ -1373,7 +1373,6 @@ public class SyncJob implements InterruptableJob {
 				return null;
 			}
 		});
-		
 		if (save) {
 			rootNode.removeProperty(Node.MAX_DEPTH);
 			rootNode.removeProperty(Node.MAX_NODES);
@@ -1382,22 +1381,35 @@ public class SyncJob implements InterruptableJob {
 
 	}
 	
+	
 	protected void takeRemoteSnapshot(final Node rootNode, final Node currentFolder, final List<Node> accumulator, final boolean save) throws Exception {
-		currentFolder.setProperty(Node.MAX_DEPTH, "1");
-		currentFolder.setProperty(Node.MAX_NODES, "100");
+		currentFolder.setProperty(Node.MAX_DEPTH, "3");
+		currentFolder.setProperty(Node.MAX_NODES, "500");
 		Logger.getRootLogger().info("Taking remote content for node: " + currentFolder.getPath());
 
 		final List<Node> partial = new ArrayList<Node>();
 		
 		// parse file structure to node tree
-		parseNodesFromStream(getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(currentFolder)), rootNode,
+		URI recursiveLsDirectoryUri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(currentFolder);
+		parseNodesFromStream(getUriContentStream(recursiveLsDirectoryUri), rootNode,
 				partial, save);
+		
+		if (interruptRequired) {
+			return;
+		}
 		
 		Logger.getRootLogger().info("Loaded part: " + partial.size());
 		
 		for (Node n : partial) {
+			
+			if (interruptRequired) {
+				return;
+			}
+
 			if (!n.isLeaf() && "true".equals(n.getPropertyValue(Node.NODE_HAS_CHILDREN))) {
-				takeRemoteSnapshot(rootNode, n, accumulator, save);
+				if (!"".equals(n.getPath()) && !"/".equals(n.getPath())  ) {
+					takeRemoteSnapshot(rootNode, n, accumulator, save);
+				}
 			}
 		}
 		
@@ -1438,25 +1450,28 @@ public class SyncJob implements InterruptableJob {
 				@Override
 				public void process(StructuredNode node) {
 
+					// check if user wants to stop?
+					if (interruptRequired) {
+						return;
+					}
+					
+					
 					try {
 						org.w3c.dom.Node xmlNode = node.queryXMLNode("/tree");
 						parentNode.removeProperty(Node.MAX_DEPTH);
 						parentNode.removeProperty(Node.MAX_NODES);
 						
 						Node entry = new Node(Node.NODE_TYPE_ENTRY, "", parentNode);
-						List<Node> exists = nodeDao.queryForEq("path", entry.getPath());
-						if (exists.isEmpty()) {
-							if (save) {
-								nodeDao.create(entry);
-							}
-							entry.properties = nodeDao.getEmptyForeignCollection("properties");
-							entry.initFromXmlNode(xmlNode);
-							if (save) {
-								nodeDao.update(entry);
-							}
-							if (list != null) {
-								list.add(entry);
-							}
+						if (save) {
+							nodeDao.create(entry);
+						}
+						entry.properties = nodeDao.getEmptyForeignCollection("properties");
+						entry.initFromXmlNode(xmlNode);
+						if (save) {
+							nodeDao.update(entry);
+						}
+						if (list != null) {
+							list.add(entry);
 						}
 					} catch (XPathExpressionException e) {
 						// FIXME - how to manage this errors here?

@@ -33,6 +33,8 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 import org.eclipse.jface.action.Action;
@@ -130,7 +132,8 @@ public class JobEditor extends Composite{
 	private boolean autoKeepRemoteState = false;
 	private boolean autoKeepLocalState = false;
 	
-	private HashMap<String, String> repoItems;
+	// we will use TreeMap implementation so items in combo are sorted
+	private Map<String, String> repoItems;
 	//private ConfigPanel configPanel;
 	
 	private Form form;
@@ -267,7 +270,7 @@ public class JobEditor extends Composite{
 		currentRepoLabel = values.get("REPOSITORY_LABEL");
 		currentRepoId = values.get("REPOSITORY_ID");
 		tfRepo.setText(currentRepoLabel);
-		repoItems = new HashMap<String, String>();
+		repoItems = new TreeMap<String, String>();
 		repoItems.put(values.get("REPOSITORY_LABEL"), values.get("REPOSITORY_ID"));
 		tfTarget.setText(values.get("TARGET"));
 		currentActiveState = values.get("ACTIVE").equals("true");
@@ -302,7 +305,7 @@ public class JobEditor extends Composite{
 		if(tfRepo != null) {
 			tfRepo.setText("");			
 		}
-		repoItems = new HashMap<String, String>();
+		repoItems = new TreeMap<String, String>();
 		tfTarget.setText("");
 		comboDirection.select(0);
 		
@@ -355,7 +358,7 @@ public class JobEditor extends Composite{
 						throw new Exception("No repositories found");
 					}			
 					final NodeList repos = mainTag.item(0).getChildNodes();
-					repoItems = new HashMap<String, String>();
+					repoItems = new TreeMap<String, String>();
 					
 					
 					if (repos!=null && repos.getLength() > 0){
