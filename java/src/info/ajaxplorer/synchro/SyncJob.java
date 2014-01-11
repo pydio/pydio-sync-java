@@ -44,6 +44,7 @@ import info.ajaxplorer.synchro.utils.IEhcacheListDeterminant;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -52,6 +53,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringWriter;
 import java.math.BigInteger;
@@ -488,7 +490,8 @@ public class SyncJob implements InterruptableJob {
 			takeLocalSnapshot(localRootNode, null, true, localSnapshot);
 			clearSnapshot("local_tmp");
 
-			takeRemoteSnapshot(remoteRootNode, null, true);
+			remoteSnapshot = EhcacheListFactory.getInstance().getList(REMOTE_SNAPSHOT_LIST);
+			takeRemoteSnapshot(remoteRootNode, remoteSnapshot, true);
 			clearSnapshot("remote_tmp");
 
 			cleanDB();
@@ -1362,29 +1365,53 @@ public class SyncJob implements InterruptableJob {
 	 * @throws Exception
 	 */
 	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception {
+		long time = System.currentTimeMillis();
 		if (save) {
 			emptyNodeChildren(rootNode, false);
 		}
 
-		nodeDao.callBatchTasks(new Callable<Void>() {
-			public Void call() throws Exception {
-				takeRemoteSnapshot(rootNode, rootNode, accumulator, save);
+		// takeRemoteSnapshots only creates a collection of remote nodes
+		// with properties stored in local (not managed by DB) properties collection
+		// this calls LS remote dir recursive, and will produce a full 
+		// tree conent of nodes, then - we need to persist!
+		
+		takeRemoteSnapshot(rootNode, rootNode, accumulator, save);
 
-				return null;
-			}
-		});
+		Logger.getRootLogger().info("Saving nodes");
+		
 		if (save) {
-			rootNode.removeProperty(Node.MAX_DEPTH);
-			rootNode.removeProperty(Node.MAX_NODES);
 			nodeDao.update(rootNode);
+
+			// now we need to persist collection of nodes
+			// with steps reproduced from original takeRemoteSnapshot()
+			// - adding parent
+			// - create
+			// - create properties collection
+			// - update
+			// NOTE: before update, we need to copy properties from local collection to db managed collection!
+			nodeDao.callBatchTasks(new Callable<Void>() {
+				public Void call() throws Exception {
+					for (Node n : accumulator) {
+						// add parent
+						n.setParent(rootNode);
+						nodeDao.create(n);
+						n.properties = nodeDao.getEmptyForeignCollection("properties");
+						n.copyLocalProperties();
+						nodeDao.update(n);
+					}
+					return null;
+				}
+			});
+
 		}
 
+		Logger.getRootLogger().info("Nodes saved: " + (System.currentTimeMillis() - time));
 	}
 	
 	
 	protected void takeRemoteSnapshot(final Node rootNode, final Node currentFolder, final List<Node> accumulator, final boolean save) throws Exception {
-		currentFolder.setProperty(Node.MAX_DEPTH, "3");
-		currentFolder.setProperty(Node.MAX_NODES, "500");
+		currentFolder.setMaxDepth(1);
+		currentFolder.setMaxNodes(100);
 		Logger.getRootLogger().info("Taking remote content for node: " + currentFolder.getPath());
 
 		final List<Node> partial = new ArrayList<Node>();
@@ -1405,8 +1432,7 @@ public class SyncJob implements InterruptableJob {
 			if (interruptRequired) {
 				return;
 			}
-
-			if (!n.isLeaf() && "true".equals(n.getPropertyValue(Node.NODE_HAS_CHILDREN))) {
+			if (!n.isLeaf() && n.isHasChildren()) {
 				if (!"".equals(n.getPath()) && !"/".equals(n.getPath())  ) {
 					takeRemoteSnapshot(rootNode, n, accumulator, save);
 				}
@@ -1458,24 +1484,14 @@ public class SyncJob implements InterruptableJob {
 					
 					try {
 						org.w3c.dom.Node xmlNode = node.queryXMLNode("/tree");
-						parentNode.removeProperty(Node.MAX_DEPTH);
-						parentNode.removeProperty(Node.MAX_NODES);
 						
 						Node entry = new Node(Node.NODE_TYPE_ENTRY, "", parentNode);
-						if (save) {
-							nodeDao.create(entry);
-						}
-						entry.properties = nodeDao.getEmptyForeignCollection("properties");
-						entry.initFromXmlNode(xmlNode);
-						if (save) {
-							nodeDao.update(entry);
-						}
+						// init node with properties saved to LOCAL property collection
+						entry.initFromXmlNode(xmlNode, true);
 						if (list != null) {
 							list.add(entry);
 						}
 					} catch (XPathExpressionException e) {
-						// FIXME - how to manage this errors here?
-					} catch (SQLException e) {
 						// FIXME - how to manage this errors here?
 					}
 				}
@@ -1491,6 +1507,27 @@ public class SyncJob implements InterruptableJob {
 		} catch (ParserConfigurationException e) {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (SAXException e) {
+			
+			URI recursiveLsDirectoryUri;
+			try {
+				recursiveLsDirectoryUri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(parentNode);
+				InputStream ia = getUriContentStream(recursiveLsDirectoryUri);
+			
+				BufferedReader br = new BufferedReader(new InputStreamReader(ia));
+				Logger.getRootLogger().error("" + br.readLine());
+				br.close();
+				
+			} catch (URISyntaxException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			} catch (IllegalStateException e1) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (IOException e) {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
