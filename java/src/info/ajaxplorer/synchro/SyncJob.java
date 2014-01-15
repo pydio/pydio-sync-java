@@ -38,6 +38,7 @@ import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncChangeValue;
 import info.ajaxplorer.synchro.model.SyncLog;
 import info.ajaxplorer.synchro.model.SyncLogDetails;
+import info.ajaxplorer.synchro.progressmonitor.IProgressMonitor;
 import info.ajaxplorer.synchro.utils.EhcacheList;
 import info.ajaxplorer.synchro.utils.EhcacheListFactory;
 import info.ajaxplorer.synchro.utils.IEhcacheListDeterminant;
@@ -70,6 +71,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -196,6 +198,11 @@ public class SyncJob implements InterruptableJob {
 	// it is only available change to true, if direction == UPLOAD ONLY || BI
 	private boolean autoKeepLocalFile = true;
 
+	// progress monitor
+	private IProgressMonitor monitor;
+
+	private MessageListener messageHandler;
+
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
 		String keepRemoteData = ctx.getMergedJobDataMap().getString(JobEditor.AUTO_KEEP_REMOTE);
@@ -227,7 +234,6 @@ public class SyncJob implements InterruptableJob {
 		interruptRequired = true;
 	}
 
-	private MessageListener messageHandler;
 
 	protected RestRequest getRequest() {
 		RestRequest rest = new RestRequest();
@@ -335,6 +341,8 @@ public class SyncJob implements InterruptableJob {
 	public void run() {
 
 		try {
+			monitor = CoreManager.getInstance().getProgressMonitor();
+
 			AjxpHttpClient.clearCookiesStatic();
 			// instantiate the daos
 			ConnectionSource connectionSource = getCoreManager().getConnection();
@@ -432,7 +440,7 @@ public class SyncJob implements InterruptableJob {
 			if (previousChanges.size() > 0) {
 				updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
 				Logger.getRootLogger().debug("Getting previous tasks");
-				again = applyChanges(previousChanges);
+				again = applyChanges(previousChanges, monitor, MonitorTaskType.APPLY_PREVIOUS_CHANGES);
 				if (previouslyRemaining.size() > 999) {
 					syncChangeDao.callBatchTasks(new Callable<Void>() {
 						public Void call() throws Exception {
@@ -454,7 +462,7 @@ public class SyncJob implements InterruptableJob {
 			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
 			Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
 			updateRunningStatus(RUNNING_STATUS_APPLY_CHANGES);
-			Map<String, Object[]> remainingChanges = applyChanges(changes);
+			Map<String, Object[]> remainingChanges = applyChanges(changes, monitor, MonitorTaskType.APPLY_CHANGES);
 			if (again != null && again.size() > 0) {
 				remainingChanges.putAll(again);
 			}
@@ -640,18 +648,24 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
-	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) {
-		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet().iterator();
-		// Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
-		// // Make sure to apply those one at the end
-		// Map<String, Object[]> moves = new TreeMap<String, Object[]>();
-		// Map<String, Object[]> deletes = new TreeMap<String, Object[]>();
+	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, IProgressMonitor monitor, MonitorTaskType taskType) {
+		Set<Entry<String, Object[]>> changesEntrySet = changes.entrySet();
+		Iterator<Map.Entry<String, Object[]>> it = changesEntrySet.iterator();
 		Map<String, Object[]> notApplied = createMapDBFile("notApplied");
 		// Make sure to apply those one at the end
 		Map<String, Object[]> moves = createMapDBFile("moves");
 		Map<String, Object[]> deletes = createMapDBFile("deletes");
 		RestRequest rest = this.getRequest();
+		int total = changes.size();
+		int work = 0;
+		if (monitor != null) {
+			monitor.begin(getMonitorTaskName(taskType));
+		}
 		while (it.hasNext()) {
+			// add information for user
+			if (monitor != null) {
+				monitor.notifyProgress(total, work++);
+			}
 			Map.Entry<String, Object[]> entry = it.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -830,9 +844,20 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 
+		if (monitor != null) {
+			monitor.end();
+			monitor.begin(getMonitorTaskName(taskType) + " - " + getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_MOVES));
+		}
+
 		// APPLY MOVES
-		Iterator<Map.Entry<String, Object[]>> mIt = moves.entrySet().iterator();
+		Set<Entry<String, Object[]>> movesEntrySet = moves.entrySet();
+		Iterator<Map.Entry<String, Object[]>> mIt = movesEntrySet.iterator();
+		total = moves.size();
+		work = 0;
 		while (mIt.hasNext()) {
+			if (monitor != null) {
+				monitor.notifyProgress(total, work++);
+			}
 			Map.Entry<String, Object[]> entry = mIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -900,8 +925,19 @@ public class SyncJob implements InterruptableJob {
 		}
 
 		// APPLY DELETES
-		Iterator<Map.Entry<String, Object[]>> dIt = deletes.entrySet().iterator();
+		if (monitor != null) {
+			monitor.end();
+			monitor.begin(getMonitorTaskName(taskType) + " - " + getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_DELETES));
+		}
+
+		Set<Entry<String, Object[]>> deletesEntrySet = deletes.entrySet();
+		Iterator<Map.Entry<String, Object[]>> dIt = deletesEntrySet.iterator();
+		total = deletes.size();
+		work = 0;
 		while (dIt.hasNext()) {
+			if (monitor != null) {
+				monitor.notifyProgress(total, work++);
+			}
 			Map.Entry<String, Object[]> entry = dIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -954,6 +990,9 @@ public class SyncJob implements InterruptableJob {
 				value[2] = STATUS_ERROR;
 				notApplied.put(k, value);
 			}
+		}
+		if (monitor != null) {
+			monitor.end();
 		}
 		rest.release();
 		return notApplied;
@@ -1242,7 +1281,7 @@ public class SyncJob implements InterruptableJob {
 
 		takeLocalSnapshot(root, list, true, previousSnapshot);
 
-		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local");
+		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local", monitor);
 
 		clearSnapshot("previous_indexation");
 
@@ -1405,7 +1444,7 @@ public class SyncJob implements InterruptableJob {
 
 		}
 
-		Logger.getRootLogger().info("Nodes saved: " + (System.currentTimeMillis() - time));
+		Logger.getRootLogger().info("Nodes saved: " + (System.currentTimeMillis() - time) + " ms");
 	}
 	
 	
@@ -1451,7 +1490,7 @@ public class SyncJob implements InterruptableJob {
 		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_REMOTE_CHANGES_LIST);
 		takeRemoteSnapshot(root, list, true);
 
-		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
+		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote", monitor);
 		// Logger.getRootLogger().info(diff);
 		return diff;
 	}
@@ -1572,14 +1611,25 @@ public class SyncJob implements InterruptableJob {
 	 * @return
 	 * @throws EhcacheListException
 	 */
-	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) throws EhcacheListException {
+	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type, IProgressMonitor monitor)
+			throws EhcacheListException {
 		EhcacheList<Node> saved = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_SAVED_LIST);
 		saved.addAll(snapshot);
 
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
 		EhcacheList<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
+		int total = snapshot.size();
+		int work = 0;
+		if (monitor != null) {
+			monitor.begin(("local".equals(type) ? getMonitorTaskName(MonitorTaskType.LOAD_LOCAL_CHANGES)
+					: getMonitorTaskName(MonitorTaskType.LOAD_REMOTE_CHANGES)));
+		}
 		while (cIt.hasNext()) {
+			// add progress information
+			if (monitor != null) {
+				monitor.notifyProgress(total, work++);
+			}
 			Node c = cIt.next();
 
 			// because we use comparator by path,
@@ -1608,6 +1658,9 @@ public class SyncJob implements InterruptableJob {
 		if (saved.size() > 0) {
 			Iterator<Node> sIt = saved.iterator();
 			while (sIt.hasNext()) {
+				if (monitor != null) {
+					monitor.notifyProgress(total, work++);
+				}
 				Node s = sIt.next();
 				if (s.isLeaf()) {
 					// again - we use ehcache list
@@ -1650,6 +1703,9 @@ public class SyncJob implements InterruptableJob {
 				diff.put(c.getPath(true),
 						makeTodoObject((c.isLeaf() ? NODE_CHANGE_STATUS_FILE_CREATED : NODE_CHANGE_STATUS_DIR_CREATED), c));
 			}
+		}
+		if (monitor != null) {
+			monitor.end();
 		}
 		return diff;
 	}
@@ -2085,5 +2141,34 @@ public class SyncJob implements InterruptableJob {
 			bw.close();
 		} catch (Exception e) {
 		}
+	}
+
+	private enum MonitorTaskType {
+		LOAD_LOCAL_CHANGES, LOAD_REMOTE_CHANGES, APPLY_CHANGES, APPLY_PREVIOUS_CHANGES, APPLY_CHANGES_MOVES, APPLY_CHANGES_DELETES
+	}
+
+	private String getMonitorTaskName(MonitorTaskType taskType) {
+		String taskName = "no_name";
+		switch (taskType) {
+		case APPLY_CHANGES:
+			taskName = getMessage("task_name_apply_changes");
+			break;
+		case APPLY_CHANGES_MOVES:
+			taskName = getMessage("subtask_name_apply_changes_moves");
+			break;
+		case APPLY_CHANGES_DELETES:
+			taskName = getMessage("subtask_name_apply_changes_deletes");
+			break;
+		case APPLY_PREVIOUS_CHANGES:
+			taskName = getMessage("task_name_apply_previous_changes");
+			break;
+		case LOAD_LOCAL_CHANGES:
+			taskName = getMessage("task_name_load_local_changes");
+			break;
+		case LOAD_REMOTE_CHANGES:
+			taskName = getMessage("task_name_load_remote_changes");
+			break;
+		}
+		return taskName;
 	}
 }

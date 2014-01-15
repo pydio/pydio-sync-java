@@ -31,6 +31,8 @@ import info.ajaxplorer.synchro.gui.JobEditor;
 import info.ajaxplorer.synchro.model.SyncChange;
 import info.ajaxplorer.synchro.model.SyncLog;
 import info.ajaxplorer.synchro.model.SyncLogDetails;
+import info.ajaxplorer.synchro.progressmonitor.IProgressMonitor;
+import info.ajaxplorer.synchro.progressmonitor.StandardProgressMonitor;
 
 import java.io.File;
 import java.net.URI;
@@ -84,6 +86,15 @@ public class CoreManager {
 	public boolean firstRun = false;
 	private boolean schedulerInitialized = false; 	
 	
+	private IProgressMonitor progressMonitor;
+
+	public IProgressMonitor getProgressMonitor() {
+		if (progressMonitor == null) {
+			progressMonitor = new StandardProgressMonitor();
+		}
+		return progressMonitor;
+	}
+
 	public RdiffProcessor getRdiffProc() {
 		return rdiffProc;
 	}
@@ -573,8 +584,23 @@ public class CoreManager {
 	}
 		
 	public String makeJobLabel(Node node, boolean shortFormat){
+		return makeJobLabel(node, shortFormat, false);
+	}
+
+	public String makeJobLabel(Node node, boolean shortFormat, boolean progressFirstLine) {
 		if(node == null) return "null node!";
-		String s = getMessage("joblabel_format");
+
+		String s = "";
+
+		if (progressFirstLine) {
+			IProgressMonitor lprogressMonitor = getProgressMonitor();
+			if (lprogressMonitor != null && lprogressMonitor.isShowProgress()) {
+				Logger.getRootLogger().info(lprogressMonitor.getProgressString());
+				s += lprogressMonitor.getProgressString() + "\n";
+			}
+		}
+
+		s += getMessage("joblabel_format");
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
 		if(uri != null){
@@ -586,13 +612,15 @@ public class CoreManager {
 			File f = new File(node.getPropertyValue("target_folder"));
 			s = s.replace("LOCAL", f.getName());			
 		}
-		if(node.getPropertyValue("synchro_active").equals("false")){
+		if (node.getPropertyValue("synchro_active").equals("false")) {
 			s = s + " - " + getMessage("sync_short_status_inactive");
 		}else if(node.getStatus() == Node.NODE_STATUS_LOADING){
 			s = s + " - " + getMessage("sync_short_status_running");
 		}else if(node.getStatus() == Node.NODE_STATUS_ERROR){
 			s = s + " - " + getMessage("sync_short_status_error");
 		}
+
+		// update with ProgressMonitor text
 		return s.toString();
 	}
 	

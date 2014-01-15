@@ -23,6 +23,7 @@ package info.ajaxplorer.synchro;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.gui.SysTray;
+import info.ajaxplorer.synchro.progressmonitor.IProgressMonitor;
 
 import java.io.File;
 import java.sql.SQLException;
@@ -45,7 +46,7 @@ public class Manager extends CoreManager {
 	static Shell instanceShell;	
 	private SysTray sysTray;
 	
-	
+	private IProgressMonitor progressMonitor;
 	/**
 	 * @param args
 	 */
@@ -169,6 +170,12 @@ public class Manager extends CoreManager {
 		Manager.instance = (Manager)CoreManager.instance;
 	}
 	
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see info.ajaxplorer.synchro.CoreManager#notifyUser(java.lang.String,
+	 * java.lang.String, java.lang.String, boolean)
+	 */
 	public void notifyUser(final String title, final String message, final String nodeId, final boolean forceDisplay){
 		if(this.sysTray == null) {
 			Logger.getRootLogger().info("No systray - message was " + message);
@@ -252,5 +259,6 @@ public class Manager extends CoreManager {
 		Program.launch(server + "?repository_id=" + synchroNode.getPropertyValue("repository_id") + "&folder=%2F");
 		return true;
 	}
+
 
 }

@@ -72,7 +72,8 @@ public class SysTray {
 		String jobLabel = "";
 		if(nodeId != null){
 			Node n = CoreManager.getInstance().getSynchroNode(nodeId);
-			if(n != null) jobLabel = CoreManager.getInstance().makeJobLabel(n, true)+": ";
+			if (n != null)
+				jobLabel = CoreManager.getInstance().makeJobLabel(n, true, true) + ": ";
 		}
 		item.setToolTipText( jobLabel + title + " ("+message+")");
 		
@@ -110,7 +111,7 @@ public class SysTray {
 			this.currentStartItems.get(nodeId).setEnabled(!state);
 		}
 		this.setIconState(state?"running":"idle");
-		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true)+": " + this.computeSyncStatus(node));
+		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true) + ": " + this.computeSyncStatus(node));
 	}
 	protected Image getImage(String name){
 		try{
@@ -156,6 +157,8 @@ public class SysTray {
 			}
 		}
 		//Logger.getRootLogger().info("-- Status : " + syncNode.id + " ==> " + syncNode.getPropertyValue("sync_running_status"));
+
+
 		return syncStatus;
 	}
 	
