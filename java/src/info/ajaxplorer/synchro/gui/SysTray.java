@@ -23,6 +23,7 @@ package info.ajaxplorer.synchro.gui;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.synchro.CoreManager;
 import info.ajaxplorer.synchro.SyncJob;
+import info.ajaxplorer.synchro.progressmonitor.IProgressMonitor;
 
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -73,7 +74,7 @@ public class SysTray {
 		if(nodeId != null){
 			Node n = CoreManager.getInstance().getSynchroNode(nodeId);
 			if (n != null)
-				jobLabel = CoreManager.getInstance().makeJobLabel(n, true, true) + ": ";
+				jobLabel = CoreManager.getInstance().makeJobLabel(n, true) + ": ";
 		}
 		item.setToolTipText( jobLabel + title + " ("+message+")");
 		
@@ -158,6 +159,12 @@ public class SysTray {
 		}
 		//Logger.getRootLogger().info("-- Status : " + syncNode.id + " ==> " + syncNode.getPropertyValue("sync_running_status"));
 
+		// add information about progress if available
+		IProgressMonitor lprogressMonitor = CoreManager.getInstance().getProgressMonitor();
+		if (lprogressMonitor != null && lprogressMonitor.isShowProgress()) {
+			Logger.getRootLogger().info(lprogressMonitor.getProgressString());
+			syncStatus += " - " + lprogressMonitor.getShortProgressString();
+		}
 
 		return syncStatus;
 	}

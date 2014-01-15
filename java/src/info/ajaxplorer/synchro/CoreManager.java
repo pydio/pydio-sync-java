@@ -584,23 +584,9 @@ public class CoreManager {
 	}
 		
 	public String makeJobLabel(Node node, boolean shortFormat){
-		return makeJobLabel(node, shortFormat, false);
-	}
-
-	public String makeJobLabel(Node node, boolean shortFormat, boolean progressFirstLine) {
 		if(node == null) return "null node!";
 
-		String s = "";
-
-		if (progressFirstLine) {
-			IProgressMonitor lprogressMonitor = getProgressMonitor();
-			if (lprogressMonitor != null && lprogressMonitor.isShowProgress()) {
-				Logger.getRootLogger().info(lprogressMonitor.getProgressString());
-				s += lprogressMonitor.getProgressString() + "\n";
-			}
-		}
-
-		s += getMessage("joblabel_format");
+		String s = getMessage("joblabel_format");
 		s = s.replace("REPO", node.getLabel());
 		URI uri = URI.create(node.getParent().getLabel());
 		if(uri != null){

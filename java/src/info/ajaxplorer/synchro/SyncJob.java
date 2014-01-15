@@ -662,10 +662,7 @@ public class SyncJob implements InterruptableJob {
 			monitor.begin(getMonitorTaskName(taskType));
 		}
 		while (it.hasNext()) {
-			// add information for user
-			if (monitor != null) {
-				monitor.notifyProgress(total, work++);
-			}
+			work = notifyProgressMonitor(monitor, total, work);
 			Map.Entry<String, Object[]> entry = it.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -855,9 +852,7 @@ public class SyncJob implements InterruptableJob {
 		total = moves.size();
 		work = 0;
 		while (mIt.hasNext()) {
-			if (monitor != null) {
-				monitor.notifyProgress(total, work++);
-			}
+			work = notifyProgressMonitor(monitor, total, work);
 			Map.Entry<String, Object[]> entry = mIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -935,9 +930,7 @@ public class SyncJob implements InterruptableJob {
 		total = deletes.size();
 		work = 0;
 		while (dIt.hasNext()) {
-			if (monitor != null) {
-				monitor.notifyProgress(total, work++);
-			}
+			work = notifyProgressMonitor(monitor, total, work);
 			Map.Entry<String, Object[]> entry = dIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -1626,10 +1619,7 @@ public class SyncJob implements InterruptableJob {
 					: getMonitorTaskName(MonitorTaskType.LOAD_REMOTE_CHANGES)));
 		}
 		while (cIt.hasNext()) {
-			// add progress information
-			if (monitor != null) {
-				monitor.notifyProgress(total, work++);
-			}
+			work = notifyProgressMonitor(monitor, total, work);
 			Node c = cIt.next();
 
 			// because we use comparator by path,
@@ -1658,9 +1648,7 @@ public class SyncJob implements InterruptableJob {
 		if (saved.size() > 0) {
 			Iterator<Node> sIt = saved.iterator();
 			while (sIt.hasNext()) {
-				if (monitor != null) {
-					monitor.notifyProgress(total, work++);
-				}
+				work = notifyProgressMonitor(monitor, total, work);
 				Node s = sIt.next();
 				if (s.isLeaf()) {
 					// again - we use ehcache list
@@ -1708,6 +1696,24 @@ public class SyncJob implements InterruptableJob {
 			monitor.end();
 		}
 		return diff;
+	}
+
+	/**
+	 * Notifies progress monitor (if exists) about work part done
+	 * updates also the status message (by coreManager instance)
+	 * 
+	 * @param monitor
+	 * @param total
+	 * @param work
+	 * @return
+	 */
+	private int notifyProgressMonitor(IProgressMonitor monitor, int total, int work) {
+		if (monitor != null) {
+			monitor.notifyProgress(total, work++);
+			// update status message
+			getCoreManager().updateSynchroState(currentRepository, (localWatchOnly ? false : true));
+		}
+		return work;
 	}
 
 	/**
