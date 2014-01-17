@@ -27,26 +27,42 @@ public interface IProgressMonitor {
 	 */
 	public String getProgressString();
 
-	public String getShortProgressString();
-
 	/**
-	 * Denotes if progress should be shown
+	 * Returns the short progress string - contains percentage value
 	 * 
 	 * @return
 	 */
-	public boolean isShowProgress();
+	public String getShortProgressString();
+
+	/**
+	 * Denotes if progress should be shown for syncNodeId
+	 * 
+	 * @param nodeId
+	 * 
+	 * @return
+	 */
+	public boolean isShowProgress(int nodeId);
 
 	/**
 	 * Starts the progress for taskName
 	 * 
+	 * @param currentJobNodeID
+	 *            - denotes which repo node is processed, so progress start to
+	 *            notify proper status item
+	 * 
 	 * @param taskName
 	 *            - task name to display
 	 */
-	public void begin(String taskName);
+	public void begin(String currentJobNodeID, String taskName);
 
 	/**
 	 * Stops the progress
+	 * 
+	 * @param currentJobNodeID
+	 *            - denotes which repo node is stopped with process, so progress
+	 *            stop notifying status item
+	 * 
 	 */
-	public void end();
+	public void end(String currentJobNodeID);
 
 }

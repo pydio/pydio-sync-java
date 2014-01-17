@@ -1,5 +1,8 @@
 package info.ajaxplorer.synchro.progressmonitor;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Implementation of progress monitor
  * 
@@ -11,7 +14,7 @@ public class StandardProgressMonitor implements IProgressMonitor {
 	private int total;
 	private int current;
 	private String taskName;
-	private boolean showProgress = false;
+	private Map<String, Boolean> showProgress = new HashMap<String, Boolean>();
 
 	@Override
 	public void notifyProgress(int total, int current) {
@@ -21,11 +24,8 @@ public class StandardProgressMonitor implements IProgressMonitor {
 
 	@Override
 	public String getProgressString() {
-		String progressString = "";
-		if (showProgress) {
-			progressString += taskName != null ? (taskName + " - ") : "";
-			progressString += getProgressValue() + "%";
-		}
+		String progressString = taskName != null ? (taskName + " - ") : "";
+		progressString += getProgressValue() + "%";
 		return progressString;
 	}
 
@@ -35,23 +35,24 @@ public class StandardProgressMonitor implements IProgressMonitor {
 	}
 
 	@Override
-	public boolean isShowProgress() {
-		return showProgress;
+	public boolean isShowProgress(int nodeId) {
+		Boolean showPrg = showProgress.get("" + nodeId);
+		return showPrg != null ? showPrg : false;
 	}
 
 	@Override
-	public void begin(String taskName) {
+	public void begin(String tcurrenNodeId, String taskName) {
 		this.taskName = taskName;
 		this.current = 0;
 		this.total = 0;
-		this.showProgress = true;
+		showProgress.put(tcurrenNodeId, true);
 	}
 
 	@Override
-	public void end() {
+	public void end(String tcurrentNodeId) {
 		this.current = 0;
 		this.total = 0;
-		this.showProgress = false;
+		showProgress.put(tcurrentNodeId, false);
 	}
 
 	private int getProgressValue() {

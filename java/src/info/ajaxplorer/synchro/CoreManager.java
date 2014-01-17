@@ -606,7 +606,6 @@ public class CoreManager {
 			s = s + " - " + getMessage("sync_short_status_error");
 		}
 
-		// update with ProgressMonitor text
 		return s.toString();
 	}
 	

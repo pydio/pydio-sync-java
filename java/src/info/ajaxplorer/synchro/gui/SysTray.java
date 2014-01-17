@@ -161,8 +161,7 @@ public class SysTray {
 
 		// add information about progress if available
 		IProgressMonitor lprogressMonitor = CoreManager.getInstance().getProgressMonitor();
-		if (lprogressMonitor != null && lprogressMonitor.isShowProgress()) {
-			Logger.getRootLogger().info(lprogressMonitor.getProgressString());
+		if (lprogressMonitor != null && lprogressMonitor.isShowProgress(syncNode.id)) {
 			syncStatus += " - " + lprogressMonitor.getShortProgressString();
 		}
 
