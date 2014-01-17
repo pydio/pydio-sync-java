@@ -659,10 +659,10 @@ public class SyncJob implements InterruptableJob {
 		int total = changes.size();
 		int work = 0;
 		if (monitor != null) {
-			monitor.begin(getMonitorTaskName(taskType));
+			monitor.begin(currentJobNodeID, getMonitorTaskName(taskType));
 		}
 		while (it.hasNext()) {
-			work = notifyProgressMonitor(monitor, total, work);
+			notifyProgressMonitor(monitor, total, work++);
 			Map.Entry<String, Object[]> entry = it.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -842,8 +842,8 @@ public class SyncJob implements InterruptableJob {
 		}
 
 		if (monitor != null) {
-			monitor.end();
-			monitor.begin(getMonitorTaskName(taskType) + " - " + getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_MOVES));
+			monitor.end(currentJobNodeID);
+			monitor.begin(currentJobNodeID, getMonitorTaskName(taskType) + " - " + getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_MOVES));
 		}
 
 		// APPLY MOVES
@@ -852,7 +852,7 @@ public class SyncJob implements InterruptableJob {
 		total = moves.size();
 		work = 0;
 		while (mIt.hasNext()) {
-			work = notifyProgressMonitor(monitor, total, work);
+			notifyProgressMonitor(monitor, total, work++);
 			Map.Entry<String, Object[]> entry = mIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -921,8 +921,9 @@ public class SyncJob implements InterruptableJob {
 
 		// APPLY DELETES
 		if (monitor != null) {
-			monitor.end();
-			monitor.begin(getMonitorTaskName(taskType) + " - " + getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_DELETES));
+			monitor.end(currentJobNodeID);
+			monitor.begin(currentJobNodeID, getMonitorTaskName(taskType) + " - "
+					+ getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_DELETES));
 		}
 
 		Set<Entry<String, Object[]>> deletesEntrySet = deletes.entrySet();
@@ -930,7 +931,7 @@ public class SyncJob implements InterruptableJob {
 		total = deletes.size();
 		work = 0;
 		while (dIt.hasNext()) {
-			work = notifyProgressMonitor(monitor, total, work);
+			notifyProgressMonitor(monitor, total, work++);
 			Map.Entry<String, Object[]> entry = dIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -985,7 +986,7 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 		if (monitor != null) {
-			monitor.end();
+			monitor.end(currentJobNodeID);
 		}
 		rest.release();
 		return notApplied;
@@ -1409,6 +1410,10 @@ public class SyncJob implements InterruptableJob {
 		
 		takeRemoteSnapshot(rootNode, rootNode, accumulator, save);
 
+		if (interruptRequired) {
+			return;
+		}
+
 		Logger.getRootLogger().info("Saving nodes");
 		
 		if (save) {
@@ -1612,14 +1617,14 @@ public class SyncJob implements InterruptableJob {
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
 		EhcacheList<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
-		int total = snapshot.size();
+		int total = current.size() + saved.size();
 		int work = 0;
 		if (monitor != null) {
-			monitor.begin(("local".equals(type) ? getMonitorTaskName(MonitorTaskType.LOAD_LOCAL_CHANGES)
+			monitor.begin(currentJobNodeID, ("local".equals(type) ? getMonitorTaskName(MonitorTaskType.LOAD_LOCAL_CHANGES)
 					: getMonitorTaskName(MonitorTaskType.LOAD_REMOTE_CHANGES)));
 		}
 		while (cIt.hasNext()) {
-			work = notifyProgressMonitor(monitor, total, work);
+			notifyProgressMonitor(monitor, total, work++);
 			Node c = cIt.next();
 
 			// because we use comparator by path,
@@ -1629,6 +1634,7 @@ public class SyncJob implements InterruptableJob {
 			if (s != null) {
 				found = true;
 				saved.remove(s);
+				total--;
 				if (c.isLeaf()) {// FILE : compare date & size
 					if ((c.getLastModified().after(s.getLastModified()) || !c.getPropertyValue("bytesize").equals(
 							s.getPropertyValue("bytesize")))
@@ -1648,7 +1654,7 @@ public class SyncJob implements InterruptableJob {
 		if (saved.size() > 0) {
 			Iterator<Node> sIt = saved.iterator();
 			while (sIt.hasNext()) {
-				work = notifyProgressMonitor(monitor, total, work);
+				notifyProgressMonitor(monitor, total, work++);
 				Node s = sIt.next();
 				if (s.isLeaf()) {
 					// again - we use ehcache list
@@ -1693,7 +1699,7 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 		if (monitor != null) {
-			monitor.end();
+			monitor.end(currentJobNodeID);
 		}
 		return diff;
 	}
@@ -1709,7 +1715,7 @@ public class SyncJob implements InterruptableJob {
 	 */
 	private int notifyProgressMonitor(IProgressMonitor monitor, int total, int work) {
 		if (monitor != null) {
-			monitor.notifyProgress(total, work++);
+			monitor.notifyProgress(total, work);
 			// update status message
 			getCoreManager().updateSynchroState(currentRepository, (localWatchOnly ? false : true));
 		}
