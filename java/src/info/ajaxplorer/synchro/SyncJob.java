@@ -45,7 +45,6 @@ import info.ajaxplorer.synchro.utils.IEhcacheListDeterminant;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -54,7 +53,6 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringWriter;
 import java.math.BigInteger;
@@ -295,6 +293,11 @@ public class SyncJob implements InterruptableJob {
 
 	private boolean exitWithStatus(int status) throws SQLException {
 		currentRepository.setStatus(status);
+		// Fix the last modified status so we have proper status of interrupted
+		// jobs
+		if (status != Node.NODE_STATUS_ERROR) {
+			currentRepository.setLastModified(new Date());
+		}
 		nodeDao.update(currentRepository);
 		getCoreManager().updateSynchroState(currentRepository, false);
 		getCoreManager().releaseConnection();
@@ -457,7 +460,7 @@ public class SyncJob implements InterruptableJob {
 				this.clearSnapshot("remaining_nodes");
 			}
 			if (this.interruptRequired) {
-				throw new InterruptedException();
+				throw new InterruptedException("Interrupt required");
 			}
 			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
 			Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
@@ -1411,7 +1414,7 @@ public class SyncJob implements InterruptableJob {
 		takeRemoteSnapshot(rootNode, rootNode, accumulator, save);
 
 		if (interruptRequired) {
-			return;
+			throw new InterruptedException("Interrupt required");
 		}
 
 		Logger.getRootLogger().info("Saving nodes");
@@ -1459,7 +1462,7 @@ public class SyncJob implements InterruptableJob {
 				partial, save);
 		
 		if (interruptRequired) {
-			return;
+			throw new InterruptedException("Interrupt required");
 		}
 		
 		Logger.getRootLogger().info("Loaded part: " + partial.size());
@@ -1467,7 +1470,7 @@ public class SyncJob implements InterruptableJob {
 		for (Node n : partial) {
 			
 			if (interruptRequired) {
-				return;
+				throw new InterruptedException("Interrupt required");
 			}
 			if (!n.isLeaf() && n.isHasChildren()) {
 				if (!"".equals(n.getPath()) && !"/".equals(n.getPath())  ) {
@@ -1502,9 +1505,10 @@ public class SyncJob implements InterruptableJob {
 	 * @param list
 	 * @param save
 	 * @throws SynchroOperationException
+	 * @throws InterruptedException
 	 */
 	protected void parseNodesFromStream(InputStream is, final Node parentNode, final List<Node> list, final boolean save)
-			throws SynchroOperationException {
+			throws SynchroOperationException, InterruptedException {
 
 		try {
 			XMLReader reader = new XMLReader();
@@ -1534,8 +1538,10 @@ public class SyncJob implements InterruptableJob {
 				}
 			});
 			reader.parse(is);
-			// close the stream
-			is.close();
+
+			if (interruptRequired) {
+				throw new InterruptedException("Interrupt required");
+			}
 			if (list != null) {
 				Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream");
 			} else {
@@ -1545,29 +1551,17 @@ public class SyncJob implements InterruptableJob {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (SAXException e) {
 			
-			URI recursiveLsDirectoryUri;
-			try {
-				recursiveLsDirectoryUri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(parentNode);
-				InputStream ia = getUriContentStream(recursiveLsDirectoryUri);
-			
-				BufferedReader br = new BufferedReader(new InputStreamReader(ia));
-				Logger.getRootLogger().error("" + br.readLine());
-				br.close();
-				
-			} catch (URISyntaxException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			} catch (IllegalStateException e1) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (IOException e1) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (IOException e) {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
+		} finally {
+			if (is != null) {
+				try {
+					is.close();
+				} catch (IOException e) {
+					// we cannot do here nothing more
+				}
+			}
 		}
 	}
 
@@ -1845,7 +1839,7 @@ public class SyncJob implements InterruptableJob {
 		} catch (IOException ex) {
 			if (this.interruptRequired) {
 				rest.release();
-				throw new InterruptedException();
+				throw new InterruptedException("Interrupt required");
 			}
 		}
 		rest.release();
@@ -2071,7 +2065,7 @@ public class SyncJob implements InterruptableJob {
 		}
 		if (this.interruptRequired) {
 			rest.release();
-			throw new InterruptedException();
+			throw new InterruptedException("Interrupt required");
 		}
 		rest.release();
 	}
