@@ -2063,10 +2063,10 @@ public class SyncJob implements InterruptableJob {
 		} catch (IOException e) {
 			throw new SynchroFileOperationException("Error during file content rewriting: " + e.getMessage(), e);
 		}
-		if (this.interruptRequired) {
-			rest.release();
-			throw new InterruptedException("Interrupt required");
-		}
+		// if (this.interruptRequired) {
+		// rest.release();
+		// throw new InterruptedException("Interrupt required");
+		// }
 		rest.release();
 	}
 

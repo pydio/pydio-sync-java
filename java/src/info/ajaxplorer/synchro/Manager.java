@@ -23,7 +23,6 @@ package info.ajaxplorer.synchro;
 import info.ajaxplorer.client.model.Node;
 import info.ajaxplorer.client.util.RdiffProcessor;
 import info.ajaxplorer.synchro.gui.SysTray;
-import info.ajaxplorer.synchro.progressmonitor.IProgressMonitor;
 
 import java.io.File;
 import java.sql.SQLException;
@@ -41,12 +40,16 @@ import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 
 public class Manager extends CoreManager {
-	
+
 	static Manager instance;	
 	static Shell instanceShell;	
 	private SysTray sysTray;
 	
-	private IProgressMonitor progressMonitor;
+	// Runnables instances for reuse, so we are not recreating them all the time
+	// anyway, we will end up with OOME after some time of running app
+	private UpdateSynchroStateRunnable updateSynchroStateRunnable;
+	private UpdateSysTrayJobsMenuRunnable updateSysTrayJobsMenuRunnable;
+	private NotifyUserRunnable notifyUserRunnable;
 	/**
 	 * @param args
 	 */
@@ -125,13 +128,7 @@ public class Manager extends CoreManager {
 		CoreManager.getInstance().setRdiffProc(proc);
 		if(deferInit > 0 ){
 			Timer t = new Timer();
-			t.schedule(new TimerTask() {
-				
-				@Override
-				public void run() {
-					CoreManager.getInstance().initScheduler();
-				}
-			}, 1000*deferInit);
+			t.schedule(new ManagerTimerTask(), 1000*deferInit);
 		}else{
 			CoreManager.getInstance().initScheduler();
 			/*
@@ -181,22 +178,23 @@ public class Manager extends CoreManager {
 			Logger.getRootLogger().info("No systray - message was " + message);
 			return;
 		}
-		this.sysTray.getDisplay().asyncExec(new Runnable() {
-			
-			public void run() {
-				if(!sysTray.isDisposed()){
-					sysTray.notifyUser(title, message, nodeId, forceDisplay);
-				}else{
-					Logger.getRootLogger().info("No systray - message was " + message);
-				}
-			}
-		});		
+		if (notifyUserRunnable == null) {
+			notifyUserRunnable = new NotifyUserRunnable(forceDisplay, nodeId, title, message);
+		} else {
+			notifyUserRunnable.setForceDisplay(forceDisplay);
+			notifyUserRunnable.setMessage(message);
+			notifyUserRunnable.setNodeId(nodeId);
+			notifyUserRunnable.setTitle(title);
+		}
+
+		this.sysTray.getDisplay().asyncExec(notifyUserRunnable);
 	}
 	
 	public void notifyUser(final String title, final String message, final String nodeId){
 		notifyUser(title, message, nodeId, false);
 	}
 	
+
 	public void updateSynchroState(final Node node, final boolean running){
 		if(running){
 			//this.stopWatcher(nodeId);
@@ -206,23 +204,20 @@ public class Manager extends CoreManager {
 		if(this.sysTray == null) {
 			return;
 		}
-		this.sysTray.getDisplay().asyncExec(new Runnable() {			
-			public void run() {
-				if(!sysTray.isDisposed()){
-					sysTray.setMenuTriggerRunning(node, running);
-				}
-			}
-		});
+		if (updateSynchroStateRunnable == null) {
+			updateSynchroStateRunnable = new UpdateSynchroStateRunnable(node, running);
+		} else {
+			updateSynchroStateRunnable.setNode(node);
+			updateSynchroStateRunnable.setRunning(running);
+		}
+		this.sysTray.getDisplay().asyncExec(updateSynchroStateRunnable);
 	}
 	
 	public void updateSysTrayJobsMenu(){
-		this.sysTray.getDisplay().asyncExec(new Runnable() {			
-			public void run() {
-				if(!sysTray.isDisposed()){
-					sysTray.refreshJobsMenu(Manager.this);
-				}
-			}
-		});		
+		if (updateSysTrayJobsMenuRunnable == null) {
+			updateSysTrayJobsMenuRunnable = new UpdateSysTrayJobsMenuRunnable();
+		}
+		this.sysTray.getDisplay().asyncExec(updateSysTrayJobsMenuRunnable);
 	}
 	
 	public Manager(Locale locale, boolean daemon){
@@ -260,5 +255,81 @@ public class Manager extends CoreManager {
 		return true;
 	}
 
+	private final class UpdateSysTrayJobsMenuRunnable implements Runnable {
+		public void run() {
+			if (!sysTray.isDisposed()) {
+				sysTray.refreshJobsMenu(Manager.this);
+			}
+		}
+	}
+
+	private final class UpdateSynchroStateRunnable implements Runnable {
+		private Node node;
+		private boolean running;
+
+		private UpdateSynchroStateRunnable(Node node, boolean running) {
+			this.node = node;
+			this.running = running;
+		}
+
+		public void setNode(Node node) {
+			this.node = node;
+		}
+
+		public void setRunning(boolean running) {
+			this.running = running;
+		}
+
+		public void run() {
+			if (!sysTray.isDisposed()) {
+				sysTray.setMenuTriggerRunning(node, running);
+			}
+		}
+	}
+
+	private final class NotifyUserRunnable implements Runnable {
+		private boolean forceDisplay;
+		private String nodeId;
+		private String title;
+		private String message;
+
+		private NotifyUserRunnable(boolean forceDisplay, String nodeId, String title, String message) {
+			this.forceDisplay = forceDisplay;
+			this.nodeId = nodeId;
+			this.title = title;
+			this.message = message;
+		}
+
+		public void setForceDisplay(boolean forceDisplay) {
+			this.forceDisplay = forceDisplay;
+		}
+
+		public void setMessage(String message) {
+			this.message = message;
+		}
+
+		public void setNodeId(String nodeId) {
+			this.nodeId = nodeId;
+		}
+
+		public void setTitle(String title) {
+			this.title = title;
+		}
+
+		public void run() {
+			if (!sysTray.isDisposed()) {
+				sysTray.notifyUser(title, message, nodeId, forceDisplay);
+			} else {
+				Logger.getRootLogger().info("No systray - message was " + message);
+			}
+		}
+	}
+
+	private static final class ManagerTimerTask extends TimerTask {
+		@Override
+		public void run() {
+			CoreManager.getInstance().initScheduler();
+		}
+	}
 
 }
