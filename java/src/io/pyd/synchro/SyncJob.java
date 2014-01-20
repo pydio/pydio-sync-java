@@ -1790,7 +1790,7 @@ public class SyncJob implements InterruptableJob {
 		if (monitor != null) {
 			monitor.notifyProgress(total, work);
 			// update status message
-			getCoreManager().updateSynchroState(currentRepository, (localWatchOnly ? false : true));
+			getCoreManager().updateSynchroState(currentRepository, (localWatchOnly ? false : true), false);
 		}
 		return work;
 	}

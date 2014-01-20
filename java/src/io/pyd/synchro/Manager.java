@@ -190,6 +190,10 @@ public class Manager extends CoreManager {
 	}
 	
 	public void updateSynchroState(final Node node, final boolean running){
+		updateSynchroState(node, running, true);
+	}
+
+	public void updateSynchroState(final Node node, final boolean running, boolean updateIconState) {
 		if(running){
 			//this.stopWatcher(nodeId);
 		}else{
@@ -204,6 +208,7 @@ public class Manager extends CoreManager {
 			updateSynchroStateRunnable.setNode(node);
 			updateSynchroStateRunnable.setRunning(running);
 		}
+		updateSynchroStateRunnable.setUpdateIconState(updateIconState);
 		this.sysTray.getDisplay().asyncExec(updateSynchroStateRunnable);
 	}
 	
@@ -260,6 +265,7 @@ public class Manager extends CoreManager {
 	private final class UpdateSynchroStateRunnable implements Runnable {
 		private Node node;
 		private boolean running;
+		private boolean updateIconState = true;
 
 		private UpdateSynchroStateRunnable(Node node, boolean running) {
 			this.node = node;
@@ -274,9 +280,13 @@ public class Manager extends CoreManager {
 			this.running = running;
 		}
 
+		public void setUpdateIconState(boolean updateIconState) {
+			this.updateIconState = updateIconState;
+		}
+
 		public void run() {
 			if (!sysTray.isDisposed()) {
-				sysTray.setMenuTriggerRunning(node, running);
+				sysTray.setMenuTriggerRunning(node, running, updateIconState);
 			}
 		}
 	}

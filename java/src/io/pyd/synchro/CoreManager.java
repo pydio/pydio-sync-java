@@ -231,6 +231,10 @@ public class CoreManager {
 	}
 	
 	public void updateSynchroState(final Node node, final boolean running){
+		updateSynchroState(node, running, true);
+	}
+
+	public void updateSynchroState(final Node node, final boolean running, boolean updateIconState) {
 	}
 	
 	public CoreManager(){
