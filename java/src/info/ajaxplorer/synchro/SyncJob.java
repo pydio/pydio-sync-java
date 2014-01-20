@@ -2010,6 +2010,15 @@ public class SyncJob implements InterruptableJob {
 
 		FileOutputStream output;
 		try {
+			String dir = targetFile.getPath();
+			if (dir != null) {
+				dir = dir.substring(0, dir.lastIndexOf(File.separator));
+				File dirExist = new File(dir);
+				if (!dirExist.exists()) {
+					Logger.getRootLogger().info("Need to create directory: " + dir);
+					dirExist.mkdirs();
+				}
+			}
 			output = new FileOutputStream(targetFile.getPath());
 		} catch (FileNotFoundException e) {
 			throw new SynchroFileOperationException("Error during file accessing: " + e.getMessage(), e);
