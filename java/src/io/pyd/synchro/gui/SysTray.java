@@ -23,6 +23,7 @@ package io.pyd.synchro.gui;
 import info.ajaxplorer.client.model.Node;
 import io.pyd.synchro.CoreManager;
 import io.pyd.synchro.SyncJob;
+import io.pyd.synchro.progressmonitor.IProgressMonitor;
 
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -156,6 +157,13 @@ public class SysTray {
 			}
 		}
 		//Logger.getRootLogger().info("-- Status : " + syncNode.id + " ==> " + syncNode.getPropertyValue("sync_running_status"));
+
+		// add information about progress if available
+		IProgressMonitor lprogressMonitor = CoreManager.getInstance().getProgressMonitor();
+		if (lprogressMonitor != null && lprogressMonitor.isShowProgress(syncNode.id)) {
+			syncStatus += " - " + lprogressMonitor.getShortProgressString();
+		}
+
 		return syncStatus;
 	}
 	
