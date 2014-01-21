@@ -106,19 +106,21 @@ public class SysTray {
 
 	public void setMenuTriggerRunning(Node node, boolean state, boolean updateIconState) {
 		String nodeId = String.valueOf(node.id);
-		if(this.jobEditor != null){
-			this.jobEditor.notifyJobStateChanged(nodeId, state);
-		}
-		if(this.menu.isVisible() && this.currentStateItems != null && this.currentStateItems.containsKey(nodeId)){
+
+		if (this.menu.isVisible() && this.currentStateItems != null && this.currentStateItems.containsKey(nodeId)) {
 			this.currentStateItems.get(nodeId).setText(this.computeSyncStatus(node));
 		}
-		if(this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)){
-			this.currentStartItems.get(nodeId).setEnabled(!state);
-		}
+
 		if (updateIconState) {
+			if (this.jobEditor != null) {
+				this.jobEditor.notifyJobStateChanged(nodeId, state);
+			}
+			if (this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)) {
+				this.currentStartItems.get(nodeId).setEnabled(!state);
+			}
 			this.setIconState(state ? "running" : "idle");
 		}
-		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true)+": " + this.computeSyncStatus(node));
+		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true) + ": " + this.computeSyncStatus(node));
 	}
 
 	protected Image getImage(String name){
