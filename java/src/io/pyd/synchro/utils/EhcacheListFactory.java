@@ -87,7 +87,8 @@ public class EhcacheListFactory {
 		}
 		this.determinant = tdeterminant;
 
-		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(CoreManager.getDBHomeDir() + System.getProperty("file.separator") + "ehcache-" + cacheID));
+		Configuration cacheManagerConfig = new Configuration().diskStore(new DiskStoreConfiguration().path(CoreManager.getInstance()
+				.getDBHomeDir() + System.getProperty("file.separator") + "ehcache-" + cacheID));
 
 		int oneFileMem = totalMem / cacheNames.length;
 

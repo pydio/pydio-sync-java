@@ -38,6 +38,7 @@ import io.pyd.synchro.model.SyncChange;
 import io.pyd.synchro.model.SyncChangeValue;
 import io.pyd.synchro.model.SyncLog;
 import io.pyd.synchro.model.SyncLogDetails;
+import io.pyd.synchro.progressmonitor.IProgressMonitor;
 import io.pyd.synchro.utils.EhcacheList;
 import io.pyd.synchro.utils.EhcacheListFactory;
 import io.pyd.synchro.utils.IEhcacheListDeterminant;
@@ -67,6 +68,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -193,6 +195,11 @@ public class SyncJob implements InterruptableJob {
 	// it is only available change to true, if direction == UPLOAD ONLY || BI
 	private boolean autoKeepLocalFile = true;
 
+	// progress monitor
+	private IProgressMonitor monitor;
+
+	private MessageListener messageHandler;
+
 	@Override
 	public void execute(JobExecutionContext ctx) throws JobExecutionException {
 		String keepRemoteData = ctx.getMergedJobDataMap().getString(JobEditor.AUTO_KEEP_REMOTE);
@@ -244,8 +251,6 @@ public class SyncJob implements InterruptableJob {
 		interruptRequired = true;
 	}
 
-	private MessageListener messageHandler;
-
 	protected RestRequest getRequest() {
 		RestRequest rest = new RestRequest();
 		if (messageHandler == null) {
@@ -293,6 +298,12 @@ public class SyncJob implements InterruptableJob {
 
 	private boolean exitWithStatus(int status) throws SQLException {
 		currentRepository.setStatus(status);
+		// Fix the last modified status so we have proper status of interrupted
+		// jobs
+		if (status != Node.NODE_STATUS_ERROR) {
+			currentRepository.setLastModified(new Date());
+		}
+
 		nodeDao.update(currentRepository);
 		getCoreManager().updateSynchroState(currentRepository, false);
 		getCoreManager().releaseConnection();
@@ -339,6 +350,8 @@ public class SyncJob implements InterruptableJob {
 	public void run() {
 
 		try {
+			monitor = CoreManager.getInstance().getProgressMonitor();
+
 			AjxpHttpClient.clearCookiesStatic();
 			// instantiate the daos
 			ConnectionSource connectionSource = getCoreManager().getConnection();
@@ -443,7 +456,8 @@ public class SyncJob implements InterruptableJob {
 			if (previousChanges.size() > 0) {
 				updateRunningStatus(RUNNING_STATUS_PREVIOUS_CHANGES);
 				Logger.getRootLogger().debug("Getting previous tasks");
-				again = applyChanges(previousChanges);
+				again = applyChanges(previousChanges, monitor, MonitorTaskType.APPLY_PREVIOUS_CHANGES);
+
 				if (previouslyRemaining.size() > 999) {
 					syncChangeDao.callBatchTasks(new Callable<Void>() {
 						public Void call() throws Exception {
@@ -460,12 +474,12 @@ public class SyncJob implements InterruptableJob {
 				this.clearSnapshot("remaining_nodes");
 			}
 			if (this.interruptRequired) {
-				throw new InterruptedException();
+				throw new InterruptedException("Interrupt required");
 			}
 			updateRunningStatus(RUNNING_STATUS_COMPARING_CHANGES);
 			Map<String, Object[]> changes = mergeChanges(remoteDiff, localDiff);
 			updateRunningStatus(RUNNING_STATUS_APPLY_CHANGES);
-			Map<String, Object[]> remainingChanges = applyChanges(changes);
+			Map<String, Object[]> remainingChanges = applyChanges(changes, monitor, MonitorTaskType.APPLY_CHANGES);
 			if (again != null && again.size() > 0) {
 				remainingChanges.putAll(again);
 			}
@@ -502,7 +516,8 @@ public class SyncJob implements InterruptableJob {
 			clearSnapshot("local_tmp");
 
 			try {
-				takeRemoteSnapshot(remoteRootNode, null, true);
+				remoteSnapshot = EhcacheListFactory.getInstance().getList(REMOTE_SNAPSHOT_LIST);
+				takeRemoteSnapshot(remoteRootNode, remoteSnapshot, true);
 			} catch (SynchroOperationException e) {
 				// there was problem with server response - cannot go further!
 				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "job_server_didnt_responsed_title", "job_server_didnt_responsed");
@@ -665,18 +680,23 @@ public class SyncJob implements InterruptableJob {
 
 	}
 
-	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes) {
-		Iterator<Map.Entry<String, Object[]>> it = changes.entrySet().iterator();
-		// Map<String, Object[]> notApplied = new TreeMap<String, Object[]>();
-		// // Make sure to apply those one at the end
-		// Map<String, Object[]> moves = new TreeMap<String, Object[]>();
-		// Map<String, Object[]> deletes = new TreeMap<String, Object[]>();
+	protected Map<String, Object[]> applyChanges(Map<String, Object[]> changes, IProgressMonitor monitor, MonitorTaskType taskType) {
+		Set<Entry<String, Object[]>> changesEntrySet = changes.entrySet();
+		Iterator<Map.Entry<String, Object[]>> it = changesEntrySet.iterator();
+
 		Map<String, Object[]> notApplied = createMapDBFile("notApplied");
 		// Make sure to apply those one at the end
 		Map<String, Object[]> moves = createMapDBFile("moves");
 		Map<String, Object[]> deletes = createMapDBFile("deletes");
 		RestRequest rest = this.getRequest();
+		int total = changes.size();
+		int work = 0;
+		if (monitor != null) {
+			monitor.begin(currentJobNodeID, getMonitorTaskName(taskType));
+		}
 		while (it.hasNext()) {
+			notifyProgressMonitor(monitor, total, work++);
+
 			Map.Entry<String, Object[]> entry = it.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -868,9 +888,19 @@ public class SyncJob implements InterruptableJob {
 			}
 		}
 
+		if (monitor != null) {
+			monitor.end(currentJobNodeID);
+			monitor.begin(currentJobNodeID, getMonitorTaskName(taskType) + " - " + getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_MOVES));
+		}
+
 		// APPLY MOVES
-		Iterator<Map.Entry<String, Object[]>> mIt = moves.entrySet().iterator();
+		Set<Entry<String, Object[]>> movesEntrySet = moves.entrySet();
+		Iterator<Map.Entry<String, Object[]>> mIt = movesEntrySet.iterator();
+		total = moves.size();
+		work = 0;
 		while (mIt.hasNext()) {
+			notifyProgressMonitor(monitor, total, work++);
+
 			Map.Entry<String, Object[]> entry = mIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -938,8 +968,19 @@ public class SyncJob implements InterruptableJob {
 		}
 
 		// APPLY DELETES
-		Iterator<Map.Entry<String, Object[]>> dIt = deletes.entrySet().iterator();
+		if (monitor != null) {
+			monitor.end(currentJobNodeID);
+			monitor.begin(currentJobNodeID, getMonitorTaskName(taskType) + " - "
+					+ getMonitorTaskName(MonitorTaskType.APPLY_CHANGES_DELETES));
+		}
+
+		Set<Entry<String, Object[]>> deletesEntrySet = deletes.entrySet();
+		Iterator<Map.Entry<String, Object[]>> dIt = deletesEntrySet.iterator();
+		total = deletes.size();
+		work = 0;
 		while (dIt.hasNext()) {
+			notifyProgressMonitor(monitor, total, work++);
+
 			Map.Entry<String, Object[]> entry = dIt.next();
 			String k = entry.getKey();
 			Object[] value = entry.getValue().clone();
@@ -993,6 +1034,10 @@ public class SyncJob implements InterruptableJob {
 				notApplied.put(k, value);
 			}
 		}
+		if (monitor != null) {
+			monitor.end(currentJobNodeID);
+		}
+
 		rest.release();
 		return notApplied;
 	}
@@ -1303,7 +1348,7 @@ public class SyncJob implements InterruptableJob {
 
 		takeLocalSnapshot(root, list, true, previousSnapshot);
 
-		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local");
+		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "local", monitor);
 
 		clearSnapshot("previous_indexation");
 
@@ -1425,34 +1470,89 @@ public class SyncJob implements InterruptableJob {
 	 * @throws Exception
 	 */
 	protected void takeRemoteSnapshot(final Node rootNode, final List<Node> accumulator, final boolean save) throws Exception {
-
+		long time = System.currentTimeMillis();
 		if (save) {
 			emptyNodeChildren(rootNode, false);
 		}
 
-		final boolean[] streamStatusOK = { true };
+		// takeRemoteSnapshots only creates a collection of remote nodes
+		// with properties stored in local (not managed by DB) properties
+		// collection
+		// this calls LS remote dir recursive, and will produce a full
+		// tree conent of nodes, then - we need to persist!
 
-		nodeDao.callBatchTasks(new Callable<Void>() {
-			public Void call() throws Exception {
-				// parse file structure to node tree
-				InputStream uriContentStream = null;
-				try {					
-					uriContentStream = getUriContentStream(AjxpAPI.getInstance().getRecursiveLsDirectoryUri(rootNode));
-					parseNodesFromStream(uriContentStream, rootNode, accumulator, save);
-				} catch (Exception e) {
-					streamStatusOK[0] = false;
-				}
-				return null;
-			}
-		});
+		takeRemoteSnapshot(rootNode, rootNode, accumulator, save);
 
-		if (!streamStatusOK[0]) {
-			throw new SynchroOperationException("Error during remote snapshot - server didnt responsed with node tree");
+		if (interruptRequired) {
+			throw new InterruptedException("Interrupt required");
 		}
+
+		Logger.getRootLogger().info("Saving nodes");
 
 		if (save) {
 			nodeDao.update(rootNode);
+
+			// now we need to persist collection of nodes
+			// with steps reproduced from original takeRemoteSnapshot()
+			// - adding parent
+			// - create
+			// - create properties collection
+			// - update
+			// NOTE: before update, we need to copy properties from local
+			// collection to db managed collection!
+			nodeDao.callBatchTasks(new Callable<Void>() {
+				public Void call() throws Exception {
+					for (Node n : accumulator) {
+						// add parent
+						n.setParent(rootNode);
+						nodeDao.create(n);
+						n.properties = nodeDao.getEmptyForeignCollection("properties");
+						n.copyLocalProperties();
+						nodeDao.update(n);
+					}
+					return null;
+				}
+			});
+
 		}
+
+		Logger.getRootLogger().info("Nodes saved: " + (System.currentTimeMillis() - time) + " ms");
+	}
+
+	protected void takeRemoteSnapshot(final Node rootNode, final Node currentFolder, final List<Node> accumulator, final boolean save)
+			throws Exception {
+		currentFolder.setMaxDepth(1);
+		currentFolder.setMaxNodes(100);
+		Logger.getRootLogger().info("Taking remote content for node: " + currentFolder.getPath());
+
+		final List<Node> partial = new ArrayList<Node>();
+
+		// parse file structure to node tree
+		URI recursiveLsDirectoryUri = AjxpAPI.getInstance().getRecursiveLsDirectoryUri(currentFolder);
+		parseNodesFromStream(getUriContentStream(recursiveLsDirectoryUri), rootNode, partial, save);
+
+		if (interruptRequired) {
+			throw new InterruptedException("Interrupt required");
+		}
+
+		Logger.getRootLogger().info("Loaded part: " + partial.size());
+
+		for (Node n : partial) {
+
+			if (interruptRequired) {
+				throw new InterruptedException("Interrupt required");
+			}
+			if (!n.isLeaf() && n.isHasChildren()) {
+				if (!"".equals(n.getPath()) && !"/".equals(n.getPath())) {
+					takeRemoteSnapshot(rootNode, n, accumulator, save);
+				}
+			}
+		}
+
+		if (accumulator != null) {
+			accumulator.addAll(partial);
+		}
+
 	}
 
 	protected Map<String, Object[]> loadRemoteChanges(List<Node> snapshot) throws URISyntaxException, Exception {
@@ -1461,10 +1561,11 @@ public class SyncJob implements InterruptableJob {
 		final List<Node> list = EhcacheListFactory.getInstance().getList(LOAD_REMOTE_CHANGES_LIST);
 		takeRemoteSnapshot(root, list, true);
 
-		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote");
+		Map<String, Object[]> diff = this.diffNodeLists(list, snapshot, "remote", monitor);
 		// Logger.getRootLogger().info(diff);
 		return diff;
 	}
+
 
 	/**
 	 * Parses remote node structure directly from XML stream using modified
@@ -1475,9 +1576,10 @@ public class SyncJob implements InterruptableJob {
 	 * @param list
 	 * @param save
 	 * @throws SynchroOperationException
+	 * @throws InterruptedException
 	 */
 	protected void parseNodesFromStream(InputStream is, final Node parentNode, final List<Node> list, final boolean save)
-			throws SynchroOperationException {
+			throws SynchroOperationException, InterruptedException {
 
 		try {
 			XMLReader reader = new XMLReader();
@@ -1486,30 +1588,33 @@ public class SyncJob implements InterruptableJob {
 				@Override
 				public void process(StructuredNode node) {
 
+					// check if user wants to stop?
+					if (interruptRequired) {
+						return;
+					}
+
 					try {
 						org.w3c.dom.Node xmlNode = node.queryXMLNode("/tree");
+
 						Node entry = new Node(Node.NODE_TYPE_ENTRY, "", parentNode);
-						if (save) {
-							nodeDao.create(entry);
-						}
-						entry.properties = nodeDao.getEmptyForeignCollection("properties");
-						entry.initFromXmlNode(xmlNode);
-						if (save) {
-							nodeDao.update(entry);
-						}
+						// init node with properties saved to LOCAL property
+						// collection
+						entry.initFromXmlNode(xmlNode, true);
+
 						if (list != null) {
 							list.add(entry);
 						}
 					} catch (XPathExpressionException e) {
 						// FIXME - how to manage this errors here?
-					} catch (SQLException e) {
-						// FIXME - how to manage this errors here?
+
 					}
 				}
 			});
 			reader.parse(is);
-			// close the stream
-			is.close();
+
+			if (interruptRequired) {
+				throw new InterruptedException("Interrupt required");
+			}
 			if (list != null) {
 				Logger.getRootLogger().info("Parsed " + list.size() + " nodes from stream");
 			} else {
@@ -1518,9 +1623,18 @@ public class SyncJob implements InterruptableJob {
 		} catch (ParserConfigurationException e) {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (SAXException e) {
+
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
 		} catch (IOException e) {
 			throw new SynchroOperationException("Error during parsing remote node tree structure: " + e.getMessage(), e);
+		} finally {
+			if (is != null) {
+				try {
+					is.close();
+				} catch (IOException e) {
+					// we cannot do here nothing more
+				}
+			}
 		}
 	}
 
@@ -1562,14 +1676,22 @@ public class SyncJob implements InterruptableJob {
 	 * @return
 	 * @throws EhcacheListException
 	 */
-	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type) throws EhcacheListException {
+	protected Map<String, Object[]> diffNodeLists(List<Node> current, List<Node> snapshot, String type, IProgressMonitor monitor)
+			throws EhcacheListException {
 		EhcacheList<Node> saved = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_SAVED_LIST);
 		saved.addAll(snapshot);
 
 		Map<String, Object[]> diff = createMapDBFile(type);
 		Iterator<Node> cIt = current.iterator();
 		EhcacheList<Node> created = EhcacheListFactory.getInstance().getList(DIFF_NODE_LISTS_CREATED_LIST);
+		int total = current.size() + saved.size();
+		int work = 0;
+		if (monitor != null) {
+			monitor.begin(currentJobNodeID, ("local".equals(type) ? getMonitorTaskName(MonitorTaskType.LOAD_LOCAL_CHANGES)
+					: getMonitorTaskName(MonitorTaskType.LOAD_REMOTE_CHANGES)));
+		}
 		while (cIt.hasNext()) {
+			notifyProgressMonitor(monitor, total, work++);
 			Node c = cIt.next();
 
 			// because we use comparator by path,
@@ -1579,6 +1701,7 @@ public class SyncJob implements InterruptableJob {
 			if (s != null) {
 				found = true;
 				saved.remove(s);
+				total--;
 				if (c.isLeaf()) {// FILE : compare date & size
 					if ((c.getLastModified().after(s.getLastModified()) || !c.getPropertyValue("bytesize").equals(
 							s.getPropertyValue("bytesize")))
@@ -1599,26 +1722,27 @@ public class SyncJob implements InterruptableJob {
 			Iterator<Node> sIt = saved.iterator();
 
 			while (sIt.hasNext()) {
+				notifyProgressMonitor(monitor, total, work++);
 				Node s = sIt.next();
 				if (s.isLeaf()) {
-					// FIXME - we cannot use ehcache feature get(s) here, as it
-					// can be different path now (we are detecting moves)
-					// maybe it is possible to find quicker way?
-					boolean isMoved = false;
-					Node destinationNode = null;
+					// again - we use ehcache list
 
-					Iterator<Node> crIt = created.iterator();
-					while (crIt.hasNext()) {
-						Node createdNode = crIt.next();
+					boolean isMoved = false;
+					Node createdNode = created.get(s);
+					Node destinationNode = null;
+					if (createdNode != null) {
+
+
+
 
 						if (createdNode.isLeaf() && createdNode.getPropertyValue("bytesize").equals(s.getPropertyValue("bytesize"))) {
 							isMoved = (createdNode.getPropertyValue("md5") != null && s.getPropertyValue("md5") != null && createdNode
 									.getPropertyValue("md5").equals(s.getPropertyValue("md5")));
 							if (isMoved) {
 								destinationNode = createdNode;
-								break;
 							}
 						}
+
 					}
 
 					if (isMoved) {
@@ -1647,7 +1771,28 @@ public class SyncJob implements InterruptableJob {
 						makeTodoObject((c.isLeaf() ? NODE_CHANGE_STATUS_FILE_CREATED : NODE_CHANGE_STATUS_DIR_CREATED), c));
 			}
 		}
+		if (monitor != null) {
+			monitor.end(currentJobNodeID);
+		}
 		return diff;
+	}
+
+	/**
+	 * Notifies progress monitor (if exists) about work part done
+	 * updates also the status message (by coreManager instance)
+	 * 
+	 * @param monitor
+	 * @param total
+	 * @param work
+	 * @return
+	 */
+	private int notifyProgressMonitor(IProgressMonitor monitor, int total, int work) {
+		if (monitor != null) {
+			monitor.notifyProgress(total, work);
+			// update status message
+			getCoreManager().updateSynchroState(currentRepository, (localWatchOnly ? false : true), false);
+		}
+		return work;
 	}
 
 	/**
@@ -1772,7 +1917,7 @@ public class SyncJob implements InterruptableJob {
 		} catch (IOException ex) {
 			if (this.interruptRequired) {
 				rest.release();
-				throw new InterruptedException();
+				throw new InterruptedException("Interrupt required");
 			}
 		}
 		rest.release();
@@ -1941,6 +2086,16 @@ public class SyncJob implements InterruptableJob {
 
 		FileOutputStream output;
 		try {
+			String dir = targetFile.getPath();
+			if (dir != null) {
+				dir = dir.substring(0, dir.lastIndexOf(File.separator));
+				File dirExist = new File(dir);
+				if (!dirExist.exists()) {
+					Logger.getRootLogger().info("Need to create directory: " + dir);
+					dirExist.mkdirs();
+				}
+			}
+
 			output = new FileOutputStream(targetFile.getPath());
 		} catch (FileNotFoundException e) {
 			throw new SynchroFileOperationException("Error during file accessing: " + e.getMessage(), e);
@@ -2062,6 +2217,35 @@ public class SyncJob implements InterruptableJob {
 			Logger.getRootLogger().info(xmlString);
 		} catch (Exception e) {
 		}
+	}
+
+	private enum MonitorTaskType {
+		LOAD_LOCAL_CHANGES, LOAD_REMOTE_CHANGES, APPLY_CHANGES, APPLY_PREVIOUS_CHANGES, APPLY_CHANGES_MOVES, APPLY_CHANGES_DELETES
+	}
+
+	private String getMonitorTaskName(MonitorTaskType taskType) {
+		String taskName = "no_name";
+		switch (taskType) {
+		case APPLY_CHANGES:
+			taskName = getMessage("task_name_apply_changes");
+			break;
+		case APPLY_CHANGES_MOVES:
+			taskName = getMessage("subtask_name_apply_changes_moves");
+			break;
+		case APPLY_CHANGES_DELETES:
+			taskName = getMessage("subtask_name_apply_changes_deletes");
+			break;
+		case APPLY_PREVIOUS_CHANGES:
+			taskName = getMessage("task_name_apply_previous_changes");
+			break;
+		case LOAD_LOCAL_CHANGES:
+			taskName = getMessage("task_name_load_local_changes");
+			break;
+		case LOAD_REMOTE_CHANGES:
+			taskName = getMessage("task_name_load_remote_changes");
+			break;
+		}
+		return taskName;
 	}
 
 }

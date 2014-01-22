@@ -31,6 +31,8 @@ import io.pyd.synchro.gui.JobEditor;
 import io.pyd.synchro.model.SyncChange;
 import io.pyd.synchro.model.SyncLog;
 import io.pyd.synchro.model.SyncLogDetails;
+import io.pyd.synchro.progressmonitor.IProgressMonitor;
+import io.pyd.synchro.progressmonitor.StandardProgressMonitor;
 
 import java.io.File;
 import java.net.URI;
@@ -84,6 +86,15 @@ public class CoreManager {
 	public boolean firstRun = false;
 	private boolean schedulerInitialized = false; 	
 	
+	private IProgressMonitor progressMonitor;
+
+	public IProgressMonitor getProgressMonitor() {
+		if (progressMonitor == null) {
+			progressMonitor = new StandardProgressMonitor();
+		}
+		return progressMonitor;
+	}
+
 	public RdiffProcessor getRdiffProc() {
 		return rdiffProc;
 	}
@@ -220,6 +231,10 @@ public class CoreManager {
 	}
 	
 	public void updateSynchroState(final Node node, final boolean running){
+		updateSynchroState(node, running, true);
+	}
+
+	public void updateSynchroState(final Node node, final boolean running, boolean updateIconState) {
 	}
 	
 	public CoreManager(){
@@ -324,7 +339,7 @@ public class CoreManager {
 	 * Return home directory for DB
 	 * @return
 	 */
-	public static String getDBHomeDir() {
+	public String getDBHomeDir() {
 		return System.getProperty("user.home")+System.getProperty("file.separator") + ".pydio";
 	}
 	

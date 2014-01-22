@@ -23,6 +23,7 @@ package io.pyd.synchro.gui;
 import info.ajaxplorer.client.model.Node;
 import io.pyd.synchro.CoreManager;
 import io.pyd.synchro.SyncJob;
+import io.pyd.synchro.progressmonitor.IProgressMonitor;
 
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -66,7 +67,7 @@ public class SysTray {
 	private JobEditor jobEditor;
 	private AboutPanel aboutPanel;
 	private boolean schedulerStateStarted = true;
-	private AnimationThread at;
+	private AnimationRunnable at;
 	
 	public void notifyUser(String title, String message, String nodeId, boolean forceDisplay){
 		String jobLabel = "";
@@ -98,20 +99,30 @@ public class SysTray {
 	public Display getDisplay(){
 		return display;
 	}
+
 	public void setMenuTriggerRunning(Node node, boolean state){
+		setMenuTriggerRunning(node, state, true);
+	}
+
+	public void setMenuTriggerRunning(Node node, boolean state, boolean updateIconState) {
 		String nodeId = String.valueOf(node.id);
-		if(this.jobEditor != null){
-			this.jobEditor.notifyJobStateChanged(nodeId, state);
-		}
-		if(this.menu.isVisible() && this.currentStateItems != null && this.currentStateItems.containsKey(nodeId)){
+
+		if (this.menu.isVisible() && this.currentStateItems != null && this.currentStateItems.containsKey(nodeId)) {
 			this.currentStateItems.get(nodeId).setText(this.computeSyncStatus(node));
 		}
-		if(this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)){
-			this.currentStartItems.get(nodeId).setEnabled(!state);
+
+		if (updateIconState) {
+			if (this.jobEditor != null) {
+				this.jobEditor.notifyJobStateChanged(nodeId, state);
+			}
+			if (this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)) {
+				this.currentStartItems.get(nodeId).setEnabled(!state);
+			}
+			this.setIconState(state ? "running" : "idle");
 		}
-		this.setIconState(state?"running":"idle");
-		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true)+": " + this.computeSyncStatus(node));
+		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true) + ": " + this.computeSyncStatus(node));
 	}
+
 	protected Image getImage(String name){
 		try{
 			return new Image(getDisplay(), new ImageData(this.getClass().getClassLoader().getResourceAsStream("images/"+name+".png")));			
@@ -156,6 +167,13 @@ public class SysTray {
 			}
 		}
 		//Logger.getRootLogger().info("-- Status : " + syncNode.id + " ==> " + syncNode.getPropertyValue("sync_running_status"));
+
+		// add information about progress if available
+		IProgressMonitor lprogressMonitor = CoreManager.getInstance().getProgressMonitor();
+		if (lprogressMonitor != null && lprogressMonitor.isShowProgress(syncNode.id)) {
+			syncStatus += " - " + lprogressMonitor.getShortProgressString();
+		}
+
 		return syncStatus;
 	}
 	
@@ -459,27 +477,26 @@ public class SysTray {
 		shell.open ();
 		shell.setVisible(false);
 	}
-		
 	public void setIconState(String state){
-		boolean isMac = SWTResourceManager.isMac();
 		if(state.equals("running")){
-			if(at!=null && at.isAlive()){
-				return;
+			if (at == null) {
+				at = new AnimationRunnable();
+				at.delayedAnimation(item, 700, "AjxpLogo16-BW-Bouncing", 8);
+				at.restoreImage = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
+				new Thread(at).start();
 			}
-			at = new AnimationThread();
-			at.delayedAnimation(item, 700, "AjxpLogo16-BW-Bouncing", 8);
-			at.start();					
+			if (at != null) {
+				at.requireInterrupt = false;
+			}
 		}else if(state.equals("idle")){
-			Image restore = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
-			if(at!=null && at.isAlive()){
+			if (at != null) {
 				at.requireInterrupt = true;
-				at.restoreImage = restore;
 			}
-			item.setImage(restore);
+			item.setImage(at.restoreImage);
 		}
 	}
 	
-	class AnimationThread extends Thread {
+	class AnimationRunnable implements Runnable {
 		TrayItem item;
 		int delay;
 		String img;
@@ -514,7 +531,6 @@ public class SysTray {
 			while (true) {
 				try {
 					if(requireInterrupt){
-						interrupt();
 						if(restoreImage != null){
 							display.asyncExec(new Runnable() {						
 								public void run() {
@@ -524,17 +540,17 @@ public class SysTray {
 								}
 							});							
 						}
-						return;
-					}
-					sleep(delay);
-					final Image im = getImage();
-					display.asyncExec(new Runnable() {						
-						public void run() {
-							if(!SysTray.this.isDisposed()){
-								item.setImage(im);
+					} else {
+						final Image im = getImage();
+						display.asyncExec(new Runnable() {
+							public void run() {
+								if (!SysTray.this.isDisposed()) {
+									item.setImage(im);
+								}
 							}
-						}
-					});
+						});
+					}
+					Thread.sleep(delay);
 				}
 				catch (Exception e) {
 					e.printStackTrace();
