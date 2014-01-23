@@ -67,8 +67,78 @@ public class SysTray {
 	private JobEditor jobEditor;
 	private AboutPanel aboutPanel;
 	private boolean schedulerStateStarted = true;
-	private AnimationRunnable at;
-	
+	private AnimationThread at;
+
+	// systray images for reuse
+	// FIXME - should be moved to ImageRegistry
+	private Image restoreImage;
+	private Image[] animationImages = new Image[8];
+
+	public SysTray(final Shell shell, ResourceBundle messages, CoreManager managerInstance) {
+
+		this.shell = shell;
+		this.messages = messages;
+		display = shell.getDisplay();
+
+		final Tray tray = display.getSystemTray();
+		// tip = new ToolTip(shell, SWT.BALLOON | SWT.ICON_INFORMATION);
+		boolean isMac = SWTResourceManager.isMac();
+		if (tray == null) {
+			Logger.getRootLogger().error("The system tray is not available");
+			item = null;
+		} else {
+			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
+
+			item = new TrayItem(tray, SWT.NONE);
+			item.setToolTipText("Pydio Synchronizer");
+			// item.setToolTip(tip);
+			item.addListener(SWT.Show, new Listener() {
+				public void handleEvent(Event event) {
+				}
+			});
+			item.addListener(SWT.Hide, new Listener() {
+				public void handleEvent(Event event) {
+				}
+			});
+			/*
+			 * item.addListener (SWT.DefaultSelection, new Listener () {
+			 * public void handleEvent (Event event) {
+			 * openConfiguration(shell, null);
+			 * }
+			 * });
+			 */
+
+			menu = new Menu(shell, SWT.POP_UP);
+
+			if (!SWTResourceManager.isMac()) {
+				item.addListener(SWT.Selection, new Listener() {
+					public void handleEvent(Event event) {
+						menu.setVisible(true);
+						refreshJobsMenu();
+					}
+				});
+			}
+			item.addListener(SWT.MenuDetect, new Listener() {
+				public void handleEvent(Event event) {
+					menu.setVisible(true);
+					refreshJobsMenu();
+				}
+			});
+			item.setImage(image);
+		}
+		shell.setBounds(-10, -10, 10, 10);
+		shell.open();
+		shell.setVisible(false);
+
+		// initialize animation images;
+		for (int ind = 0; ind < 8; ind++) {
+			animationImages[ind] = new Image(display, SysTray.this.getClass().getClassLoader()
+					.getResourceAsStream("images/AjxpLogo16-BW-Bouncing-" + ind + ".png"));
+		}
+		// initialize image for idle
+		restoreImage = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
+	}
+
 	public void notifyUser(String title, String message, String nodeId, boolean forceDisplay){
 		String jobLabel = "";
 		if(nodeId != null){
@@ -421,100 +491,37 @@ public class SysTray {
 		});					
 	}
 	
-	public SysTray(final Shell shell, ResourceBundle messages, CoreManager managerInstance){
-		
-		this.shell = shell;
-		this.messages = messages;
-		display = shell.getDisplay();
-		
-		final Tray tray = display.getSystemTray ();
-		//tip = new ToolTip(shell, SWT.BALLOON | SWT.ICON_INFORMATION);
-		boolean isMac = SWTResourceManager.isMac();
-		if (tray == null) {
-			Logger.getRootLogger().error("The system tray is not available");
-			item = null;			
-		} else {
-			image = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
 
-			item = new TrayItem (tray, SWT.NONE);
-			item.setToolTipText("Pydio Synchronizer");
-			//item.setToolTip(tip);
-			item.addListener (SWT.Show, new Listener () {
-				public void handleEvent (Event event) {
-				}
-			});
-			item.addListener (SWT.Hide, new Listener () {
-				public void handleEvent (Event event) {
-				}
-			});
-			/*
-			item.addListener (SWT.DefaultSelection, new Listener () {
-				public void handleEvent (Event event) {
-					openConfiguration(shell, null);
-				}
-			});
-			*/
-			
-			menu = new Menu (shell, SWT.POP_UP);
-			
-			if(!SWTResourceManager.isMac()){
-				item.addListener (SWT.Selection, new Listener () {
-					public void handleEvent (Event event) {
-						menu.setVisible (true);
-						refreshJobsMenu();
-					}
-				});
-			}
-			item.addListener (SWT.MenuDetect, new Listener () {
-				public void handleEvent (Event event) {
-					menu.setVisible (true);
-					refreshJobsMenu();
-				}
-			});
-			item.setImage (image);
-		}
-		shell.setBounds(-10, -10, 10, 10);
-		shell.open ();
-		shell.setVisible(false);
-	}
+
+
 	public void setIconState(String state){
-		if(state.equals("running")){
-			if (at == null) {
-				at = new AnimationRunnable();
-				at.delayedAnimation(item, 700, "AjxpLogo16-BW-Bouncing", 8);
-				at.restoreImage = new Image(display, this.getClass().getClassLoader().getResourceAsStream("images/AjxpLogo16-BW.png"));
-				new Thread(at).start();
+		if (state.equals("running")) {
+			if (at != null && at.isAlive()) {
+				return;
 			}
-			if (at != null) {
-				at.requireInterrupt = false;
-			}
-		}else if(state.equals("idle")){
-			if (at != null) {
+			at = new AnimationThread();
+			at.delayedAnimation(item, 700);
+			at.start();
+		} else if (state.equals("idle")) {
+			if (at != null && at.isAlive()) {
 				at.requireInterrupt = true;
 			}
-			item.setImage(at.restoreImage);
+			item.setImage(restoreImage);
 		}
 	}
 	
-	class AnimationRunnable implements Runnable {
+
+	class AnimationThread extends Thread {
 		TrayItem item;
 		int delay;
 		String img;
-		int number;
+		int number = animationImages.length;
 		int currentIndex = 0;
 		public boolean requireInterrupt = false;
-		public Image restoreImage;
-		Image[] images;
 
-		public void delayedAnimation(TrayItem i, int delay, String imgRadical, int number) {
+		public void delayedAnimation(TrayItem i, int delay) {
 			this.item = i;
 			this.delay = delay;
-			this.img = imgRadical;
-			this.number = number;
-			images = new Image[10];
-			for(int ind=0;ind<this.number; ind++){
-				images[ind] = new Image(display, SysTray.this.getClass().getClassLoader().getResourceAsStream("images/"+this.img+"-"+ind+".png"));
-			}
 		}
 
 		public Image getImage(){
@@ -523,36 +530,35 @@ public class SysTray {
 			}else{
 				currentIndex = 0;
 			}
-			//Image image = new Image(display, SysTray.this.getClass().getClassLoader().getResourceAsStream("images/"+this.img+"-"+currentIndex+".png"));
-			return images[currentIndex];
+			return animationImages[currentIndex];
 		}
 		
 		public void run() {
 			while (true) {
 				try {
-					if(requireInterrupt){
-						if(restoreImage != null){
-							display.asyncExec(new Runnable() {						
+					if (requireInterrupt) {
+						interrupt();
+						if (restoreImage != null) {
+							display.asyncExec(new Runnable() {
 								public void run() {
-									if(!SysTray.this.isDisposed()){
-										item.setImage(restoreImage);										
+									if (!SysTray.this.isDisposed()) {
+										item.setImage(restoreImage);
 									}
 								}
-							});							
+							});
 						}
-					} else {
-						final Image im = getImage();
-						display.asyncExec(new Runnable() {
-							public void run() {
-								if (!SysTray.this.isDisposed()) {
-									item.setImage(im);
-								}
-							}
-						});
+						return;
 					}
-					Thread.sleep(delay);
-				}
-				catch (Exception e) {
+					sleep(delay);
+					final Image im = getImage();
+					display.asyncExec(new Runnable() {
+						public void run() {
+							if (!SysTray.this.isDisposed()) {
+								item.setImage(im);
+							}
+						}
+					});
+				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
