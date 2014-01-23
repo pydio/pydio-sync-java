@@ -1521,8 +1521,19 @@ public class SyncJob implements InterruptableJob {
 
 	protected void takeRemoteSnapshot(final Node rootNode, final Node currentFolder, final List<Node> accumulator, final boolean save)
 			throws Exception {
-		currentFolder.setMaxDepth(1);
-		currentFolder.setMaxNodes(100);
+		
+		currentFolder.setMaxDepth(3);
+		currentFolder.setMaxNodes(1000);
+		int d = 3; int no= 1000;
+		if(currentRepository.getPropertyValue("max_depth") != null){
+			d = new Integer(currentRepository.getPropertyValue("max_depth"));
+			if(d == -1) no = -1;
+			else if(d == 3) no = 1000;
+			else no = 100;
+		}
+		currentFolder.setMaxDepth(d);
+		currentFolder.setMaxNodes(no);
+		
 		Logger.getRootLogger().info("Taking remote content for node: " + currentFolder.getPath());
 
 		final List<Node> partial = new ArrayList<Node>();

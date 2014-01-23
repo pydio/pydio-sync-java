@@ -407,6 +407,7 @@ public class CoreManager {
 			node.addProperty("synchro_active", data.get("ACTIVE"));
 			node.addProperty("synchro_direction", data.get("DIRECTION"));
 			node.addProperty("synchro_interval", data.get("INTERVAL"));
+			node.addProperty("max_depth", data.get("MAX_DEPTH"));
 			node.addProperty(JobEditor.AUTO_KEEP_REMOTE,
 					data.get(JobEditor.AUTO_KEEP_REMOTE_DATA));
 			node.addProperty(JobEditor.AUTO_KEEP_LOCAL,
@@ -485,6 +486,12 @@ public class CoreManager {
 				else if(p.getName().equals("synchro_interval") 
 						&& !p.getValue().equals(data.get("INTERVAL"))) {
 					p.setValue(data.get("INTERVAL"));
+					intervalChanges = true;
+					toSave.add(p);
+				}
+				else if(p.getName().equals("max_depth") 
+						&& !p.getValue().equals(data.get("MAX_DEPTH"))) {
+					p.setValue(data.get("MAX_DEPTH"));
 					intervalChanges = true;
 					toSave.add(p);
 				}

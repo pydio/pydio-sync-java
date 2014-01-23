@@ -113,6 +113,9 @@ public class JobEditor extends Composite{
 	private Button radioSyncInterval3;
 	private Button radioSyncInterval1;
 	private Combo comboDirection;
+	private Button radioServerLoadLow;
+	private Button radioServerLoadMedium;
+	private Button radioServerLoadHigh;
 
 	private Button keepAutoRemote;
 	private Button keepAutoLocal;
@@ -163,14 +166,18 @@ public class JobEditor extends Composite{
 		this.sTray = systemTray;
 		this.anchorH = "bottom";
 		this.anchorW = "right";
+		int fontSizeOffset = 0;
+		if(System.getProperty("os.name").equalsIgnoreCase("Windows XP")){
+			fontSizeOffset = 2;
+		}
 		//populateToolkit(parent);	
 		stackData = new LinkedHashMap<String, HashMap<String, Object>>();
 		HashMap<String, Object> connData = new HashMap<String, Object>();
 		connData.put("LABEL", CoreManager.getMessage("jobeditor_stack_server"));
 		connData.put("WIDTH", 280);
 		connData.put("HEIGHT", 240);
-		connData.put("FONT_HEIGHT", 23);
-		connData.put("FONT_WIDTH", 22);
+		connData.put("FONT_HEIGHT", 23 + fontSizeOffset);
+		connData.put("FONT_WIDTH", 22 + fontSizeOffset);
 		connData.put("ICON", "fa/blue/globe");
 		stackData.put("connexion", connData);
 		
@@ -178,8 +185,8 @@ public class JobEditor extends Composite{
 		connData2.put("LABEL", CoreManager.getMessage("jobeditor_stack_params"));
 		connData2.put("WIDTH", 280);
 		connData2.put("HEIGHT", 210);
-		connData2.put("FONT_HEIGHT", 17);
-		connData2.put("FONT_WIDTH", 22);
+		connData2.put("FONT_HEIGHT", 23 + fontSizeOffset);
+		connData2.put("FONT_WIDTH", 22 + fontSizeOffset);
 		connData2.put("ICON", "fa/blue/cog");
 		stackData.put("parameters", connData2);
 		
@@ -187,8 +194,8 @@ public class JobEditor extends Composite{
 		connData3.put("LABEL", CoreManager.getMessage("jobeditor_stack_logs"));
 		connData3.put("WIDTH", 520);
 		connData3.put("HEIGHT", 420);
-		connData3.put("FONT_HEIGHT", 33);
-		connData3.put("FONT_WIDTH", 40);		
+		connData3.put("FONT_HEIGHT", 33 + fontSizeOffset);
+		connData3.put("FONT_WIDTH", 40 + fontSizeOffset);		
 		connData3.put("ICON", "fa/blue/list-alt");
 		stackData.put("logs", connData3);
 		
@@ -234,6 +241,7 @@ public class JobEditor extends Composite{
 			values.put("ACTIVE", baseNode.getPropertyValue("synchro_active"));
 			values.put("DIRECTION", baseNode.getPropertyValue("synchro_direction"));
 			values.put("INTERVAL", baseNode.getPropertyValue("synchro_interval"));
+			values.put("MAX_DEPTH", baseNode.getPropertyValue("max_depth"));
 
 			values.put(AUTO_KEEP_REMOTE_DATA,
 					baseNode.getPropertyValue(AUTO_KEEP_REMOTE));
@@ -278,6 +286,10 @@ public class JobEditor extends Composite{
 		if(radioSyncInterval2.getSelection()) freq = "hour";
 		else if(radioSyncInterval3.getSelection()) freq = "day";
 		values.put("INTERVAL", freq);
+		String max_depth = "3";
+		if(radioServerLoadLow.getSelection()) max_depth = "1";
+		else if(radioServerLoadHigh.getSelection()) max_depth = "-1";
+		values.put("MAX_DEPTH", max_depth);
 		return values;
 	}
 	
@@ -305,6 +317,14 @@ public class JobEditor extends Composite{
 		radioSyncInterval1.setSelection(values.get("INTERVAL").equals("minute"));
 		radioSyncInterval2.setSelection(values.get("INTERVAL").equals("hour"));
 		radioSyncInterval3.setSelection(values.get("INTERVAL").equals("day"));
+		
+		if(values.get("MAX_DEPTH") != null){
+			radioServerLoadLow.setSelection(values.get("MAX_DEPTH").equals("1"));
+			radioServerLoadMedium.setSelection(values.get("MAX_DEPTH").equals("3"));
+			radioServerLoadHigh.setSelection(values.get("MAX_DEPTH").equals("-1"));			
+		}else{
+			radioServerLoadMedium.setSelection(true);
+		}
 		
 		autoKeepRemoteState = "true".equals(values.get(AUTO_KEEP_REMOTE_DATA));
 		autoKeepLocalState = "true".equals(values.get(AUTO_KEEP_LOCAL_DATA));
@@ -336,6 +356,10 @@ public class JobEditor extends Composite{
 		radioSyncInterval1.setSelection(false);
 		radioSyncInterval2.setSelection(true);
 		radioSyncInterval3.setSelection(false);
+		
+		radioServerLoadLow.setSelection(false);
+		radioServerLoadMedium.setSelection(true);
+		radioServerLoadHigh.setSelection(false);
 		
 		if(this.form != null){
 			updateFormActions();
@@ -688,6 +712,24 @@ public class JobEditor extends Composite{
 		radioSyncInterval2 = toolkit.createButton(rComp2, CoreManager.getMessage("jobeditor_hours"), SWT.RADIO);
 		radioSyncInterval3 = toolkit.createButton(rComp2, CoreManager.getMessage("jobeditor_days"), SWT.RADIO);
 		radioSyncInterval2.setSelection(true);
+
+		Label lab3 = toolkit.createLabel(sectionClient3, CoreManager.getMessage("jobeditor_radioserverlegend") + " : ", SWT.WRAP | SWT.READ_ONLY);
+
+		TableWrapData twd = new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE);
+		if(this.heightHint > 0) twd.heightHint = this.heightHint * 4;
+		else twd.heightHint = 42;
+		lab3.setLayoutData(twd);
+		
+		Composite rComp3= toolkit.createComposite(sectionClient3);
+		rComp3.setLayoutData(new TableWrapData(TableWrapData.LEFT, TableWrapData.MIDDLE));
+		layout2 = new TableWrapLayout();
+		layout2.numColumns = 3;
+		rComp3.setLayout(layout2);
+		radioServerLoadLow = toolkit.createButton(rComp3, CoreManager.getMessage("jobeditor_radioserverlow"), SWT.RADIO);
+		radioServerLoadMedium = toolkit.createButton(rComp3, CoreManager.getMessage("jobeditor_radioservermedium"), SWT.RADIO);
+		radioServerLoadHigh = toolkit.createButton(rComp3, CoreManager.getMessage("jobeditor_radioserverhigh"), SWT.RADIO);
+		radioServerLoadMedium.setSelection(true);
+		
 		
 		saveAction = new Action("Save", new ImageDescriptor() {
 			@Override
@@ -747,6 +789,11 @@ public class JobEditor extends Composite{
 			}
 		});
 		radioSyncInterval1.addSelectionListener(rSel);
+		radioSyncInterval2.addSelectionListener(rSel);
+		radioSyncInterval3.addSelectionListener(rSel);
+		radioServerLoadLow.addSelectionListener(rSel);
+		radioServerLoadMedium.addSelectionListener(rSel);
+		radioServerLoadHigh.addSelectionListener(rSel);
 		
 		closeAction = new Action("Close", new ImageDescriptor() {
 			@Override
