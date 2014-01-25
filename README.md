@@ -1,12 +1,12 @@
-# AjaXplorer In Sync
+# Pydio Java Sync
 
-This application is a Java-based desktop tool that will allow you to seemlessly synchronize the content of a local folder to a remote AjaXplorer repository. See http://ajaxplorer.info/ for more info about the core project. You can configure many synchronization tasks between various repositories of various ajaxplorer instances, to be synced to different folders on your computer. 
+This application is a Java-based desktop tool that will allow you to seemlessly synchronize the content of a local folder to a remote Pydio repository. See http://pyd.io/ for more info about the core project. You can configure many synchronization tasks between various repositories of various ajaxplorer instances, to be synced to different folders on your computer. 
 
 Network latency is reduced by using librsync on both end. Thus you MUST install the php_rsync extension on your server, along with the meta.filehasher plugin (see below). On the client computer, you must install a Java Runtime Environnment 1.6 or higher.
 
 Please be aware that the application is not yet considered totally stable, thus you should really backup your data on a regular basis in case something went wrong! But still try to use it on a "real-life" set of data to have a good overview of how the client handles with high volumes of data and frequently changing.
 
-## Server requirements : AjaXplorer v4.2.0+ & PHP rsync extension
+## Server requirements : AjaXplorer v4.2.0+ & PHP rsync extension / Pydio 5.X
 
 To get a low bandwith consumption, you should enable the use of the rsync algorithm on the server. This is done by installating the *PECL Rsync extension* (http://pecl.php.net/package/rsync), that interfaces PHP with the librsync functions (namely rdiff and all its declinaisons). See below for further instructions for Debian 6, CentOS 5 and CentOS 6.
 Please report if you could successfully compile it on other distributions. 
@@ -33,17 +33,17 @@ The Windows installer is based on a test version of Advanced Installer, thus it 
 
 The JAR's are built everynight, if you are invited by a team member to update them, you must first have the application originally installed with the installer, be it on Windows or Mac. Then you will find the correct package corresponding to your platform OS on http://ajaxplorer.info/download/ (tab "Nightly Builds", section "Synchro Client Package"), download and unzip the content somewhere. 
 
-* On Mac, you have to right click the "AjaXplorer" application icon and select "Display package content", then browse to Contents / Resources / Java. 
-* On Windows, using windows Explorer, browse to the Abstrium > AjaXplorer-In-Sync program folder
+* On Mac, you have to right click the "Pydio" application icon and select "Display package content", then browse to Contents / Resources / Java. 
+* On Windows, using windows Explorer, browse to the Abstrium > Pydio Sync program folder
 
-Now in both cases, backup the AjaXplorerSynchro.jar and AjaXplorerSynchro_lib folder, and replace them by the content of the zip. The new JAR will be named something like ajaxplorer-sync-X.Y.Z-SNAPSHOT.jar, rename it to AjaXplorerSynchro.jar. The folder should already have the right name. That's it.
+Now in both cases, backup the PydioSync.jar and PydioSync_lib folder, and replace them by the content of the zip. The new JAR will be named something like pydio-sync-X.Y.Z-SNAPSHOT.jar, rename it to PydioSync.jar. The folder should already have the right name. That's it.
 
 ## Configuring the client
 
 At first start, the client will open a dialog for creating a synchronization task. Fill in the form with the current values : 
 
-* *Host* : exactly the same URL (starting with http:// or https://) as you are using to access Ajaxplorer through the web
-* *User* & *Password* : AjaXplorer user name & password
+* *Host* : exactly the same URL (starting with http:// or https://) as you are using to access Pydio through the web
+* *User* & *Password* : Pydio user name & password
 * *Repository* : once the previous fields are filled, click on the "load" button to get the list of repositories from the server, and select the one you want to synchronize
 * *Local folder* : If not already pre-filled, browse your computer and choose the folder to which it will be synchronized.
 
