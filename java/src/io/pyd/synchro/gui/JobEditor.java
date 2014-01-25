@@ -167,8 +167,9 @@ public class JobEditor extends Composite{
 		this.anchorH = "bottom";
 		this.anchorW = "right";
 		int fontSizeOffset = 0;
-		if(System.getProperty("os.name").equalsIgnoreCase("Windows XP")){
-			fontSizeOffset = 2;
+		String os = System.getProperty("os.name");
+		if(os.equalsIgnoreCase("Windows XP") || os.equals("Windows NT") || os.equals("Windows 2000")){
+			fontSizeOffset = 3;
 		}
 		//populateToolkit(parent);	
 		stackData = new LinkedHashMap<String, HashMap<String, Object>>();
