@@ -33,7 +33,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
@@ -305,7 +304,8 @@ public class JobEditor extends Composite{
 		tfRepo.setText(currentRepoLabel);
 		repoItems = new TreeMap<String, String>();
 		repoItems.put(values.get("REPOSITORY_LABEL"), values.get("REPOSITORY_ID"));
-		tfTarget.setText(values.get("TARGET"));
+		String repoTarget = values.get("TARGET");
+		tfTarget.setText(repoTarget);
 		currentActiveState = values.get("ACTIVE").equals("true");
 		
 		String dir = values.get("DIRECTION");
@@ -348,7 +348,9 @@ public class JobEditor extends Composite{
 			tfRepo.setText("");			
 		}
 		repoItems = new TreeMap<String, String>();
-		tfTarget.setText("");
+		if (tfTarget != null) {
+			tfTarget.setText("");
+		}
 		comboDirection.select(0);
 		
 
@@ -1102,9 +1104,20 @@ public class JobEditor extends Composite{
 			currentSynchroNode = n;
 			loadFormFromNode(n);
 			logs.loadSynchroLog(n);
-			
 		}
+		updateTargetTextFieldEditable();
 	}	
+
+	private void updateTargetTextFieldEditable() {
+		// target editable if no node is selected!
+		boolean targetEditable = currentSynchroNode == null;
+		if (tfTarget != null) {
+			tfTarget.setEnabled(targetEditable);
+		}
+		if (buttonFileChooser != null) {
+			buttonFileChooser.setEnabled(targetEditable);
+		}
+	}
 	
 	public void notifyJobStateChanged(String nodeId, boolean running){
 		logs.reload();

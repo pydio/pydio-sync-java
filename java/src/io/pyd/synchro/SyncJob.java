@@ -368,6 +368,11 @@ public class SyncJob implements InterruptableJob {
 				throw new Exception("The database returned an empty node.");
 			}
 
+			// check if core folder exists - if NOT, quit and do nothing
+			if (!testRootNodeExists()) {
+				return;
+			}
+
 			getCoreManager().updateSynchroState(currentRepository, (localWatchOnly ? false : true));
 
 			currentRepository.setStatus(Node.NODE_STATUS_LOADING);
@@ -621,6 +626,29 @@ public class SyncJob implements InterruptableJob {
 			}
 
 		}
+	}
+
+	/**
+	 * Tests if local folder exists - to prevent data loss.
+	 * If exists - we can run synchro safely, otherwise synchronisation will
+	 * cause remote data deletion and data loss
+	 * 
+	 * @return
+	 * @throws SQLException
+	 */
+	private boolean testRootNodeExists() throws SQLException {
+		if (currentRepository != null) {
+			String localRepoFolder = currentRepository.getPropertyValue("target_folder");
+			Logger.getRootLogger().info("Checking local repo folder: " + localRepoFolder);
+			if (!new File(localRepoFolder).exists()) {
+				Logger.getRootLogger().info("Local repo not exists - quit");
+				this.exitWithStatusAndNotify(Node.NODE_STATUS_ERROR, "local_repo_failed", "local_repo_not_exists_msg");
+				return false;
+			} else {
+				Logger.getRootLogger().info("Local repo exists - OK");
+			}
+		}
+		return true;
 	}
 
 	protected boolean testConnexion() throws SQLException {
