@@ -182,13 +182,14 @@ public class SysTray {
 		}
 
 		if (updateIconState) {
+			this.setIconState(state ? "running" : "idle");
+		} else {
 			if (this.jobEditor != null) {
 				this.jobEditor.notifyJobStateChanged(nodeId, state);
 			}
 			if (this.menu.isVisible() && this.currentStartItems != null && this.currentStartItems.containsKey(nodeId)) {
 				this.currentStartItems.get(nodeId).setEnabled(!state);
 			}
-			this.setIconState(state ? "running" : "idle");
 		}
 		item.setToolTipText(CoreManager.getInstance().makeJobLabel(node, true) + ": " + this.computeSyncStatus(node));
 	}
