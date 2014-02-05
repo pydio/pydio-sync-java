@@ -73,7 +73,7 @@ public class CoreManager {
 	private Logger log = Logger.getLogger(getClass());
 	
 	
-	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "mysql", "imap", "jsapi"};
+	public static String[] EXCLUDED_ACCESS_TYPES = {"ajxp_conf", "ajxp_shared", "ajxp_user", "mysql", "imap", "jsapi"};
 	public String[] EXCLUDED_FILES_START = {".", "Thumbs.db"};
 	public String[] EXCLUDED_FILES_END = {};
 
@@ -351,7 +351,7 @@ public class CoreManager {
 		
 		File work = new File(dbHomeDir);
 		if(!work.exists()) work.mkdirs();
-		File dbFile = new File(work, "ajxpsync.db");
+		File dbFile = new File(work, "pydiosync.sqlite");
 		boolean dbAlreadyCreated = dbFile.exists();
 		databaseUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();		
 
@@ -384,6 +384,8 @@ public class CoreManager {
 		ConnectionSource cSource = this.getConnection();
 		Dao<Node, String>nodeDao = DaoManager.createDao(cSource, Node.class);
 		nodeDao.executeRaw("PRAGMA recursive_triggers = TRUE;");
+		// Delete Server node!
+		nodeDao.delete(node.getParent());
 		nodeDao.delete(node);
 		nodeDao.executeRaw("DELETE FROM b WHERE node_id=0;");
 		this.releaseConnection();
