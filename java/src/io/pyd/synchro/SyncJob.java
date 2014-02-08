@@ -1952,7 +1952,7 @@ public class SyncJob implements InterruptableJob {
 		});
 		String targetName = sourceFile.getName();
 		try {
-			rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName);
+			rest.getStringContent(AjxpAPI.getInstance().getUploadUri(folderNode.getPath(true)), null, sourceFile, targetName, 200);
 		} catch (IOException ex) {
 			if (this.interruptRequired) {
 				rest.release();
