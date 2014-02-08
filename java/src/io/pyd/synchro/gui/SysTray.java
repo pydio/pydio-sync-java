@@ -572,7 +572,9 @@ public class SysTray {
 	
 	public void closeConfiguration(){
 		shell.setVisible(false);
-		jobEditor.dispose();
+		if (jobEditor != null) {
+			jobEditor.dispose();
+		}
 		jobEditor = null;
 		System.gc();
 	}
