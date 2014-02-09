@@ -88,6 +88,16 @@ public class CoreManager {
 	
 	private IProgressMonitor progressMonitor;
 
+	private boolean headless = false;
+
+	public void setHeadless(boolean headless) {
+		this.headless = headless;
+	}
+
+	public boolean isHeadless() {
+		return headless;
+	}
+
 	public IProgressMonitor getProgressMonitor() {
 		if (progressMonitor == null) {
 			progressMonitor = new StandardProgressMonitor();

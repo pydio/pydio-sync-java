@@ -51,6 +51,7 @@ public class Manager extends CoreManager {
 	private UpdateSysTrayJobsMenuRunnable updateSysTrayJobsMenuRunnable;
 	private NotifyUserRunnable notifyUserRunnable;
 	
+
 	/**
 	 * @param args
 	 */
@@ -59,6 +60,7 @@ public class Manager extends CoreManager {
 		String language = null;
         String country = null;
         boolean daemon = false;
+		boolean lheadless = false;
         RdiffProcessor proc=null ;
         int deferInit = -1;
     	for(int i = 0; i < args.length ; i++){
@@ -82,6 +84,8 @@ public class Manager extends CoreManager {
         		Manager.defaultHome = defHome;
         	}else if(args[i].startsWith("daemon=")){
         		daemon = args[i].substring(new String("daemon=").length()).equals("true");
+			} else if (args[i].startsWith("headless=")) {
+				lheadless = args[i].substring(new String("headless=").length()).equals("true");
         	}else if(args[i].startsWith("defer_init=")){
         		deferInit = Integer.valueOf(args[i].substring(new String("defer_init=").length()));
         	}else if(args[i].startsWith("lang=")){
@@ -115,56 +119,47 @@ public class Manager extends CoreManager {
         if(proc == null){
         	proc = new RdiffProcessor("/usr/local/bin/rdiff");
         }
-        Locale currentLocale = new Locale(language, country);        
-		Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
-		Display.setAppVersion("1.0");
-		final Display display = new Display();
-		final Shell shell = new Shell(display, SWT.ALPHA|SWT.NONE);
-		shell.setActive();
 
-		Manager.instanceShell = shell;
-		
-		Logger.getRootLogger().info("Rdiff Processor active? " + (proc.rdiffEnabled()?"Yes" :"No"));
-		Manager.instanciate(currentLocale, daemon);
+        Locale currentLocale = new Locale(language, country);        
+		Shell shell = null;
+		Display display = null;
+		if (!lheadless) {
+			Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
+			Display.setAppVersion("1.0");
+			display = new Display();
+			shell = new Shell(display, SWT.ALPHA | SWT.NONE);
+			shell.setActive();
+
+			Manager.instanceShell = shell;
+		}
+
+		Logger.getRootLogger().info("Rdiff Processor active? " + (proc.rdiffEnabled() ? "Yes" : "No"));
+		Manager.instanciate(currentLocale, daemon, lheadless);
+
+		CoreManager.getInstance().setHeadless(lheadless);
 		CoreManager.getInstance().setRdiffProc(proc);
 		if(deferInit > 0 ){
 			Timer t = new Timer();
 			t.schedule(new ManagerTimerTask(), 1000 * deferInit);
 		}else{
 			CoreManager.getInstance().initScheduler();
-			/*
-			Map<String, String> headers = new HashMap<String, String>();
-			headers.put("Ajxp-User", "admin");
-			headers.put("Ajxp-Password", "admin");
-			AjxpWebSocket awS = new AjxpWebSocket(URI.create("ws://192.168.0.18:8090/ajaxplorer"), headers);
-			Thread t = new Thread(awS);
-			t.start();
-			try {
-				t.join();
-			} catch ( InterruptedException e1 ) {
-				e1.printStackTrace();
-			} finally {
-				awS.close();
-			}			
-			*/
 		}
 		
-
-		if(Manager.instance.firstRun){
-			Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
+		
+		if (!lheadless) {
+			if (Manager.instance.firstRun) {
+				Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
+			}
+			while (!shell.isDisposed()) {
+				if (!display.readAndDispatch())
+					display.sleep();
+			}
+			display.dispose();
 		}
-    	//Manager.defaultHome = null;
-		
-		
-		while (!shell.isDisposed ()) {
-			if (!display.readAndDispatch ()) display.sleep ();
-		}
-		display.dispose ();		
-		
 	}
 		
-	public static void instanciate(Locale locale, boolean daemon){
-		CoreManager.instance = new Manager(locale, daemon);
+	public static void instanciate(Locale locale, boolean daemon, boolean headless) {
+		CoreManager.instance = new Manager(locale, daemon, headless);
 		Manager.instance = (Manager)CoreManager.instance;
 	}
 	
@@ -219,7 +214,7 @@ public class Manager extends CoreManager {
 		this.sysTray.getDisplay().asyncExec(updateSysTrayJobsMenuRunnable);
 	}
 	
-	public Manager(Locale locale, boolean daemon){
+	public Manager(Locale locale, boolean daemon, boolean headless) {
 		super();
 		messages = ResourceBundle.getBundle("strings/MessagesBundle", locale);
 		boolean alreadyExists = false;
@@ -228,8 +223,12 @@ public class Manager extends CoreManager {
 		}catch(SQLException e){
 			Logger.getRootLogger().error("Synchro", e);
 		}
-		sysTray = new SysTray(Manager.instanceShell, messages, this);
-	    try {			
+
+		if (!headless) {
+			sysTray = new SysTray(Manager.instanceShell, messages, this);
+		}
+
+		try {
             scheduler = StdSchedulerFactory.getDefaultScheduler();
             scheduler.start();
         } catch (SchedulerException se) {
