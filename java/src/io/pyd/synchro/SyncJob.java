@@ -276,6 +276,10 @@ public class SyncJob implements InterruptableJob {
 					this.interrupt = true;
 				}
 
+				public void log(String message) {
+					Logger.getRootLogger().info(message);
+				};
+
 				@Override
 				public boolean isInterruptRequired() {
 					return this.interrupt;
