@@ -88,15 +88,6 @@ public class CoreManager {
 	
 	private IProgressMonitor progressMonitor;
 
-	private boolean headless = false;
-
-	public void setHeadless(boolean headless) {
-		this.headless = headless;
-	}
-
-	public boolean isHeadless() {
-		return headless;
-	}
 
 	public IProgressMonitor getProgressMonitor() {
 		if (progressMonitor == null) {
@@ -195,25 +186,7 @@ public class CoreManager {
 			}, 1000*deferInit);
 		}else{
 			CoreManager.getInstance().initScheduler();
-			/*
-			Map<String, String> headers = new HashMap<String, String>();
-			headers.put("Ajxp-User", "admin");
-			headers.put("Ajxp-Password", "admin");
-			AjxpWebSocket awS = new AjxpWebSocket(URI.create("ws://192.168.0.18:8090/ajaxplorer"), headers);
-			Thread t = new Thread(awS);
-			t.start();
-			try {
-				t.join();
-			} catch ( InterruptedException e1 ) {
-				e1.printStackTrace();
-			} finally {
-				awS.close();
-			}			
-			*/
 		}
-		
-
-    	//Manager.defaultHome = null;
 	}
 	
 	public static void stop(String[] args){

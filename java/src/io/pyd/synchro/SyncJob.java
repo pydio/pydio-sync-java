@@ -277,6 +277,11 @@ public class SyncJob implements InterruptableJob {
 				}
 
 				@Override
+				public void log(String message) {
+					Logger.getRootLogger().info(message);
+				};
+
+				@Override
 				public boolean isInterruptRequired() {
 					return this.interrupt;
 				}
@@ -389,6 +394,8 @@ public class SyncJob implements InterruptableJob {
 			restStateHolder.setRepository(currentRepository);
 			// set upload chunk size for 16K
 			restStateHolder.setFileUploadChunkSize(RestStateHolder.FILE_UPLOAD_CHUNK_16K);
+			// 5M for big files
+			restStateHolder.setFileUploadChunkSizeBigFile(RestStateHolder.FILE_UPLOAD_CHUNK_5M);
 
 			AjxpAPI.getInstance().setServer(s);
 			currentLocalFolder = new File(currentRepository.getPropertyValue("target_folder"));

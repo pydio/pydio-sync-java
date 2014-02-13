@@ -121,22 +121,10 @@ public class Manager extends CoreManager {
         }
 
         Locale currentLocale = new Locale(language, country);        
-		Shell shell = null;
-		Display display = null;
-		if (!lheadless) {
-			Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
-			Display.setAppVersion("1.0");
-			display = new Display();
-			shell = new Shell(display, SWT.ALPHA | SWT.NONE);
-			shell.setActive();
-
-			Manager.instanceShell = shell;
-		}
 
 		Logger.getRootLogger().info("Rdiff Processor active? " + (proc.rdiffEnabled() ? "Yes" : "No"));
 		Manager.instanciate(currentLocale, daemon, lheadless);
 
-		CoreManager.getInstance().setHeadless(lheadless);
 		CoreManager.getInstance().setRdiffProc(proc);
 		if(deferInit > 0 ){
 			Timer t = new Timer();
@@ -146,13 +134,23 @@ public class Manager extends CoreManager {
 		}
 		
 		
+		// if we are not in headless mode - run GUI
 		if (!lheadless) {
+			Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
+			Display.setAppVersion("1.0");
+			Display display = new Display();
+			Shell shell = new Shell(display, SWT.ALPHA | SWT.NONE);
+			shell.setActive();
+
+			Manager.instanceShell = shell;
+
 			if (Manager.instance.firstRun) {
 				Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
 			}
 			while (!shell.isDisposed()) {
-				if (!display.readAndDispatch())
+				if (!display.readAndDispatch()) {
 					display.sleep();
+				}
 			}
 			display.dispose();
 		}
@@ -224,6 +222,7 @@ public class Manager extends CoreManager {
 			Logger.getRootLogger().error("Synchro", e);
 		}
 
+		// create systray if not in headless mode
 		if (!headless) {
 			sysTray = new SysTray(Manager.instanceShell, messages, this);
 		}
