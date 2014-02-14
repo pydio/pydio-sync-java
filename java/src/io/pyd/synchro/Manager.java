@@ -122,6 +122,19 @@ public class Manager extends CoreManager {
 
         Locale currentLocale = new Locale(language, country);        
 
+		Display display = null;
+		Shell shell = null;
+		if (!lheadless) {
+			Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
+			Display.setAppVersion("1.0");
+			display = new Display();
+			shell = new Shell(display, SWT.ALPHA | SWT.NONE);
+			shell.setActive();
+
+			Manager.instanceShell = shell;
+
+		}
+
 		Logger.getRootLogger().info("Rdiff Processor active? " + (proc.rdiffEnabled() ? "Yes" : "No"));
 		Manager.instanciate(currentLocale, daemon, lheadless);
 
@@ -136,14 +149,6 @@ public class Manager extends CoreManager {
 		
 		// if we are not in headless mode - run GUI
 		if (!lheadless) {
-			Display.setAppName(ResourceBundle.getBundle("strings/MessagesBundle", currentLocale).getString("shell_title"));
-			Display.setAppVersion("1.0");
-			Display display = new Display();
-			Shell shell = new Shell(display, SWT.ALPHA | SWT.NONE);
-			shell.setActive();
-
-			Manager.instanceShell = shell;
-
 			if (Manager.instance.firstRun) {
 				Manager.instance.sysTray.openConfiguration(shell, null, "connexion");
 			}

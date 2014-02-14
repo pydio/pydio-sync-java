@@ -1881,7 +1881,6 @@ public class SyncJob implements InterruptableJob {
 	}
 
 	protected boolean synchronousUP(Node folderNode, final File sourceFile, Node remoteNode) throws Exception {
-
 		if (getCoreManager().getRdiffProc() != null && getCoreManager().getRdiffProc().rdiffEnabled()) {
 			// RDIFF !
 			File signatureFile = tmpFileName(sourceFile, "sig");
@@ -1941,7 +1940,7 @@ public class SyncJob implements InterruptableJob {
 				}
 				currentPercent = Math.min(Math.max(currentPercent, 0), 100);
 				if (currentPercent > previousPercent) {
-					logChange(getMessage("job_log_uploading"), sourceFile.getName() + " - " + currentPercent + "%");
+					logChange(getMessage("job_log_uploading"), currentPercent + "%" + " - " + sourceFile.getName());
 				}
 				previousPercent = currentPercent;
 			}
@@ -1953,8 +1952,7 @@ public class SyncJob implements InterruptableJob {
 				if (SyncJob.this.interruptRequired) {
 					throw new IOException("Upload interrupted on demand");
 				}
-				Logger.getRootLogger().info("PARTS " + " [" + (part + 1) + "/" + total + "]");
-				logChange(getMessage("job_log_uploading"), sourceFile.getName() + " [" + (part + 1) + "/" + total + "]");
+				logChange(getMessage("job_log_uploading"), "[" + (part + 1) + "/" + total + "] " + sourceFile.getName());
 			}
 		});
 		String targetName = sourceFile.getName();
