@@ -281,11 +281,6 @@ public class SyncJob implements InterruptableJob {
 				};
 
 				@Override
-				public void log(String message) {
-					Logger.getRootLogger().info(message);
-				};
-
-				@Override
 				public boolean isInterruptRequired() {
 					return this.interrupt;
 				}
