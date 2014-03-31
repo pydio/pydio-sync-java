@@ -127,3 +127,8 @@ Install PECL Rsync extension
 
 Add extension=rsync.so in PHP.INI
 Restart Apache
+
+
+## Contributing
+
+Please <a href="http://pyd.io/contribute/cla">sign the Contributor License Agreement</a> before contributing.
