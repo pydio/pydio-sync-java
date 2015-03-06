@@ -1,3 +1,5 @@
+[deprecated, please switch to the python-based client for pydio 6 and later]
+
 # Pydio Java Sync
 
 This application is a Java-based desktop tool that will allow you to seemlessly synchronize the content of a local folder to a remote Pydio repository. See http://pyd.io/ for more info about the core project. You can configure many synchronization tasks between various repositories of various ajaxplorer instances, to be synced to different folders on your computer. 
